@@ -98,6 +98,30 @@ function getUserTarget(node)
 // }
 
 
+// 假设这是你的缓存对象
+let cache = {};
+
+// 用来请求项的详细信息的函数
+async function fetchDataDetails(fileName) {
+  // 检查缓存
+  if (cache[fileName]) {
+    return cache[fileName]; // 直接返回缓存的数据
+  }
+
+  let url = chrome.runtime.getURL(`data/${fileName}.bin`);
+  console.log(url)
+
+  fetch(url)
+  .then(response => response.arrayBuffer())
+  .then(data => {
+      data = pako.inflate(data);
+      data = msgpack.decode(new Uint8Array(data));
+      cache[fileName] = data;
+      return data;
+  })  
+}
+
+
 function updateUserInfo(dataId, callback){
     const pattern = /^(.*_TOP\d*_Delay\d)_(.*)/;
     const match = dataId.match(pattern);
@@ -108,24 +132,55 @@ function updateUserInfo(dataId, callback){
       console.log('No match found');
     }
     
-    let myExtensionId = chrome.runtime.id;
-    fetch(`chrome-extension://${myExtensionId}/data/${fileName}.bin`)
-    .then(response => response.arrayBuffer())
-    .then(data => {
-        data = pako.inflate(data);
-        data = msgpack.decode(new Uint8Array(data));
-        console.log(data)
 
-        itemData = data[dataField];
-        tmp = itemData['yearly_distribution']
-        tmp = tmp.replace(/\(/g, '{').replace(/\)/g, '}');
-        tmp = tmp.replace(/({\d+(\.\d+)?, \d+(\.\d+)?})/g, '"$1"');
-        itemData['yearly_distribution'] = JSON.parse(tmp)
+    fetchDataDetails(fileName).then(data=>{
+        let itemData = data[dataField];
+        try{
+            tmp = itemData['yearly_distribution'];
+            tmp = tmp.replace(/\(/g, '{').replace(/\)/g, '}');
+            tmp = tmp.replace(/({\d+(\.\d+)?, \d+(\.\d+)?})/g, '"$1"');
+            itemData['yearly_distribution'] = JSON.parse(tmp)
+        } catch (error){
+        } finally{
+            callback(itemData);
+        }
         
-        callback(itemData);
     })
-    .catch(error => console.error('Error:', error));
 }
+
+
+
+
+// function updateUserInfo(dataId, callback){
+//     const pattern = /^(.*_TOP\d*_Delay\d)_(.*)/;
+//     const match = dataId.match(pattern);
+//     if (match) {
+//       fileName = match[1]; // 期望输出：news12_USA_TOP3000_Delay1
+//       dataField = match[2]
+//     } else {
+//       console.log('No match found');
+//     }
+    
+//     let url = chrome.runtime.getURL(`data/${fileName}.bin`);
+//     console.log(url)
+
+//     fetch(url)
+//     .then(response => response.arrayBuffer())
+//     .then(data => {
+//         data = pako.inflate(data);
+//         data = msgpack.decode(new Uint8Array(data));
+//         console.log(data)
+
+//         itemData = data[dataField];
+//         tmp = itemData['yearly_distribution']
+//         tmp = tmp.replace(/\(/g, '{').replace(/\)/g, '}');
+//         tmp = tmp.replace(/({\d+(\.\d+)?, \d+(\.\d+)?})/g, '"$1"');
+//         itemData['yearly_distribution'] = JSON.parse(tmp)
+        
+//         callback(itemData);
+//     })
+//     .catch(error => console.error('Error:', error));
+// }
 
 
 

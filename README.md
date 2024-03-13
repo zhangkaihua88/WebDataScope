@@ -11,6 +11,17 @@ WQScope是一个正在为WorldQuant平台打造的Chrome插件。它可以让你
 # 功能
 当在数据页面浏览时，鼠标移至数据行上可以显示相应数据的分析报告（只覆盖了部分数据）
 
+# TODO
+
+
+# 更新日志
+- V0.2.0(20240314)
+  - 适配Edge浏览器
+  - 启用数据缓存策略，提高加载速度
+  - 禁用画图动画效果
+
+- V0.1.0(20240311)
+  - 完成插件主体内容
 
 # Reference
 - [BiliScope](https://github.com/gaogaotiantian/biliscope)

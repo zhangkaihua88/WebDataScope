@@ -225,6 +225,7 @@ UserProfileCard.prototype.updateData = function (data) {
         options: {
             maintainAspectRatio: false,
             responsive: true,
+            animations: false,
             scales: {
                 y: {
                     min: 0, // 设置 Y 轴的最小值
@@ -283,6 +284,7 @@ UserProfileCard.prototype.updateData = function (data) {
             options: {
                 maintainAspectRatio: false,
                 responsive: true,
+                animations: false,
                 scales: {
                     y: {
                         beginAtZero: true
