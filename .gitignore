@@ -1,7 +1,9 @@
 raw_data/*
 node_modules/*
 Reference/*
-package-lock
+package-lock.json
 package.json
 data/*
 img/screenshot.png
+make.bat
+WebDataScope.zip
