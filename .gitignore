@@ -1,0 +1,6 @@
+raw_data/*
+node_modules/*
+Reference/*
+package-lock
+package.json
+data/*
