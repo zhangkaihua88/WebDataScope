@@ -1,5 +1,5 @@
-# WQScope
-WQScope是一个正在为WorldQuant平台打造的Chrome插件。它可以让你在WorldQuant平台上方便的获得其数据分析报告
+# WebDataScope
+WebDataScope是一个正在为WorldQuant平台打造的Chrome/Edge插件。它可以让你在WorldQuant平台上方便的获得其数据分析报告
 <!-- ![](img/screenshot.png) -->
 
 
@@ -12,7 +12,7 @@ WQScope是一个正在为WorldQuant平台打造的Chrome插件。它可以让你
 当在数据页面浏览时，鼠标移至数据行上可以显示相应数据的分析报告（只覆盖了部分数据）
 
 # TODO
-
+- [ ] simulation->Data中的数据展示
 
 # 更新日志
 - V0.2.0(20240314)
