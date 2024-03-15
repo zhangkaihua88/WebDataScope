@@ -1,7 +1,6 @@
 const BILIBILI_SPACE_URL = "https://space.bilibili.com/"
 
-var currentUrl = window.location.href;
-var currentParams = new URLSearchParams(new URL(currentUrl).search);
+
 function isCorrectUrlFormat(url) {
     // 定义匹配的正则表达式
     var regex = /^https:\/\/platform\.worldquantbrain\.com\/data\/data-sets\/[^\/]+\/data-fields\/[^\/]+$/;
@@ -38,23 +37,27 @@ function hasAncestorWithClass(node, className) {
 
 document.addEventListener("mouseover", showProfile);
 document.addEventListener("mousemove", (ev) => userProfileCard.updateCursor(ev.pageX, ev.pageY));
-function getUserId(target)
-{
+
+
+function getUserId(target) {
     let pattern = /\/data-sets\/([^\/]+)\/data-fields\/([^\/]+)/;
     let matches = target.match(pattern);
-
+    // let currentUrl = window.location.href;
+    // let currentParams = new URLSearchParams(new URL(currentUrl).search);
     let data = {};
     data['dataSet'] = matches[1];
     data['dataField'] = matches[2];
-    data['delay'] = currentParams.get('delay');
-    data['region'] = currentParams.get('region');
-    data['universe'] = currentParams.get('universe');
+    // data['delay'] = currentParams.get('delay');
+    // data['region'] = currentParams.get('region');
+    // data['universe'] = currentParams.get('universe');
+    data['delay'] = document.getElementById('data-delay').querySelector('[aria-selected="true"]').firstChild.innerHTML
+    data['region'] = document.getElementById('data-region').querySelector('[aria-selected="true"]').firstChild.innerHTML
+    data['universe'] = document.getElementById('data-universe').querySelector('[aria-selected="true"]').firstChild.innerHTML
     return data;
 }
 
 
-function getUserTarget(node)
-{
+function getUserTarget(node) {
     // console.log(node);
     let className = "rt-tr-group";
 
@@ -81,7 +84,7 @@ function getUserTarget(node)
 //     } else {
 //       console.log('No match found');
 //     }
-    
+
 //     let myExtensionId = chrome.runtime.id;
 //     fetch(`chrome-extension://${myExtensionId}/data/${fileName}.json`)
 //     .then(response => response.json())
@@ -91,7 +94,7 @@ function getUserTarget(node)
 //         tmp = tmp.replace(/\(/g, '{').replace(/\)/g, '}');
 //         tmp = tmp.replace(/({\d+(\.\d+)?, \d+(\.\d+)?})/g, '"$1"');
 //         itemData['yearly_distribution'] = JSON.parse(tmp)
-        
+
 //         callback(itemData);
 //     })
 //     .catch(error => console.error('Error:', error));
@@ -103,48 +106,49 @@ let cache = {};
 
 // 用来请求项的详细信息的函数
 async function fetchDataDetails(fileName) {
-  // 检查缓存
-  if (cache[fileName]) {
-    return cache[fileName]; // 直接返回缓存的数据
-  }
+    // 检查缓存
+    if (cache[fileName]) {
+        return cache[fileName]; // 直接返回缓存的数据
+    }
 
-  let url = chrome.runtime.getURL(`data/${fileName}.bin`);
-  console.log(url)
+    let url = chrome.runtime.getURL(`data/${fileName}.bin`);
+    console.log(url)
 
-  fetch(url)
-  .then(response => response.arrayBuffer())
-  .then(data => {
-      data = pako.inflate(data);
-      data = msgpack.decode(new Uint8Array(data));
-      cache[fileName] = data;
-      return data;
-  })  
+    fetch(url)
+        .then(response => response.arrayBuffer())
+        .then(data => {
+            data = pako.inflate(data);
+            data = msgpack.decode(new Uint8Array(data));
+            cache[fileName] = data;
+            return data;
+        })
 }
 
 
-function updateUserInfo(dataId, callback){
+function updateUserInfo(dataId, callback) {
     const pattern = /^(.*_TOP\d*_Delay\d)_(.*)/;
     const match = dataId.match(pattern);
     if (match) {
-      fileName = match[1]; // 期望输出：news12_USA_TOP3000_Delay1
-      dataField = match[2]
+        fileName = match[1];
+        dataField = match[2];
     } else {
-      console.log('No match found');
+        console.log(dataId)
+        console.log('No match found');
     }
-    
 
-    fetchDataDetails(fileName).then(data=>{
+
+    fetchDataDetails(fileName).then(data => {
         let itemData = data[dataField];
-        try{
+        try {
             tmp = itemData['yearly_distribution'];
             tmp = tmp.replace(/\(/g, '{').replace(/\)/g, '}');
             tmp = tmp.replace(/({\d+(\.\d+)?, \d+(\.\d+)?})/g, '"$1"');
             itemData['yearly_distribution'] = JSON.parse(tmp)
-        } catch (error){
-        } finally{
+        } catch (error) {
+        } finally {
             callback(itemData);
         }
-        
+
     })
 }
 
@@ -160,7 +164,7 @@ function updateUserInfo(dataId, callback){
 //     } else {
 //       console.log('No match found');
 //     }
-    
+
 //     let url = chrome.runtime.getURL(`data/${fileName}.bin`);
 //     console.log(url)
 
@@ -176,7 +180,7 @@ function updateUserInfo(dataId, callback){
 //         tmp = tmp.replace(/\(/g, '{').replace(/\)/g, '}');
 //         tmp = tmp.replace(/({\d+(\.\d+)?, \d+(\.\d+)?})/g, '"$1"');
 //         itemData['yearly_distribution'] = JSON.parse(tmp)
-        
+
 //         callback(itemData);
 //     })
 //     .catch(error => console.error('Error:', error));
@@ -184,27 +188,26 @@ function updateUserInfo(dataId, callback){
 
 
 
-function showProfile(event)
-{
+function showProfile(event) {
     let result = getUserTarget(event.target);
     let target = result[0];
     let url = result[1]
-    
-    
+
+
 
     if (url) {
         let data = getUserId(url);
         let dataId = data.dataSet + "_" + data.region + "_" + data.universe + "_Delay" + data.delay + "_" + data.dataField;
 
 
-        
+
 
         if (userProfileCard.enable(dataId)) {
-            userProfileCard.updateDataId(dataId,data);
+            userProfileCard.updateDataId(dataId, data);
 
             userProfileCard.updateCursor(event.clientX, event.clientY);
             userProfileCard.updateTarget(target);
-            
+
             // userProfileCard.updateData(data);
             updateUserInfo(dataId, (itemData) => userProfileCard.updateData(itemData));
         }

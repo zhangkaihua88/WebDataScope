@@ -57,17 +57,17 @@ function UserProfileCard() {
     this.disable();
     document.body.appendChild(this.el);
 
-    // 创建一个新的script元素
-    var script = document.createElement('script');
-    // 设置script的src属性指向Chart.js的CDN链接
-    script.src = 'https://cdn.jsdelivr.net/npm/chart.js';
-    // 当script加载完成后执行的回调函数
-    script.onload = function () {
-        // Chart.js 已加载，可以在这里使用它了
-        console.log('Chart.js has been loaded successfully!');
-    };
-    // 将script元素添加到文档的head中，开始加载过程
-    document.head.appendChild(script);
+    // // 创建一个新的script元素
+    // var script = document.createElement('script');
+    // // 设置script的src属性指向Chart.js的CDN链接
+    // script.src = 'https://cdn.jsdelivr.net/npm/chart.js';
+    // // 当script加载完成后执行的回调函数
+    // script.onload = function () {
+    //     // Chart.js 已加载，可以在这里使用它了
+    //     console.log('Chart.js has been loaded successfully!');
+    // };
+    // // 将script元素添加到文档的head中，开始加载过程
+    // document.head.appendChild(script);
 
 }
 UserProfileCard.prototype.enable = function (dataId) {
