@@ -123,7 +123,7 @@ function plotData(data, delay) {
                 point: {
                     // 回调函数，用于设置散点的半径
                     radius: function (context) {
-                        var value = context.dataset.data[context.dataIndex].value;
+                        var value = context.dataset.data[context.dataIndex].value/data.count*100;
                         return Math.sqrt(value) * 2; // 根据值的大小设置半径
                     }
                 }
