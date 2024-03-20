@@ -17,7 +17,7 @@ WebDataScope是一个正在为WorldQuant平台打造的Chrome/Edge插件。它�
 # 更新日志
 - V
   - 更新`region`,`delay`和`universe`的获取逻辑，避免获取失败
-  - 添加`alpha`->`distribution`的分析图
+  - 添加`alpha`->`distribution`的分析图, 添加红色提示以及灰色不可用提示
 
 - V0.2.0(20240314)
   - 适配Edge浏览器
