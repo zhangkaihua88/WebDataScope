@@ -4,6 +4,7 @@ Reference/*
 package-lock.json
 package.json
 data/*
+figure/*
 img/screenshot.png
 make.bat
 WebDataScope.zip
