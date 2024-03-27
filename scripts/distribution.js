@@ -200,11 +200,12 @@ function plotData(data, delay) {
                     label: `Delay${delay}`,
                     backgroundColor: function (context) {
                         // 如果已指定特定点的背景颜色，则使用它，否则使用默认颜色
-                        if (context.raw.value > 30 && context.raw.value / context.raw.total > 0.3) {
-                            return 'rgba(226, 49, 32, 1)'
-                        } else {
-                            return 'rgba(75, 192, 192, 1)';
-                        }
+                        // if (context.raw.value > 30 && context.raw.value / context.raw.total > 0.3) {
+                        //     return 'rgba(226, 49, 32, 1)'
+                        // } else {
+                        //     return 'rgba(75, 192, 192, 1)';
+                        // }
+                        return 'rgba(75, 192, 192, 1)';
 
                     },
                     data: scatterData1
