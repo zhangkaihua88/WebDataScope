@@ -15,7 +15,8 @@ WebDataScope是一个正在为WorldQuant平台打造的Chrome/Edge插件。它�
 ![图片详见网盘](figure/distribution.png)
 
 # TODO
-- [x] simulation->Data中的数据展示
+- [x] simulation->Data中的数据展示-
+- [ ] 重构监听鼠标逻辑, 降低浏览器负担
 
 # 更新日志
 - V
