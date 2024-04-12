@@ -157,7 +157,10 @@ waitForElement(".card__wrapper").then(() => {
         method: 'GET', // 或者是 'POST', 'PUT', 等。
         credentials: 'include' // 确保包含同源cookie
     }).then(
-        response => response.json()
+        response => {
+            return response.json()
+
+        }
     ).then(data => {
         console.log(data)
         plotData(data, 0);
@@ -169,14 +172,19 @@ waitForElement(".card__wrapper").then(() => {
 
 
 function plotData(data, delay) {
+    console.log('data.alphas');
+    console.log(data.alphas);
     let filteredData1 = data.alphas.filter(item => regions.includes(item.region) && dataSets.hasOwnProperty(item.dataCategory.id) && item.delay == delay);
+    console.log('filteredData1');
+    console.log(filteredData1);
     let scatterData1 = filteredData1.map(item => ({
         x: item.region,
         y: dataSets[item.dataCategory.id],
         value: item.alphaCount,
+        pass: item.dataDiversity.check,
         total: data.alphas.filter(item_alpha => item_alpha.region == item.region && item_alpha.delay == delay).map(item_count => item_count.alphaCount).reduce((max, current) => Math.max(max, current), 0)
     }));
-    console.log(scatterData1);
+
     var non_data_copy
 
     if (delay==0){
@@ -184,6 +192,7 @@ function plotData(data, delay) {
     }else{
         non_data_copy = non_data;
     }
+    console.log('non_data_copy')
     console.log(non_data_copy)
     non_data_copy = non_data_copy.map(item => ({
         x: item.x,
@@ -199,13 +208,19 @@ function plotData(data, delay) {
                 {
                     label: `Delay${delay}`,
                     backgroundColor: function (context) {
+                        console.log(context.raw)
                         // 如果已指定特定点的背景颜色，则使用它，否则使用默认颜色
-                        // if (context.raw.value > 30 && context.raw.value / context.raw.total > 0.3) {
-                        //     return 'rgba(226, 49, 32, 1)'
-                        // } else {
-                        //     return 'rgba(75, 192, 192, 1)';
-                        // }
-                        return 'rgba(75, 192, 192, 1)';
+                        try{
+                            if (context.raw.pass != "PASS") {
+                                return 'rgba(226, 49, 32, 1)'
+                            } else {
+                                return 'rgba(75, 192, 192, 1)';
+                            }
+                        }catch (error) {
+                            return 'rgba(75, 192, 192, 1)'
+                        }
+                        
+                        // ;
 
                     },
                     data: scatterData1
@@ -236,7 +251,14 @@ function plotData(data, delay) {
                 point: {
                     // 回调函数，用于设置散点的半径
                     radius: function (context) {
-                        var value = context.dataset.data[context.dataIndex].value / data.count * 100;
+                        try{
+                            var value = context.dataset.data[context.dataIndex].value / data.count * 100;
+                        }catch (error) {
+                            // 当发生异常时执行的代码
+                            console.error(error);
+                            console.error(context.dataset);
+                            var value=0
+                        }                          
                         return Math.sqrt(value) * 2; // 根据值的大小设置半径
                     }
                 }

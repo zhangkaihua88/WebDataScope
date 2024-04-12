@@ -19,7 +19,7 @@ WebDataScope是一个正在为WorldQuant平台打造的Chrome/Edge插件。它�
 
 # 更新日志
 - V
-  - 删除`alpha->distribution`的分析图中的红色提示
+  - 修改`alpha->distribution`的分析图无法显示的bug 
 
 - V0.3.0(20240321)
   - 支持`simulation->Data`中的数据展示
