@@ -20,34 +20,35 @@ var dataSets = {
     "risk": "Risk data",
     "model": "Model data",
 };
-var regions = ['USA', 'ASI', 'CHN', 'EUR', 'GLB', 'HKG', 'KOR', 'TWN'];
+var regions = ['USA', 'ASI', 'CHN', 'EUR', 'GLB', 'HKG', 'KOR', 'TWN', 'AMR'];
 var url = "https://api.worldquantbrain.com/users/self/activities/diversity?grouping=region,delay,dataCategory"
 
 var non_data = [
-    { 'x': 'GLB', 'y': 'Insiders' },
-    { 'x': 'CHN', 'y': 'Insiders' },
-    { 'x': 'TWN', 'y': 'Insiders' },
-    { 'x': 'HKG', 'y': 'Instiutional Ownership Data' },
-    { 'x': 'GLB', 'y': 'Instiutional Ownership Data' },
-    { 'x': 'KOR', 'y': 'Instiutional Ownership Data' },
-    { 'x': 'TWN', 'y': 'Instiutional Ownership Data' },
-    { 'x': 'ASI', 'y': 'Instiutional Ownership Data' },
-    { 'x': 'CHN', 'y': 'Instiutional Ownership Data' },
-    { 'x': 'CHN', 'y': 'Macro data' },
-    { 'x': 'HKG', 'y': 'Option data' },
-    { 'x': 'KOR', 'y': 'Option data' },
-    { 'x': 'TWN', 'y': 'Option data' },
-    { 'x': 'ASI', 'y': 'Option data' },
-    { 'x': 'CHN', 'y': 'Option data' },
-    { 'x': 'CHN', 'y': 'Risk data' },
-    { 'x': 'HKG', 'y': 'Sentiment data' },
-    { 'x': 'GLB', 'y': 'Sentiment data' },
-    { 'x': 'KOR', 'y': 'Sentiment data' },
-    { 'x': 'TWN', 'y': 'Sentiment data' },
-    { 'x': 'ASI', 'y': 'Sentiment data' },
-    { 'x': 'CHN', 'y': 'Sentiment data' },
-    { 'x': 'KOR', 'y': 'Social media data' },
-    { 'x': 'TWN', 'y': 'Social media data' }
+    {'x': 'TWN', 'y': 'Insiders'},
+    {'x': 'CHN', 'y': 'Insiders'},
+    {'x': 'GLB', 'y': 'Insiders'},
+    {'x': 'TWN', 'y': 'Instiutional Ownership Data'},
+    {'x': 'CHN', 'y': 'Instiutional Ownership Data'},
+    {'x': 'HKG', 'y': 'Instiutional Ownership Data'},
+    {'x': 'ASI', 'y': 'Instiutional Ownership Data'},
+    {'x': 'GLB', 'y': 'Instiutional Ownership Data'},
+    {'x': 'KOR', 'y': 'Instiutional Ownership Data'},
+    {'x': 'CHN', 'y': 'Macro data'},
+    {'x': 'TWN', 'y': 'Option data'},
+    {'x': 'CHN', 'y': 'Option data'},
+    {'x': 'HKG', 'y': 'Option data'},
+    {'x': 'ASI', 'y': 'Option data'},
+    {'x': 'KOR', 'y': 'Option data'},
+    {'x': 'CHN', 'y': 'Risk data'},
+    {'x': 'AMR', 'y': 'Sentiment data'},
+    {'x': 'TWN', 'y': 'Sentiment data'},
+    {'x': 'CHN', 'y': 'Sentiment data'},
+    {'x': 'HKG', 'y': 'Sentiment data'},
+    {'x': 'ASI', 'y': 'Sentiment data'},
+    {'x': 'GLB', 'y': 'Sentiment data'},
+    {'x': 'KOR', 'y': 'Sentiment data'},
+    {'x': 'TWN', 'y': 'Social media data'},
+    {'x': 'KOR', 'y': 'Social media data'}
 ]
 
 var non_data_delay0 = [
