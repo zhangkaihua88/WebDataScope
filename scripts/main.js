@@ -122,6 +122,26 @@ async function fetchDataDetails(fileName) {
             cache[fileName] = data;
             return data;
         })
+    
+        chrome.runtime.getPackageDirectoryEntry(function(root) {
+            // 获取 "data" 文件夹的 DirectoryEntry 对象
+            root.getDirectory('data', {}, function(dataDir) {
+                // 获取文件夹中的所有文件
+                var dirReader = dataDir.createReader();
+                dirReader.readEntries(function(entries) {
+                    // 遍历文件夹中的每个文件
+                    entries.forEach(function(entry) {
+                        // 确保 entry 是一个文件
+                        if (entry.isFile) {
+                            // 获取文件名
+                            var fileName = entry.name;
+                            console.log(fileName);
+                        }
+                    });
+                });
+            });
+        });
+        
 }
 
 

@@ -1,14 +1,15 @@
 {
     "manifest_version": 3,
     "name": "WorldQuant Scope",
-    "version": "0.3.0",
+    "version": "0.4.0",
     "description": "可以显示数据分析特征",
     "author": "zhangkaihua@buaa.edu.cn",
     "icons": {
         "128": "img/logo.png"
     },
     "background": {
-        "service_worker": "scripts/background.js"
+        "service_worker": "scripts/background.js",
+        "type": "module"
     },
     "content_scripts": [
         {
@@ -30,10 +31,11 @@
     "web_accessible_resources": [
         {
             "resources": [
-                "data/*.bin"
+                "data/*.bin",
+                "data/*.json"
             ],
             "matches": [
-                "https://platform.worldquantbrain.com/*"
+                "*://platform.worldquantbrain.com/*"
             ]
         }
     ],
