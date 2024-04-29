@@ -5,7 +5,7 @@ fetch(dataSetListUrl)
 
         chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
             if (changeInfo.status === 'complete' && tab.url.startsWith("https://platform.worldquantbrain.com/data/data-sets")) {
-
+                // console.log(tab.url);
                 try {
                     chrome.scripting.executeScript({
                         target: { tabId: tabId },
@@ -14,11 +14,11 @@ fetch(dataSetListUrl)
                     }, () => {
                         chrome.scripting.executeScript({
                             target: { tabId },
-                            args: [dataSetList],
+                            args: [dataSetList, tab.url],
                             func: (...args) => dataFlagFunc(...args),
                         });
                     });
-                    console.log(tab.url);
+                    
                 }
                 catch (error) {
                     console.error('Script injection failed: ', error);

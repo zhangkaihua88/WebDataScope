@@ -1,52 +1,49 @@
+// function waitForElement(selector, nonselector, timeout = 30000) {
+//     return new Promise((resolve, reject) => {
+//         const observer = new MutationObserver((mutations, me) => {
+//             if (document.querySelector(selector) && !document.querySelector(nonselector)) {
+//                 resolve(document.querySelector(selector));
+//                 me.disconnect(); // stop observing
+//                 return;
+//             }
+//         });
 
-function waitForNonElement(selector, timeout = 30000) {
+//         observer.observe(document.body, {
+//             childList: true,
+//             subtree: true
+//         });
+
+//         setTimeout(() => {
+//             reject(new Error("Timeout waiting for element"));
+//             observer.disconnect();
+//         }, timeout);
+//     });
+// }
+function waitForElement(selector, nonselector) {
     return new Promise((resolve, reject) => {
-        const observer = new MutationObserver((mutations, me) => {
-            if (!document.querySelector(selector)) {
-                resolve(document.querySelector(selector));
-                me.disconnect(); // stop observing
-                return;
+        const interval = setInterval(() => {
+            const element = document.querySelector(selector);
+            const nonElement = document.querySelector(nonselector);
+            if (element && !nonElement) {
+                clearInterval(interval);
+                resolve(element);
             }
-        });
+        }, 100); // 每100毫秒检查一次
 
-        observer.observe(document.body, {
-            childList: true,
-            subtree: true
-        });
-
-        setTimeout(() => {
-            reject(new Error("Timeout waiting for non-element"));
-            observer.disconnect();
-        }, timeout);
+        // 设置一个超时时间防止无限等待
+        const timeout = setTimeout(() => {
+            clearInterval(interval);
+            reject(new Error('元素查找超时或非期望元素存在'));
+        }, 30000); // 5秒后超时
     });
 }
 
-
-function waitForElement(selector, timeout = 30000) {
-    return new Promise((resolve, reject) => {
-        const observer = new MutationObserver((mutations, me) => {
-            if (document.querySelector(selector)) {
-                resolve(document.querySelector(selector));
-                me.disconnect(); // stop observing
-                return;
-            }
-        });
-
-        observer.observe(document.body, {
-            childList: true,
-            subtree: true
-        });
-
-        setTimeout(() => {
-            reject(new Error("Timeout waiting for element"));
-            observer.disconnect();
-        }, timeout);
-    });
-}
-function dataFlagFunc(dataSetList){
+function dataFlagFunc(dataSetList, url){
     console.log(dataSetList)
-    waitForElement(".data-table__container").then(() => {
-        // console.log('123')
+    console.log(url)
+    // console.log(document.querySelector(".data-table__container"))
+    waitForElement(".data-table__container", ".data-table__stale-loader-container").then(() => {
+        console.log(`${url}完成加载`)
         // console.log("beg");
         let delay = document.getElementById('data-delay').querySelector('[aria-selected="true"]').firstChild.innerHTML
         let region = document.getElementById('data-region').querySelector('[aria-selected="true"]').firstChild.innerHTML
@@ -70,6 +67,7 @@ function dataFlagFunc(dataSetList){
             
         });
 
-
+        // waitForNonElement(".data-table__stale-loader-container").then(() => {
+        // })
     })
 }
