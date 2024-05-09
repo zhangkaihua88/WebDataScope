@@ -20,6 +20,10 @@ WebDataScope是一个正在为WorldQuant平台打造的Chrome/Edge插件。它�
 - [x] simulation->Data中的数据展示
 - [ ] 重构监听鼠标逻辑, 降低浏览器负担
 
+# 有data没有执行第7步，所以没处理
+- `other395_ASI_MINVOL1M_Delay1`
+- `pv13_USA_TOP3000_Delay1`
+
 # 更新日志
 - V0.4.0(20240429)
   - 修改`alpha->distribution`的分析图由于没有数据导致无法显示的bug 
