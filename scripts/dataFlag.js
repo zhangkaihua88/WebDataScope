@@ -38,7 +38,7 @@ function waitForElement(selector, nonselector) {
     });
 }
 
-function dataFlagFunc(dataSetList, url){
+function dataFlagFunc(dataSetList, url) {
     console.log(dataSetList)
     console.log(url)
     // console.log(document.querySelector(".data-table__container"))
@@ -53,18 +53,25 @@ function dataFlagFunc(dataSetList, url){
 
         // 循环遍历这些元素
         elements.forEach(function (element) {
-            // 在这里执行你想要的操作，比如打印元素内容
-            let a_element = element.querySelector(".link.link--wrap")
-            let parts = a_element.href.split("/");
+            try {
+                let a_element = element.querySelector(".link.link--wrap");
+                console.log(a_element)
+                let parts = a_element.href.split("/");
 
-            let lastPart = parts[parts.length - 1];
-            let name = `${lastPart}_${region}_${universe}_Delay${delay}`;
-            // console.log(dataSetList);
-            // console.log(name);
-            if (dataSetList.includes(name)){
-                a_element.innerHTML = `<span style="color: red;">★★★</span>${a_element.innerHTML}`
+                let lastPart = parts[parts.length - 1];
+                let name = `${lastPart}_${region}_${universe}_Delay${delay}`;
+                // console.log(dataSetList);
+                console.log(name);
+                if (dataSetList.includes(name)) {
+                    a_element.innerHTML = `<span style="color: red;">★★★</span>${a_element.innerHTML}`
+                }
+            } catch (error) {
+                // 处理错误
+                console.error('捕获到错误:', error);
             }
-            
+            // 在这里执行你想要的操作，比如打印元素内容
+
+
         });
 
         // waitForNonElement(".data-table__stale-loader-container").then(() => {
