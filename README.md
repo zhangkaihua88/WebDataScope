@@ -24,6 +24,7 @@ WebDataScope是一个正在为WorldQuant平台打造的Chrome/Edge插件。它�
 # 更新日志
 - V0.4.2(20240618)
   - fix: search时显示报告的逻辑
+  - add: JPN and AMR in `alpha->distribution`
 - V0.4.1(20240609)
   - fix: 添加已有数据报告的表示
 - V0.4.0(20240429)
