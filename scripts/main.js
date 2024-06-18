@@ -59,7 +59,8 @@ function getUserId(target) {
 
 function getUserTarget(node) {
     // console.log(node);
-    let className = "rt-tr-group";
+    // let className = "rt-tr-group";
+    let className = "rt-tr"
 
     while (node !== null && node.parentNode) {
         node = node.parentNode;
