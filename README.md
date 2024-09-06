@@ -19,9 +19,14 @@ WebDataScope是一个正在为WorldQuant平台打造的Chrome/Edge插件。它�
 - [ ] 重构监听鼠标逻辑, 降低浏览器负担
 
 # 没处理
-
+- 没跑完
+  - `analyst39_GLB_TOP3000_Delay1`
+  - `analyst46_GLB_TOP3000_Delay1`
 
 # 更新日志
+- V0.4.3(20240906)
+  - fix: 报告无法展示
+  - add: 使用五角星表示其他其他universe有的数据
 - V0.4.2(20240618)
   - fix: search时显示报告的逻辑
   - add: JPN and AMR in `alpha->distribution`
@@ -50,4 +55,5 @@ WebDataScope是一个正在为WorldQuant平台打造的Chrome/Edge插件。它�
 
 
 # 致谢
+- 感谢`MC63847`为V0.4.3做的修正
 - 感谢群里同学们提供的分析数据
