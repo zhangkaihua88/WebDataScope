@@ -52,3 +52,10 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
         }
     }
 });
+
+
+chrome.action.onClicked.addListener(() => {
+    const extensionUrl = chrome.runtime.getURL("html/WQScope.html");
+    chrome.tabs.create({ url: extensionUrl });
+  });
+  

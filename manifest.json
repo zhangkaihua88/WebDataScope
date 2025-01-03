@@ -1,11 +1,19 @@
 {
     "manifest_version": 3,
     "name": "WorldQuant Scope",
-    "version": "0.4.3",
+    "version": "0.5.1",
     "description": "可以显示数据分析特征",
     "author": "zhangkaihua@buaa.edu.cn",
     "icons": {
         "128": "img/logo.png"
+    },
+    "action": {
+        "default_popup": "html/popup.html",
+        "default_icon": {
+            "16": "img/logo.png",
+            "48": "img/logo.png",
+            "128": "img/logo.png"
+        }
     },
     "background": {
         "service_worker": "scripts/background.js",
@@ -26,7 +34,11 @@
             "css": [
                 "css/idcard.css"
             ]
-        }
+        },
+        {
+            "matches": ["*://support.worldquantbrain.com/hc/en-us/search*"],
+            "js": ["scripts/search.js"]
+          }
     ],
     "web_accessible_resources": [
         {
@@ -40,11 +52,15 @@
         }
     ],
     "host_permissions": [
-        "https://*/*"
+        "https://*/*",
+        "chrome-extension://*/*"
     ],
     "permissions": [
         "scripting",
         "cookies",
-        "tabs"
+        "tabs",
+        "storage",
+        "activeTab"
       ]
+      
 }

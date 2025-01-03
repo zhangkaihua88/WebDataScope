@@ -13,6 +13,7 @@ WebDataScope是一个正在为WorldQuant平台打造的Chrome/Edge插件。它�
 ![图片详见网盘](figure/dataFlag.png)
 - 在`alpha`->`distribution`添加分析图(region-category), 其中灰色的点为WQ平台不支持的点, 红色点为alpha个数大于30同时占比大于30%的点
 ![图片详见网盘](figure/distribution.png)
+- 支持论坛中文搜索
 
 # TODO
 - [x] simulation->Data中的数据展示
@@ -24,6 +25,8 @@ WebDataScope是一个正在为WorldQuant平台打造的Chrome/Edge插件。它�
   - `analyst46_GLB_TOP3000_Delay1`
 
 # 更新日志
+- V0.5.1(20250103)
+  - add: 论坛中文搜索支持
 - V0.4.3(20240906)
   - fix: 报告无法展示
   - add: 使用五角星表示其他其他universe有的数据

@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+  <title>WorldQuant Scope Config</title>
+  <style>
+    body {
+        font-family: Arial, sans-serif;
+        padding: 20px;
+        margin: 0;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        background-color: #f4f4f9;
+        width: 400px; /* 设置宽度 */
+        height: 250px; /* 设置高度 */
+    }
+    .container {
+        width: 100%;
+        max-width: 100%;
+        background: #fff;
+        border-radius: 10px;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        padding: 20px;
+        text-align: center;
+    }
+    h3 {
+        color: #333;
+        margin-bottom: 20px;
+    }
+    input, button {
+      width: 80%;
+      margin: 10px 0;
+      padding: 12px;
+      font-size: 16px;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+    }
+    input:focus {
+        border-color: #007BFF;
+        outline: none;
+        box-shadow: 0 0 5px rgba(0, 123, 255, 0.5);
+    }
+    button {
+        background-color: #007BFF;
+        color: white;
+        cursor: pointer;
+        border: none;
+    }
+    button:hover {
+        background-color: #0056b3;
+    }
+    #status {
+        margin-top: 15px;
+        font-size: 14px;
+        color: green;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h3>中文搜索API地址</h3>
+    <input id="dbAddress" type="text" placeholder="Enter api address" />
+    <button id="saveBtn">Save</button>
+    <p id="status"></p>
+  </div>
+  <script src="popup.js"></script>
+</body>
+</html>
