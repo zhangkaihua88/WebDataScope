@@ -1,43 +1,52 @@
 <!DOCTYPE html>
 <html>
+
 <head>
-  <title>Database Tools</title>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      padding: 10px;
-      max-width: 300px;
-    }
-    input, button {
-      width: 100%;
-      margin: 5px 0;
-      padding: 10px;
-    }
-    .section {
-      margin-bottom: 20px;
-    }
-  </style>
+    <title>Database Tools</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 10px;
+            max-width: 300px;
+        }
+
+        input,
+        button {
+            width: 100%;
+            margin: 5px 0;
+            padding: 10px;
+        }
+
+        .section {
+            margin-bottom: 20px;
+        }
+    </style>
 </head>
+
 <body>
-  <h2>Database Tools</h2>
+    <h2>Database Tools</h2>
 
-  <!-- Database Configuration Section -->
-  <div class="section" id="configSection">
-    <h3>Database Configuration</h3>
-    <input id="dbAddress" type="text" placeholder="Enter database address" />
-    <button id="saveBtn">Save</button>
-    <p id="status" style="color: green;"></p>
-  </div>
+    <!-- Database Configuration Section -->
+    <div class="section" id="configSection">
+        <h3>Database Configuration</h3>
+        <input id="dbAddress" type="text" placeholder="Enter database address" />
+        <button id="saveBtn">Save</button>
+        <p id="status" style="color: green;"></p>
+    </div>
 
-  <!-- Search Database Section -->
-  <div class="section" id="searchSection">
-    <h3>Search Database</h3>
-    <input id="searchInput" type="text" placeholder="Enter search query" />
-    <button id="searchBtn">Search</button>
-    <div id="results"></div>
-  </div>
+    <!-- Search Database Section -->
+    <div class="section" id="searchSection">
+        <h3>Search Database</h3>
+        <input id="searchInput" type="text" placeholder="Enter search query" />
+        <button id="searchBtn">Search</button>
+        <div id="results"></div>
+    </div>
 
-  <script src="/scripts/popup/popup.js"></script>
-  <script src="search.js"></script>
+    <script src="/scripts/popup/popup.js"></script>
+    <script src="search.js"></script>
 </body>
+
 </html>
+
+
+

@@ -46,7 +46,7 @@ if (queryValue) {
         button.innerText = '加载中...';
         button.disabled = true; // 禁用按钮，防止多次点击
         // 获取存储的 API 地址
-        chrome.storage.sync.get(['apiAddress'], function (result) {
+        chrome.storage.local.get(['apiAddress'], function (result) {
             const apiAddress = result.apiAddress;
             if (apiAddress) {
                 // 拼接请求 URL
@@ -96,8 +96,6 @@ if (queryValue) {
 
 
                             ulElement.innerHTML += listItemHTML;
-
-
                         }
                         const pElement = document.createElement('p'); // 空段落
                         pElement.style.marginTop = '200px';  // 上间距

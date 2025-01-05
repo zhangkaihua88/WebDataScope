@@ -18,7 +18,7 @@ function loadApiAddress() {
 function saveApiAddress() {
   const apiAddress = dbAddressInput.value.trim();
   if (apiAddress) {
-    chrome.storage.sync.set({ apiAddress }, () => {
+    chrome.storage.local.set({ apiAddress }, () => {
       statusText.textContent = '地址已保存！';
       setTimeout(() => {
         statusText.textContent = '';
