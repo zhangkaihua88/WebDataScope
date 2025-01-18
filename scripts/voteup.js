@@ -52,7 +52,6 @@ async function _upVotePost() {
     return data;
 }
 
-
 async function fetchCsrfToken() {
     // Fetch CSRF token
     try {
@@ -75,9 +74,6 @@ async function fetchCsrfToken() {
         console.error("Fetch error:", error);
     }
 }
-
-
-
 
 // 菜单 menu
 function createStartMenu() {
@@ -103,8 +99,6 @@ function createStartMenu() {
     //插入节点
     body.append(startButton)
 }
-
-
 
 async function upVoteSinglePost() {
     await fetchCsrfToken();
@@ -177,8 +171,6 @@ async function upVoteSinglePostComment(document) {
     }
     console.log(upCount);  // 打印“up”状态的评论数量
 }
-
-
 
 // Use MutationObserver to watch for DOM changes
 function voteUpMain() {
