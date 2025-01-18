@@ -1,7 +1,7 @@
 {
     "manifest_version": 3,
     "name": "WorldQuant Scope",
-    "version": "0.6.1",
+    "version": "0.7.1",
     "description": "可以显示数据分析特征",
     "author": "zhangkaihua@buaa.edu.cn",
     "icons": {
