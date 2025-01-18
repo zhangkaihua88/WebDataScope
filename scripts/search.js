@@ -46,11 +46,11 @@ if (queryValue) {
         button.innerText = '加载中...';
         button.disabled = true; // 禁用按钮，防止多次点击
         // 获取存储的 API 地址
-        chrome.storage.local.get(['apiAddress'], function (result) {
-            const apiAddress = result.apiAddress;
-            if (apiAddress) {
+        chrome.storage.local.get(['WQPApiAddress'], function (result) {
+            const WQPApiAddress = result.WQPApiAddress;
+            if (WQPApiAddress) {
                 // 拼接请求 URL
-                const url = `${apiAddress}/search?q=${queryValue}`;
+                const url = `${WQPApiAddress}/search?q=${queryValue}`;
 
                 // 发出请求
                 fetch(url)

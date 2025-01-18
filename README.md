@@ -16,14 +16,19 @@ WebDataScope是一个正在为WorldQuant平台打造的Chrome/Edge插件。它�
 - 支持论坛中文搜索
 - 支持Genius运算符使用分析
 
+# 存储的变量
+- `WQPApiAddress`: 中文搜索的api地址
+- `WQPHiddenFeatureEnabled`: 隐藏功能是否启用
+- `WQPOPSAna`: Genius运算符使用分析结果
+
 # TODO
 - [x] simulation->Data中的数据展示
 - [ ] 重构监听鼠标逻辑, 降低浏览器负担
 
 # 没处理
 - 没跑完
-  - `analyst39_GLB_TOP3000_Delay1`
-  - `analyst46_GLB_TOP3000_Delay1`
+  <!-- - `analyst39_GLB_TOP3000_Delay1`
+  - `analyst46_GLB_TOP3000_Delay1` -->
 
 # 更新日志
 - V0.6.1(20250105)

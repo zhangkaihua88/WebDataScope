@@ -1,0 +1,105 @@
+.egg_study_btn {
+    outline: 0;
+    border: 0;
+    z-index: 9999;
+    position: fixed;
+    top: 5px;
+    left: 5px;
+    padding: 12px 20px;
+    border-radius: 10px;
+    cursor: pointer;
+    background-color: #fff;
+    color: #006998;
+    font-size: 18px;
+    font-weight: bold;
+    text-align: center;
+    box-shadow: 0 0 9px #666777
+}
+
+.egg_manual_btn {
+    transition: 0.5s;
+    outline: none;
+    border: none;
+    padding: 12px 20px;
+    border-radius: 10px;
+    cursor: pointer;
+    background-color: #00affe;
+    color: rgb(255, 255, 255);
+    font-size: 18px;
+    font-weight: bold;
+    text-align: center;
+}
+
+.egg_auto_btn {
+    transition: 0.5s;
+    outline: none;
+    border: none;
+    padding: 12px 20px;
+    border-radius: 10px;
+    cursor: pointer;
+    background-color: #666777;
+    color: rgb(255, 255, 255);
+    font-size: 18px;
+    font-weight: bold;
+    text-align: center;
+}
+
+.egg_setting_box {
+    position: fixed;
+    top: 70px;
+    left: 5px;
+    padding: 12px 20px;
+    border-radius: 10px;
+    background-color: #fff;
+    box-shadow: 0 0 9px #666777
+}
+
+.egg_setting_item {
+    margin-top: 5px;
+    height: 30px;
+    width: 140px;
+    font-size: 16px;
+    display: flex;
+    justify-items: center;
+    justify-content: space-between
+}
+
+input[type='checkbox'].egg_setting_switch {
+    cursor: pointer;
+    margin: 0;
+    outline: 0;
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    position: relative;
+    width: 40px;
+    height: 22px;
+    background: #ccc;
+    border-radius: 50px;
+    transition: border-color .3s, background-color .3s
+}
+
+input[type='checkbox'].egg_setting_switch::after {
+    content: '';
+    display: inline-block;
+    width: 1rem;
+    height: 1rem;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0, 0, 2px, #999;
+    transition: .4s;
+    top: 3px;
+    position: absolute;
+    left: 3px
+}
+
+input[type='checkbox'].egg_setting_switch:checked {
+    background: #00affe
+}
+
+input[type='checkbox'].egg_setting_switch:checked::after {
+    content: '';
+    position: absolute;
+    left: 55%;
+    top: 3px
+}

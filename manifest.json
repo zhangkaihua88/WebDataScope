@@ -45,6 +45,18 @@
         },
         {
             "matches": [
+                "*://support.worldquantbrain.com/hc/en-us/community/*"
+            ],
+            "js": [
+                "scripts/voteup.js"
+            ],
+            "css": [
+                "css/menu.css"
+            ]
+
+        },
+        {
+            "matches": [
                 "*://platform.worldquantbrain.com/genius/*"
             ],
             "js": [

@@ -2,38 +2,43 @@
 
 // 获取 HTML 元素
 const dbAddressInput = document.getElementById('dbAddress');
+const hiddenFeatureCheckbox = document.getElementById('hiddenFeature');
 const saveBtn = document.getElementById('saveBtn');
 const statusText = document.getElementById('status');
 
-// 加载已保存的 API 地址
-function loadApiAddress() {
-  chrome.storage.sync.get(['apiAddress'], (result) => {
-    if (result.apiAddress) {
-      dbAddressInput.value = result.apiAddress; // 将值显示在输入框中
-    }
-  });
+function loadSettings() {
+    chrome.storage.local.get(['WQPApiAddress', 'WQPHiddenFeatureEnabled'], (result) => {
+        console.log(result);
+        if (result.WQPApiAddress) {
+            dbAddressInput.value = result.WQPApiAddress;
+        }
+        hiddenFeatureCheckbox.checked = result.WQPHiddenFeatureEnabled || false;
+    });
 }
 
-// 保存 API 地址
-function saveApiAddress() {
-  const apiAddress = dbAddressInput.value.trim();
-  if (apiAddress) {
-    chrome.storage.local.set({ apiAddress }, () => {
-      statusText.textContent = '地址已保存！';
-      setTimeout(() => {
-        statusText.textContent = '';
-      }, 2000);
-    });
-  } else {
-    statusText.textContent = '请输入有效的地址！';
-    setTimeout(() => {
-      statusText.textContent = '';
-    }, 2000);
-  }
+function saveSettings() {
+    const WQPApiAddress = dbAddressInput.value.trim();
+    const WQPHiddenFeatureEnabled = hiddenFeatureCheckbox.checked;
+    console.log(WQPApiAddress, WQPHiddenFeatureEnabled);
+
+    if (WQPApiAddress) {
+        chrome.storage.local.set({ WQPApiAddress, WQPHiddenFeatureEnabled }, () => {
+            statusText.textContent = '设置已保存！';
+            setTimeout(() => {
+                statusText.textContent = '';
+            }, 2000);
+        });
+    } else {
+        statusText.textContent = '请输入有效的地址！';
+        setTimeout(() => {
+            statusText.textContent = '';
+        }, 2000);
+    }
 }
+
 
 // 事件绑定
-saveBtn.addEventListener('click', saveApiAddress);
+saveBtn.addEventListener('click', saveSettings);
 
 // 页面加载时初始化
-loadApiAddress();
+loadSettings();

@@ -1,69 +1,110 @@
 <!DOCTYPE html>
-<html>
+<html lang="zh-CN">
+
 <head>
     <meta charset="UTF-8">
-  <title>WorldQuant Scope Config</title>
-  <style>
-    body {
-        font-family: Arial, sans-serif;
-        padding: 20px;
-        margin: 0;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        background-color: #f4f4f9;
-        width: 400px; /* 设置宽度 */
-        height: 250px; /* 设置高度 */
-    }
-    .container {
-        width: 100%;
-        max-width: 100%;
-        background: #fff;
-        border-radius: 10px;
-        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-        padding: 20px;
-        text-align: center;
-    }
-    h3 {
-        color: #333;
-        margin-bottom: 20px;
-    }
-    input, button {
-      width: 80%;
-      margin: 10px 0;
-      padding: 12px;
-      font-size: 16px;
-      border: 1px solid #ccc;
-      border-radius: 5px;
-    }
-    input:focus {
-        border-color: #007BFF;
-        outline: none;
-        box-shadow: 0 0 5px rgba(0, 123, 255, 0.5);
-    }
-    button {
-        background-color: #007BFF;
-        color: white;
-        cursor: pointer;
-        border: none;
-    }
-    button:hover {
-        background-color: #0056b3;
-    }
-    #status {
-        margin-top: 15px;
-        font-size: 14px;
-        color: green;
-    }
-  </style>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WorldQuant Scope 配置</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #eef1f6;
+        }
+
+        .container {
+            width: 360px;
+            background-color: #fff;
+            border-radius: 12px;
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.1);
+            padding: 24px;
+            text-align: center;
+        }
+
+        .input-group {
+            margin-bottom: 18px;
+            text-align: left;
+        }
+
+        .input-group label {
+            font-size: 15px;
+            color: #555;
+            display: block;
+            margin-bottom: 6px;
+        }
+
+        input[type="text"] {
+            width: 94%;
+            padding: 10px;
+            font-size: 14px;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            transition: border-color 0.3s ease;
+        }
+
+        input[type="text"]:focus {
+            border-color: #007BFF;
+            outline: none;
+            box-shadow: 0 0 6px rgba(0, 123, 255, 0.3);
+        }
+
+        .checkbox-container {
+            display: flex;
+            align-items: center;
+            justify-content: flex-start;
+            margin-top: 12px;
+            font-size: 15px;
+            color: #555;
+        }
+
+        .checkbox-container input {
+            margin-right: 8px;
+        }
+
+        button {
+            width: 100%;
+            margin-top: 12px;
+            padding: 12px;
+            font-size: 16px;
+            border: none;
+            border-radius: 6px;
+            background-color: #007BFF;
+            color: #fff;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+
+        button:hover {
+            background-color: #0056b3;
+        }
+
+        #status {
+            margin-top: 12px;
+            font-size: 14px;
+            color: green;
+        }
+    </style>
 </head>
+
 <body>
-  <div class="container">
-    <h3>中文搜索API地址</h3>
-    <input id="dbAddress" type="text" placeholder="Enter api address" />
-    <button id="saveBtn">Save</button>
-    <p id="status"></p>
-  </div>
-  <script src="popup.js"></script>
+    <div class="container">
+        <div class="input-group">
+            <label for="dbAddress">中文搜索 API 地址</label>
+            <input id="dbAddress" type="text" placeholder="请输入 API 地址" />
+        </div>
+        <div class="checkbox-container">
+            <label for="hiddenFeature">启用隐藏功能</label>
+            <input type="checkbox" id="hiddenFeature">
+        </div>
+        <button id="saveBtn">保存设置</button>
+        <p id="status"></p>
+    </div>
+    <script src="popup.js"></script>
 </body>
+
 </html>

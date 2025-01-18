@@ -206,7 +206,7 @@ function ButtonOpsAna() {
             array: operators,
             timestamp: currentTime
         };
-        chrome.storage.local.set({ WQOPSAna: dataToSave }, function() {
+        chrome.storage.local.set({ WQPOPSAna: dataToSave }, function() {
             console.log('数据已保存');
             console.log(dataToSave);
         });
@@ -273,11 +273,11 @@ function insertButton() {
     
 }
 function insertOpsTable() {
-    chrome.storage.local.get('WQOPSAna', function(result) {
-        if (result.WQOPSAna) {
-            console.log('读取的数据:', result.WQOPSAna);
-            let savedArray = result.WQOPSAna.array;
-            let savedTimestamp = result.WQOPSAna.timestamp;
+    chrome.storage.local.get('WQPOPSAna', function(result) {
+        if (result.WQPOPSAna) {
+            console.log('读取的数据:', result.WQPOPSAna);
+            let savedArray = result.WQPOPSAna.array;
+            let savedTimestamp = result.WQPOPSAna.timestamp;
             console.log(savedArray);
             console.log(savedTimestamp);
 
