@@ -230,7 +230,7 @@ async function upVoteSingleUserComments(url) {
             nextTag = false;
             break;
         }
-        console.log(commentTime, quarterStartTime, commentTime >= quarterStartTime);
+        // console.log(commentTime, quarterStartTime, commentTime >= quarterStartTime);
     }
 
     let nextLink = newDoc.querySelector('a.pagination-next-link');
