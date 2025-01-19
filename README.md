@@ -31,6 +31,10 @@ WebDataScope是一个正在为WorldQuant平台打造的Chrome/Edge插件。它�
   - `analyst46_GLB_TOP3000_Delay1` -->
 
 # 更新日志
+- V0.7.2(20250119)
+  - add: 论坛的未知功能1_user
+- V0.7.1(20250118)
+  - add: 论坛的未知功能1_post
 - V0.6.1(20250105)
   - add: Genius运算符使用分析
   - fix: 存储从`chrome.storage.sync`更改为`chrome.storage.local`

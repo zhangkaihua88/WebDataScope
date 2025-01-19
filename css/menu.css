@@ -1,9 +1,36 @@
+.egg_button_container {
+    display: flex;
+    flex-direction: column; /* 垂直排列 */
+    align-items: center;    /* 居中对齐 */
+    gap: 10px;              /* 按钮之间的间距 */
+    margin: 20px;
+}
+
 .egg_study_btn {
     outline: 0;
     border: 0;
     z-index: 9999;
-    position: fixed;
-    top: 5px;
+    position: relative;
+    left: 5px;
+    padding: 12px 20px;
+    border-radius: 10px;
+    cursor: pointer;
+    background-color: #fff;
+    color: #006998;
+    font-size: 18px;
+    font-weight: bold;
+    text-align: center;
+    box-shadow: 0 0 9px #666777;
+}
+
+
+.egg_study_btn {
+    outline: 0;
+    border: 0;
+    z-index: 9999;
+    position: relative;
+    flex-direction: column;
+    /* top: 5px; */
     left: 5px;
     padding: 12px 20px;
     border-radius: 10px;
@@ -46,8 +73,9 @@
 
 .egg_setting_box {
     position: fixed;
-    top: 70px;
+    top: 5px;
     left: 5px;
+    z-index: 9999;
     padding: 12px 20px;
     border-radius: 10px;
     background-color: #fff;
