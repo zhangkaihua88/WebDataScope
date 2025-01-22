@@ -285,7 +285,7 @@ function createStartMenu() {
 
 // Use MutationObserver to watch for DOM changes
 function voteUpMain() {
-    observer.disconnect();
+    // observer.disconnect();
     chrome.storage.local.get(['WQPHiddenFeatureEnabled'], (result) => {
         if (result.WQPHiddenFeatureEnabled) {
             // 如果为 true，则执行特定代码
@@ -295,12 +295,12 @@ function voteUpMain() {
     });
 
 }
+voteUpMain()
+// const observer = new MutationObserver(() => {
+//     if (document.querySelector("#user-nav > a:nth-child(2)")) {
+//         voteUpMain()
+//     }
+// });
 
-const observer = new MutationObserver(() => {
-    if (document.querySelector("#user-nav > a:nth-child(2)")) {
-        voteUpMain()
-    }
-});
-
-// Configure the MutationObserver
-observer.observe(document.body, { childList: true, subtree: true });
+// // Configure the MutationObserver
+// observer.observe(document.body, { childList: true, subtree: true });

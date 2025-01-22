@@ -31,6 +31,8 @@ WebDataScope是一个正在为WorldQuant平台打造的Chrome/Edge插件。它�
   - `analyst46_GLB_TOP3000_Delay1` -->
 
 # 更新日志
+- V0.7.3(20250122)
+  - fix: 一个已知bug
 - V0.7.2(20250119)
   - add: 论坛的未知功能1_user
 - V0.7.1(20250118)
@@ -52,17 +54,14 @@ WebDataScope是一个正在为WorldQuant平台打造的Chrome/Edge插件。它�
   - 修改`alpha->distribution`的分析图由于没有数据导致无法显示的bug 
   - 添加`AMR`区域在`alpha->distribution`的分析图中
   - 添加已有数据报告的表示'★★★'
-
 - V0.3.0(20240321)
   - 支持`simulation->Data`中的数据展示
   - 更新`region`,`delay`和`universe`的获取逻辑，避免获取失败
   - 添加`alpha->distribution`的分析图, 添加红色提示以及灰色不可用提示
-
 - V0.2.0(20240314)
   - 适配Edge浏览器
   - 启用数据缓存策略，提高加载速度
   - 禁用画图动画效果
-
 - V0.1.0(20240311)
   - 完成插件主体内容
 
