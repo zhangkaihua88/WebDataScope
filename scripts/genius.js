@@ -24,16 +24,32 @@ async function fetchAllOperators() {
     return data;
 }
 
+async function getAlphaFromUrl(AlphaUrl) {
+    const response = await fetch(AlphaUrl, {
+        referrer: "https://platform.worldquantbrain.com/",
+        referrerPolicy: "strict-origin-when-cross-origin",
+        body: null,
+        method: "GET",
+        mode: "cors",
+        credentials: "include"
+    });
+    if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    const data = await response.json(); // Parse JSON data
+    return data
+}
+
 // Define fetchAllAlphas function
 async function fetchAllAlphas() {
     const currentDate = new Date();
-    const year = currentDate.getFullYear();
+    const year = currentDate.getUTCFullYear();
     const quarter = Math.floor((currentDate.getMonth() + 3) / 3);
     const quarters = [
-        { start: `${year}-01-01T05:00:00.000Z`, end: `${year}-03-31T05:00:00.000Z` },  // 第一季度
-        { start: `${year}-04-01T05:00:00.000Z`, end: `${year}-06-30T05:00:00.000Z` },  // 第二季度
-        { start: `${year}-07-01T05:00:00.000Z`, end: `${year}-09-30T05:00:00.000Z` },  // 第三季度
-        { start: `${year}-10-01T05:00:00.000Z`, end: `${year}-12-31T05:00:00.000Z` }   // 第四季度
+        { start: `${year}-01-01T00:00:00.000Z`, end: `${year}-03-31T23:59:59.000Z` },  // 第一季度
+        { start: `${year}-04-01T00:00:00.000Z`, end: `${year}-06-30T23:59:59.000Z` },  // 第二季度
+        { start: `${year}-07-01T00:00:00.000Z`, end: `${year}-09-30T23:59:59.000Z` },  // 第三季度
+        { start: `${year}-10-01T00:00:00.000Z`, end: `${year}-12-31T23:59:59.000Z` }   // 第四季度
     ];
     const { start, end } = quarters[quarter - 1];
     const dateRange = `dateSubmitted%3E${start}&dateSubmitted%3C${end}`;
@@ -42,46 +58,26 @@ async function fetchAllAlphas() {
     let offset = 0; // Initial offset
     const limit = 30; // Data limit per page
     const statusFilter = "status!=UNSUBMITTED%1FIS-FAIL";
-    const typeFilter = "type=REGULAR";
     const order = "order=-dateCreated";
     const hiddenFilter = "hidden=false";
     let totalCount = 0; // To store total count
 
     while (true) {
-        const AlphaUrl = `https://api.worldquantbrain.com/users/self/alphas?limit=${limit}&offset=${offset}&${statusFilter}&${dateRange}&${typeFilter}&${order}&${hiddenFilter}`;
-
-        try {
-            const response = await fetch(AlphaUrl, {
-                referrer: "https://platform.worldquantbrain.com/",
-                referrerPolicy: "strict-origin-when-cross-origin",
-                body: null,
-                method: "GET",
-                mode: "cors",
-                credentials: "include"
-            });
-
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-
-            const data = await response.json(); // Parse JSON data
-            allResults = allResults.concat(data.results); // Merge results
-
-            if (totalCount === 0) {
-                totalCount = data.count; // Get count (on first request)
-            }
-
-            // If fetched results are greater than or equal to the total count, stop fetching
-            if (allResults.length >= totalCount) {
-                break;
-            }
-
-            offset += limit; // Increase offset for the next page
-        } catch (error) {
-            console.error("Error fetching data:", error);
+        const AlphaUrl = `https://api.worldquantbrain.com/users/self/alphas?limit=${limit}&offset=${offset}&${statusFilter}&${dateRange}&${order}&${hiddenFilter}`;
+        data = await getAlphaFromUrl(AlphaUrl);
+        allResults = allResults.concat(data.results); // Merge results
+        if (totalCount === 0) {
+            totalCount = data.count; // Get count (on first request)
+        }
+        // If fetched results are greater than or equal to the total count, stop fetching
+        if (allResults.length >= totalCount) {
             break;
         }
+        offset += limit; // Increase offset for the next page
+        updateButton('WQPOPSFetchButton', `正在抓取 ${allResults.length} / ${totalCount}`); // Update button text
     }
+    updateButton('WQPOPSFetchButton', `正在分析`);
+
 
     // Check if the length matches the total count
     const count = allResults.length;
@@ -139,6 +135,7 @@ function findOps(regular, operators) {
 // Create the button
 function ButtonOpsAna() {
     const button = document.createElement('button');
+    button.id = 'WQPOPSFetchButton';
     button.innerText = '运算符分析';
     button.style.padding = '10px';
     button.style.backgroundColor = '#4CAF50';
@@ -164,9 +161,11 @@ function ButtonOpsAna() {
     button.addEventListener('click', async function () {
         const data = await fetchAllAlphas();
         operators = await fetchAllOperators();
-        operators = operators.filter(item => item.scope.includes('REGULAR'));
+        operators = operators.filter(item => item.scope.includes('REGULAR') || item.scope.includes('COMBO'));
 
-        regulars = data.map(item => item.regular.code);
+        // regulars = data.map(item => item.regular.code);
+        regulars = data.map(item => item.type === 'REGULAR' ? item.regular.code : item.combo.code);
+        console.log(regulars);
         let use_ops = regulars.map(item => findOps(item, operators)).flat();;
 
         const operatorMapping = {
@@ -198,7 +197,8 @@ function ButtonOpsAna() {
                 name: op.name,
                 category: op.category,
                 definition: op.definition,
-                count: counts[op.name] || 0
+                count: counts[op.name] || 0,
+                scope: op.scope
             };
         });
         let currentTime = new Date().toISOString();
@@ -211,6 +211,7 @@ function ButtonOpsAna() {
             console.log(dataToSave);
         });
         insertOpsTable();
+        resetButton('WQPOPSFetchButton', `分析完成${data.length}`);
     });
     return button
 }
@@ -278,6 +279,9 @@ function insertOpsTable() {
             console.log('读取的数据:', result.WQPOPSAna);
             let savedArray = result.WQPOPSAna.array;
             let savedTimestamp = result.WQPOPSAna.timestamp;
+            const zeroCount = savedArray.filter(item => item.count === 0).length;
+            const nonZeroCount = savedArray.filter(item => item.count !== 0).length;
+
             console.log(savedArray);
             console.log(savedTimestamp);
 
@@ -291,6 +295,9 @@ function insertOpsTable() {
             <article class="card">
             <div class="card_wrapper">
             <div class="card__content" style="padding-bottom: 26px;">
+                <h3>在你可用的运算符中，共有${nonZeroCount}种运算符被使用，${zeroCount}种运算符未被使用。</h3>
+                
+                
                 <div class="operator-table">
                     <table id="operatorTable" class="sortable WQScope_table">
                         <thead>
@@ -298,6 +305,7 @@ function insertOpsTable() {
                                 <th data-sort="category">Category</th>
                                 <th data-sort="definition">Definition</th>
                                 <th data-sort="count">Count</th>
+                                <th data-sort="scope">Scope</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -311,6 +319,7 @@ function insertOpsTable() {
                     <td>${item.category}</td>
                     <td>${item.definition}</td>
                     <td>${item.count}</td>
+                    <td>${item.scope}</td>
                 </tr>
                 `;
             });
