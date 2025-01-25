@@ -773,11 +773,11 @@ async function showGeniusProfile(event) {
         geniusRankProfileCard.hide();
     }
     userId = userId.substring(0, 7);
+    console.log(userId);
     const { result, savedTimestamp } = await getSingleRankByUserId(userId);
     if (geniusRankProfileCard.enable(userId)) {
         geniusRankProfileCard.updateDataId(userId, result, savedTimestamp, rankInfo2Html(result));
         geniusRankProfileCard.updateCursor(event.clientX, event.clientY);
         geniusRankProfileCard.updateData();
-
-    } e
+    }
 }
