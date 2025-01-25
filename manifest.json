@@ -63,6 +63,7 @@
             ],
             "js": [
                 "scripts/utils.js",
+                "scripts/ui_genius.js",
                 "scripts/genius.js"
             ],
             "css": [
