@@ -31,6 +31,8 @@ WebDataScope是一个正在为WorldQuant平台打造的Chrome/Edge插件。它�
   - `analyst46_GLB_TOP3000_Delay1` -->
 
 # 更新日志
+- V0.8.1(20250125)
+  - add: genius排名分析
 - V0.7.4(20250124)
   - fix: Genius运算符使用分析增加对于`Super`的支持
 - V0.7.3(20250122)
@@ -73,4 +75,5 @@ WebDataScope是一个正在为WorldQuant平台打造的Chrome/Edge插件。它�
 
 # 致谢
 - 感谢`MC63847`为V0.4.3做的修正
+- 感谢`XX42289`为genius排名分析做的贡献
 - 感谢群里同学们提供的分析数据
