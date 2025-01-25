@@ -433,31 +433,14 @@ function rankInfo2Html(result){
     <strong>总人数:</strong> ${result.gold.count} 人<br>
     <strong>可能的基准人数:</strong> ${result.gold.baseCount} 人（交够40个）
     </p>
-
-    <hr>
-
-    <h4 style="margin-top: 10px;">以 Gold 为 Universe 计算的结果：</h4>
-    <p>
-    <strong>总排名 (排名 / 满足的人数 / 最终的人数):</strong><br>
+    <strong>各个Level 满足的人数 / 最终的人数:</strong><br>
     <ul>
-        <li>For Expert: ${result.gold.expertRank} / ${result.expert.count} / ${Math.round(result.gold.baseCount * 0.2)}</li>
-        <li>For Master: ${result.gold.masterRank} / ${result.master.count} / ${Math.round(result.gold.baseCount * 0.1)}</li>
-        <li>For Grandmaster: ${result.gold.grandmasterRank} / ${result.grandmaster.count} / ${Math.round(result.gold.baseCount * 0.02)}</li> 
+        <li>For Expert: ${result.expert.count} / ${Math.round(result.gold.baseCount * 0.2)}</li>
+        <li>For Master: ${result.master.count} / ${Math.round(result.gold.baseCount * 0.1)}</li>
+        <li>For Grandmaster: ${result.grandmaster.count} / ${Math.round(result.gold.baseCount * 0.02)}</li> 
     </ul>
     </p>
-
-    <h4 style="margin-top: 10px;">各项排名：</h4>
-    <ul>
-    <li>Operator Count: ${result.gold.operatorCountRank} 名</li>
-    <li>Operator Avg: ${result.gold.operatorAvgRank} 名</li>
-    <li>Field Count: ${result.gold.fieldCountRank} 名</li>
-    <li>Field Avg: ${result.gold.fieldAvgRank} 名</li>
-    <li>Community Activity: ${result.gold.communityActivityRank} 名</li>
-    <li>Completed Referrals: ${result.gold.completedReferralsRank} 名</li>
-    <li>Max Simulation Streak: ${result.gold.maxSimulationStreakRank} 名</li>
-    <li>Total Rank: ${result.gold.totalRank} 名</li>
-    </ul>
-
+    
     <hr>
 
     <div style="display: flex; justify-content: space-between; gap: 20px;">
