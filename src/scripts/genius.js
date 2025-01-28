@@ -1,47 +1,29 @@
-console.log('Genius script loaded');
+// genius.js: genius相关功能的 JS 文件
+// 1. Operator Analysis
+// 2. Rank Analysis 
+console.log('genius.js loaded');
+
+
+
+// ############################## 常数变量 ##############################
+// operator API URL
+var OptUrl = 'https://api.worldquantbrain.com/operators';
+// genius level criteria
+var levelCriteria = {
+    "expert": { "alphaCount": 20, "pyramidCount": 10, "combinedAlphaPerformance": 0.5, "combinedSelectedAlphaPerformance": 0.5 },
+    "master": { "alphaCount": 120, "pyramidCount": 30, "combinedAlphaPerformance": 1, "combinedSelectedAlphaPerformance": 1 },
+    "grandmaster": { "alphaCount": 220, "pyramidCount": 60, "combinedAlphaPerformance": 2, "combinedSelectedAlphaPerformance": 2 }
+}
+
+var CONCURRENCY = 10; // 同时进行的请求数
 
 // ############################## 运算符分析 ##############################
-async function fetchAllOperators() {
-    OptUrl = 'https://api.worldquantbrain.com/operators';
-    data = {};
-    try {
-        const response = await fetch(OptUrl, {
-            referrer: "https://platform.worldquantbrain.com/",
-            referrerPolicy: "strict-origin-when-cross-origin",
-            body: null,
-            method: "GET",
-            mode: "cors",
-            credentials: "include"
-        });
 
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        data = await response.json();
-    } catch (error) {
-        console.error("Error fetching data:", error);
-    }
-    return data;
-}
-
-async function getDataFromUrl(AlphaUrl) {
-    const response = await fetch(AlphaUrl, {
-        referrer: "https://platform.worldquantbrain.com/",
-        referrerPolicy: "strict-origin-when-cross-origin",
-        body: null,
-        method: "GET",
-        mode: "cors",
-        credentials: "include"
-    });
-    if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-    }
-    const data = await response.json(); // Parse JSON data
-    return data
-}
-
-// Define fetchAllAlphas function
 async function fetchAllAlphas() {
+    // 抓取本季度所有的alpha
+
+    updateButton('WQPOPSFetchButton', `开始抓取`);
+
     const currentDate = new Date();
     const year = currentDate.getUTCFullYear();
     const quarter = Math.floor((currentDate.getMonth() + 3) / 3);
@@ -67,9 +49,8 @@ async function fetchAllAlphas() {
         data = await getDataFromUrl(AlphaUrl);
         allResults = allResults.concat(data.results); // Merge results
         if (totalCount === 0) {
-            totalCount = data.count; // Get count (on first request)
+            totalCount = data.count;
         }
-        // If fetched results are greater than or equal to the total count, stop fetching
         if (allResults.length >= totalCount) {
             break;
         }
@@ -88,164 +69,71 @@ async function fetchAllAlphas() {
     } else {
         console.log("There seems to be a mismatch in the count!");
     }
-
     return allResults;
 }
 
+async function opsAna() {
+    // 分析所有的alpha中的运算符, button 分析运算符的调用函数
 
-function removeComments(code) {
-    const lines = code.split('\n');
-    const cleanedLines = lines.map(line => line.split('#')[0].trim());
-    return cleanedLines.join('\n');
-}
-function escapeRegExp(str) {
-    return str.replace(/[.*+?^=!:${}()|\[\]\/\\]/g, '\\$&');
-}
+    const data = await fetchAllAlphas();
+    let operators = await getDataFromUrl(OptUrl);
+    operators = operators.filter(item => item.scope.includes('REGULAR') || item.scope.includes('COMBO'));
 
-function findSingleOps(text) {
-    const singleOps = ['+', '-', '*', '/', '^', '<=', '>=', '<', '>', '==', '!=', '?'];
-    let count = [];
-    singleOps.sort((a, b) => b.length - a.length);  // Sort by operator length in descending order
-    singleOps.forEach(op => {
-        // Adjusting regex to avoid matching '+' and '-' when followed by a number
-        let regex = new RegExp(`(?<!\\d)${escapeRegExp(op)}(?!\\d)`, 'g');
-        let matches = [...text.matchAll(regex)];
-        count = count.concat(Array(matches.length).fill(op));  // Add matched operator to the count
-        text = text.replace(regex, ' ');  // Replace matched operators with spaces
-    });
-    return count;
-}
+    // regulars = data.map(item => item.regular.code);
+    regulars = data.map(item => item.type === 'REGULAR' ? item.regular.code : item.combo.code);
+    console.log(regulars);
+    let use_ops = regulars.map(item => findOps(item, operators)).flat();
 
-const splitFunc = (item) => {
-    return item.replace(' ', '').split(/[(),:+\-*/^<>=!?;\n#]+/).filter(part => part).map(item => item.replace(' ', ''));
-};
+    const operatorMapping = {
+        '+': 'add',
+        '-': 'subtract',
+        '*': 'multiply',
+        '/': 'divide',
+        '^': 'power',
+        '<=': 'less_than_equal',
+        '>=': 'greater_than_equal',
+        '<': 'less',
+        '>': 'greater',
+        '==': 'equal',
+        '!=': 'not_equal',
+        '?': 'if_else'
+    };
 
-function findOps(regular, operators) {
-    regular = removeComments(regular);
-    // console.log(splitFunc(regular));
-    const ops = [
-        ...splitFunc(regular).filter(item => operators.map(item => item.name).includes(item)),
-        ...findSingleOps(regular)
-    ];
-    return ops;
-}
+    use_ops = use_ops.map(op => operatorMapping[op] || op);
 
-
-
-// Create the button
-function ButtonOpsAna() {
-    const button = document.createElement('button');
-    button.id = 'WQPOPSFetchButton';
-    button.innerText = '运算符分析';
-    button.style.padding = '10px';
-    button.style.backgroundColor = '#4CAF50';
-    button.style.color = 'white';
-    button.style.border = 'none';
-    button.style.borderRadius = '5px';
-    button.style.cursor = 'pointer';
-    button.style.marginTop = '20px'; // Add margin on top
-    button.style.marginBottom = '20px'; // Add margin on bottom
-    button.style.display = 'block'; // Make the button a block element
-    button.style.marginLeft = 'auto'; // Center the button horizontally
-    button.style.marginRight = 'auto'; // Center the button horizontally
-
-    button.addEventListener('mouseover', function () {
-        button.style.backgroundColor = '#45a049'; // Darker green on hover
+    let counts = {};
+    // Count the occurrences of each item
+    use_ops.forEach(op => {
+        counts[op] = (counts[op] || 0) + 1;
     });
 
-    button.addEventListener('mouseout', function () {
-        button.style.backgroundColor = '#4CAF50'; // Revert back to original color
-    });
-
-    // Button click event to fetch data
-    button.addEventListener('click', async function () {
-        const data = await fetchAllAlphas();
-        operators = await fetchAllOperators();
-        operators = operators.filter(item => item.scope.includes('REGULAR') || item.scope.includes('COMBO'));
-
-        // regulars = data.map(item => item.regular.code);
-        regulars = data.map(item => item.type === 'REGULAR' ? item.regular.code : item.combo.code);
-        console.log(regulars);
-        let use_ops = regulars.map(item => findOps(item, operators)).flat();;
-
-        const operatorMapping = {
-            '+': 'add',
-            '-': 'subtract',
-            '*': 'multiply',
-            '/': 'divide',
-            '^': 'power',
-            '<=': 'less_than_equal',
-            '>=': 'greater_than_equal',
-            '<': 'less',
-            '>': 'greater',
-            '==': 'equal',
-            '!=': 'not_equal',
-            '?': 'if_else'
+    // Assign the count to each element in the array
+    operators = operators.map(op => {
+        return {
+            name: op.name,
+            category: op.category,
+            definition: op.definition,
+            count: counts[op.name] || 0,
+            scope: op.scope
         };
-
-        use_ops = use_ops.map(op => operatorMapping[op] || op);
-
-        let counts = {};
-        // Count the occurrences of each item
-        use_ops.forEach(op => {
-            counts[op] = (counts[op] || 0) + 1;
-        });
-
-        // Assign the count to each element in the array
-        operators = operators.map(op => {
-            return {
-                name: op.name,
-                category: op.category,
-                definition: op.definition,
-                count: counts[op.name] || 0,
-                scope: op.scope
-            };
-        });
-        let currentTime = new Date().toISOString();
-        let dataToSave = {
-            array: operators,
-            timestamp: currentTime
-        };
-        chrome.storage.local.set({ WQPOPSAna: dataToSave }, function () {
-            console.log('数据已保存');
-            console.log(dataToSave);
-        });
-        insertOpsTable();
-        resetButton('WQPOPSFetchButton', `运算符分析完成${data.length}`);
     });
-    return button
+    let currentTime = new Date().toISOString();
+    let dataToSave = {
+        array: operators,
+        timestamp: currentTime
+    };
+    chrome.storage.local.set({ WQPOPSAna: dataToSave }, function () {
+        console.log('数据已保存');
+        console.log(dataToSave);
+    });
+    insertOpsTable();
+    resetButton('WQPOPSFetchButton', `运算符分析完成${data.length}`);
 }
 
-function ButtonOpsShow() {
-    const button = document.createElement('button');
-    button.innerText = '显示运算符分析';
-    button.style.padding = '10px';
-    button.style.backgroundColor = '#4CAF50';
-    button.style.color = 'white';
-    button.style.border = 'none';
-    button.style.borderRadius = '5px';
-    button.style.cursor = 'pointer';
-    button.style.marginTop = '20px'; // Add margin on top
-    button.style.marginBottom = '20px'; // Add margin on bottom
-    button.style.display = 'block'; // Make the button a block element
-    button.style.marginLeft = 'auto'; // Center the button horizontally
-    button.style.marginRight = 'auto'; // Center the button horizontally
 
-    button.addEventListener('mouseover', function () {
-        button.style.backgroundColor = '#45a049'; // Darker green on hover
-    });
-
-    button.addEventListener('mouseout', function () {
-        button.style.backgroundColor = '#4CAF50'; // Revert back to original color
-    });
-
-    button.addEventListener('click', function () {
-        insertOpsTable();
-    });
-
-    return button
-}
 function insertOpsTable() {
+    // 插入运算符分析的表格, button 插入表格的调用函数
+
     chrome.storage.local.get('WQPOPSAna', function (result) {
         if (result.WQPOPSAna) {
             console.log('读取的数据:', result.WQPOPSAna);
@@ -307,7 +195,7 @@ function insertOpsTable() {
             `;
 
             // 查找目标插入位置
-            const mainContent = document.querySelector(targetSelectorTable);
+            const mainContent = document.querySelector('.genius__main-content');
             if (mainContent) {
                 // 检查是否已经存在表格，如果存在则删除旧表格
                 const existingTable = mainContent.querySelector("#operatorTable");
@@ -354,48 +242,76 @@ function insertOpsTable() {
 }
 
 
-
 // ############################## 排名分析 ##############################
 
+
+function determineUserLevel(userData, geniusCombineTag) {
+    // 根据用户数据判断用户级别
+
+    for (const level of ["grandmaster", "master", "expert"]) {
+        const criteria = levelCriteria[level];
+
+        // 检查 alphaCount 和 pyramidCount 是否满足条件
+        const isBaseConditionMet = (
+            userData.alphaCount >= criteria.alphaCount &&
+            userData.pyramidCount >= criteria.pyramidCount
+        );
+
+        // 根据 geniusCombineTag 决定是否检查 combinedAlphaPerformance 或 combinedSelectedAlphaPerformance
+        let isPerformanceConditionMet = true;
+        if (geniusCombineTag) {
+            // 如果 geniusCombineTag 为 true，需要同时满足 combinedAlphaPerformance 和 combinedSelectedAlphaPerformance
+            isPerformanceConditionMet = (
+                userData.combinedAlphaPerformance >= criteria.combinedAlphaPerformance ||
+                userData.combinedSelectedAlphaPerformance >= criteria.combinedSelectedAlphaPerformance
+            );
+        }
+
+        // 如果所有条件都满足，则返回当前级别
+        if (isBaseConditionMet && isPerformanceConditionMet) {
+            return level;
+        }
+    }
+    return 'gold';
+}
+
 async function getSingleRankByUserId(userId) {
+    // 根据用户ID获取单个用户的排名信息
+
     return new Promise((resolve, reject) => {
-        chrome.storage.local.get('WQPRankData', function (WQPRankData) {
+        chrome.storage.local.get(['WQPRankData', 'WQPSettings'], function ({WQPRankData, WQPSettings}) {
             if (chrome.runtime.lastError) {
                 reject(chrome.runtime.lastError);
                 return;
             }
 
-            const data = WQPRankData.WQPRankData?.array || [];
-            const savedTimestamp = WQPRankData.WQPRankData?.timestamp || 'N/A';
+            const data = WQPRankData?.array || [];
+            const savedTimestamp = WQPRankData?.timestamp || 'N/A';
             const userData = data.find(item => item.user === userId);
+            
 
             if (!userData) {
                 reject(`User with ID ${userId} not found.`);
                 return;
             }
 
-            console.log(userData);
-            const criteria = {
-                "expert": { "alphaCount": 20, "pyramidCount": 10, "combinedAlphaPerformance": 0.5, "combinedSelectedAlphaPerformance": 0.5 },
-                "master": { "alphaCount": 120, "pyramidCount": 30, "combinedAlphaPerformance": 1, "combinedSelectedAlphaPerformance": 1 },
-                "grandmaster": { "alphaCount": 220, "pyramidCount": 60, "combinedAlphaPerformance": 2, "combinedSelectedAlphaPerformance": 2 }
-            }
             const result = {};
+            result['info'] = {
+                "currentLevel":determineUserLevel(userData, WQPSettings.geniusCombineTag),
+                "baseAlphaCount":WQPSettings.geniusAlphaCount,
+            };
             // filter以item.name Rank结尾的
             result['gold'] = Object.fromEntries(Object.entries(userData).filter(([key, value]) => key.endsWith('Rank')));
             result['gold']['rank'] = data.filter(item => item.totalRank < userData.totalRank).length;
             result['gold']['count'] = data.length;
-            result['gold']['baseCount'] = data.filter(item => item.alphaCount >= 40).length;
+            result['gold']['baseCount'] = data.filter(item => item.alphaCount >= WQPSettings.geniusAlphaCount).length;
 
             for (const model of ["expert", "master", "grandmaster"]) {
-                let itemData = data.filter(item => item.alphaCount >= criteria[model].alphaCount && item.pyramidCount >= criteria[model].pyramidCount);
-                if (combineTag) {
-                    itemData = itemData.filter(item => item.combinedAlphaPerformance >= criteria[model].combinedAlphaPerformance || item.combinedSelectedAlphaPerformance >= criteria[model].combinedSelectedAlphaPerformance);
+                let itemData = data.filter(item => item.alphaCount >= levelCriteria[model].alphaCount && item.pyramidCount >= levelCriteria[model].pyramidCount);
+                if (WQPSettings.geniusCombineTag) {
+                    itemData = itemData.filter(item => item.combinedAlphaPerformance >= levelCriteria[model].combinedAlphaPerformance || item.combinedSelectedAlphaPerformance >= levelCriteria[model].combinedSelectedAlphaPerformance);
                 }
                 result['gold'][model + 'Rank'] = itemData.filter(item => item.totalRank < userData.totalRank).length + 1;
-
-
-
 
                 item_count = itemData.length;
 
@@ -428,20 +344,24 @@ async function getSingleRankByUserId(userId) {
 }
 
 function rankInfo2Html(result){
+    // 将排名信息转换为HTML格式
     return `
     <p>
     <strong>总人数:</strong> ${result.gold.count} 人<br>
-    <strong>可能的基准人数:</strong> ${result.gold.baseCount} 人（交够40个）
+    <strong>可能的基准人数:</strong> ${result.gold.baseCount} 人（交够${result.info.baseAlphaCount}个）
     </p>
     <strong>各个Level 满足的人数 / 最终的人数:</strong><br>
     <ul>
         <li>For Expert: ${result.expert.count} / ${Math.round(result.gold.baseCount * 0.2)}</li>
-        <li>For Master: ${result.master.count} / ${Math.round(result.gold.baseCount * 0.1)}</li>
+        <li>For Master: ${result.master.count} / ${Math.round(result.gold.baseCount * 0.08)}</li>
         <li>For Grandmaster: ${result.grandmaster.count} / ${Math.round(result.gold.baseCount * 0.02)}</li> 
     </ul>
     </p>
     
     <hr>
+    <p>
+    该用户目前满足的级别: <strong>${result.info.currentLevel}</strong>
+    </p>
 
     <div style="display: flex; justify-content: space-between; gap: 20px;">
     <div style="flex: 1;">
@@ -492,13 +412,15 @@ function rankInfo2Html(result){
 }
 
 
-const combineTag = true;
+
 
 async function insertMyRankInfo() {
+    // 插入我的排名信息, button 插入我的排名信息的调用函数
+
     let userId = await getDataFromUrl('https://api.worldquantbrain.com/users/self/consultant/summary');
     userId = userId.leaderboard.user;
     const { result, savedTimestamp } = await getSingleRankByUserId(userId);
-    console.log('Data:', result);
+    // console.log('Data:', result);
     let tableHTML = `
         <div id='rankCard'>
         <div class="research-paradigm__header">
@@ -538,9 +460,10 @@ async function insertMyRankInfo() {
 
 }
 
-
-
 async function fetchAllUsers() {
+    // 抓取所有用户的排名信息
+
+    updateButton('WQPRankFetchButton', `开始抓取`);
     const currentDate = new Date();
     const year = currentDate.getUTCFullYear();
     const quarter = Math.floor((currentDate.getMonth() + 3) / 3);
@@ -551,146 +474,123 @@ async function fetchAllUsers() {
         `${year}-10-01`  // 第四季度
     ];
     const season = quarters[quarter - 1];
+    const limit = 100;
 
+    // 获取初始数据
+    const initialUrl = `https://api.worldquantbrain.com/consultant/boards/genius?limit=${limit}&offset=0&date=${season}&aggregate=user`;
+    const initialData = await getDataFromUrl(initialUrl);
+    const totalCount = initialData.count;
+    let data = initialData.results;
+    
+    // 初始化进度
+    let fetchedCount = data.length;
+    updateButton('WQPRankFetchButton', `正在抓取 ${fetchedCount} / ${totalCount}`);
+    
+    // 计算剩余请求
+    const remainingPages = Math.ceil(totalCount / limit) - 1;
+    const offsets = Array.from({ length: remainingPages }, (_, i) => (i + 1) * limit);
+    const urls = offsets.map(offset => 
+        `https://api.worldquantbrain.com/consultant/boards/genius?limit=${limit}&offset=${offset}&date=${season}&aggregate=user`
+    );
 
-    let data = [];
-    let offset = 0; // Initial offset
-    const limit = 100; // Data limit per page
-    let totalCount = 0; // To store total count
+    // 并发控制配置
+    
+    
+    // 分批请求函数
+    const fetchBatch = async (batchUrls) => {
+        const batchRequests = batchUrls.map(url => 
+            getDataFromUrl(url).then(page => {
+                fetchedCount += page.results.length;
+                updateButton('WQPRankFetchButton', `正在抓取 ${fetchedCount} / ${totalCount}`);
+                return page;
+            })
+        );
+        return await Promise.all(batchRequests);
+    };
 
-    while (true) {
-        const UserUrl = `https://api.worldquantbrain.com/consultant/boards/genius?limit=${limit}&offset=${offset}&date=${season}&aggregate=user`;
-
-        itemData = await getDataFromUrl(UserUrl);
-        data = data.concat(itemData.results); // Merge results
-        if (totalCount === 0) {
-            totalCount = itemData.count; // Get count (on first request)
-        }
-        // If fetched results are greater than or equal to the total count, stop fetching
-        if (data.length >= totalCount) {
-            break;
-        }
-        offset += limit; // Increase offset for the next page
-        updateButton('WQPRankFetchButton', `正在抓取 ${data.length} / ${totalCount}`); // Update button text
+    // 执行分批请求
+    for (let i = 0; i < urls.length; i += CONCURRENCY) {
+        const batchUrls = urls.slice(i, i + CONCURRENCY);
+        const batchData = await fetchBatch(batchUrls);
+        batchData.forEach(page => data = data.concat(page.results));
     }
-    updateButton('WQPRankFetchButton', `正在分析`);
 
-
-
+    // 保持原有的排名计算逻辑
     data.forEach(item => item['totalRank'] = 0);
     for (const col of ["operatorCount", "fieldCount", "communityActivity", "completedReferrals", "maxSimulationStreak"]) {
         let sorted = data.map(item => item[col]).sort((a, b) => b - a);
         data.forEach(item => item[col + 'Rank'] = sorted.indexOf(item[col]) + 1);
-        data.forEach(item => item['totalRank'] = item['totalRank'] + item[col + 'Rank']);
+        data.forEach(item => item['totalRank'] += item[col + 'Rank']);
     }
     for (const col of ["operatorAvg", "fieldAvg"]) {
         let sorted = data.map(item => item[col]).sort((a, b) => a - b);
         data.forEach(item => item[col + 'Rank'] = sorted.indexOf(item[col]) + 1);
-        data.forEach(item => item['totalRank'] = item['totalRank'] + item[col + 'Rank']);
+        data.forEach(item => item['totalRank'] += item[col + 'Rank']);
     }
 
-    // Check if the length matches the total count
-    const count = data.length;
-    console.log(`Fetched ${count} results, expected ${totalCount}`);
-
-    if (count === totalCount) {
-        console.log("All results fetched successfully!");
-    } else {
-        console.log("There seems to be a mismatch in the count!");
-    }
-
+    console.log(`Fetched ${data.length} results, expected ${totalCount}`);
     return data;
 }
 
+async function rankAna() {
+    // 分析所有用户的排名信息, button 分析排名的调用函数
 
-
-function ButtonRankShow() {
-    const button = document.createElement('button');
-    button.id = 'WQPRankFetchButton';
-    button.innerText = '显示排名分析';
-    button.style.padding = '10px';
-    button.style.backgroundColor = '#4CAF50';
-    button.style.color = 'white';
-    button.style.border = 'none';
-    button.style.borderRadius = '5px';
-    button.style.cursor = 'pointer';
-    button.style.marginTop = '20px'; // Add margin on top
-    button.style.marginBottom = '20px'; // Add margin on bottom
-    button.style.display = 'block'; // Make the button a block element
-    button.style.marginLeft = 'auto'; // Center the button horizontally
-    button.style.marginRight = 'auto'; // Center the button horizontally
-
-    button.addEventListener('mouseover', function () {
-        button.style.backgroundColor = '#45a049'; // Darker green on hover
+    data = await fetchAllUsers();
+    let currentTime = new Date().toISOString();
+    let dataToSave = {
+        array: data,
+        timestamp: currentTime
+    };
+    chrome.storage.local.set({ WQPRankData: dataToSave }, function () {
+        console.log('数据已保存');
+        console.log(dataToSave);
     });
-
-    button.addEventListener('mouseout', function () {
-        button.style.backgroundColor = '#4CAF50'; // Revert back to original color
-    });
-
-    button.addEventListener('click', async function () {
-        insertMyRankInfo();
-    });
-
-    return button
+    resetButton('WQPRankFetchButton', `排名分析完成`);
+    insertMyRankInfo();
 }
 
 
 
-function ButtonRankAna() {
-    const button = document.createElement('button');
-    button.id = 'WQPRankFetchButton';
-    button.innerText = '排名分析';
-    button.style.padding = '10px';
-    button.style.backgroundColor = '#4CAF50';
-    button.style.color = 'white';
-    button.style.border = 'none';
-    button.style.borderRadius = '5px';
-    button.style.cursor = 'pointer';
-    button.style.marginTop = '20px'; // Add margin on top
-    button.style.marginBottom = '20px'; // Add margin on bottom
-    button.style.display = 'block'; // Make the button a block element
-    button.style.marginLeft = 'auto'; // Center the button horizontally
-    button.style.marginRight = 'auto'; // Center the button horizontally
-
-    button.addEventListener('mouseover', function () {
-        button.style.backgroundColor = '#45a049'; // Darker green on hover
-    });
-
-    button.addEventListener('mouseout', function () {
-        button.style.backgroundColor = '#4CAF50'; // Revert back to original color
-    });
-
-    button.addEventListener('click', async function () {
-        data = await fetchAllUsers();
-        let currentTime = new Date().toISOString();
-        let dataToSave = {
-            array: data,
-            timestamp: currentTime
-        };
-        chrome.storage.local.set({ WQPRankData: dataToSave }, function () {
-            console.log('数据已保存');
-            console.log(dataToSave);
-        });
-        resetButton('WQPRankFetchButton', `排名分析完成`);
-        insertMyRankInfo();
-    });
-
-    return button
-}
-// Define the target element's selector
 
 
 
 // ############################## 插入按钮 ##############################
 
+function ButtonGen(buttonText, buttonId, buttonClickFunction) {
+    // 生成按钮
+    const button = document.createElement('button');
+    button.id = buttonId;
+    button.innerText = buttonText;
+    button.style.padding = '10px';
+    button.style.backgroundColor = '#4CAF50';
+    button.style.color = 'white';
+    button.style.border = 'none';
+    button.style.borderRadius = '5px';
+    button.style.cursor = 'pointer';
+    button.style.marginTop = '20px'; // Add margin on top
+    button.style.marginBottom = '20px'; // Add margin on bottom
+    button.style.display = 'block'; // Make the button a block element
+    button.style.marginLeft = 'auto'; // Center the button horizontally
+    button.style.marginRight = 'auto'; // Center the button horizontally
+    button.addEventListener('mouseover', function () {
+        button.style.backgroundColor = '#45a049'; // Darker green on hover
+    });
+
+    button.addEventListener('mouseout', function () {
+        button.style.backgroundColor = '#4CAF50'; // Revert back to original color
+    });
+    button.addEventListener('click', buttonClickFunction);
+    return button
+}
+
 function insertButton() {
+    // 插入按钮
     const targetElement = document.querySelector(targetSelectorButton);
     console.log(targetElement);
     if (targetElement) {
         // Disconnect observer to avoid duplicate insertions
         console.log('Disconnecting observer');
-        observer.disconnect();
+        
 
         // Create a container div to hold both buttons
         const buttonContainer = document.createElement('div');
@@ -700,10 +600,10 @@ function insertButton() {
         buttonContainer.style.gap = '10px'; // Space between buttons
 
         // Append buttons to the container
-        buttonContainer.appendChild(ButtonOpsAna());
-        buttonContainer.appendChild(ButtonOpsShow());
-        buttonContainer.appendChild(ButtonRankAna());
-        buttonContainer.appendChild(ButtonRankShow());
+        buttonContainer.appendChild(ButtonGen('运算符分析', 'WQPOPSFetchButton', opsAna));
+        buttonContainer.appendChild(ButtonGen('显示运算符分析', 'WQPOPSShowButton', insertOpsTable));
+        buttonContainer.appendChild(ButtonGen('排名分析', 'WQPRankFetchButton', rankAna));
+        buttonContainer.appendChild(ButtonGen('显示排名分析', 'WQPRankShowButton', insertMyRankInfo));
 
         // Insert the button container after the target element
         targetElement.insertAdjacentElement('afterend', buttonContainer);
@@ -711,26 +611,17 @@ function insertButton() {
 
 }
 
-let targetSelectorTable = '.genius__main-content';
-const targetSelectorButton = '#root > div > div.genius__container > div > div > div.genius__header';
-
-// Use MutationObserver to watch for DOM changes
-const observer = new MutationObserver(() => {
-    if (document.querySelector(targetSelectorButton)) {
-        insertButton(); // Insert the button when the target element is available
-    }
-});
-
-// Configure the MutationObserver
-observer.observe(document.body, { childList: true, subtree: true });
-
-
 
 
 function getUserId(node) {
+    // 根据鼠标悬停的元素获取用户 ID
+
     // 检查 node 是否自身就是目标元素
+    if (node.classList.contains('genius__container') || node.classList.contains('genius-main') || node.classList.contains('competition-consultant-leaderboard')) {
+        return [node, null];
+    }
     if (node.classList.contains('competitions_data_container--user')) {
-        return node.getAttribute('data-user-id') || node.textContent.trim() || null;
+        return [node, node.getAttribute('data-user-id') || node.textContent.trim() || null];
     }
 
     // 查找子元素中是否存在匹配的 div
@@ -738,29 +629,53 @@ function getUserId(node) {
 
     // 如果找到了该节点，尝试获取用户 ID
     if (userDiv) {
-        return userDiv.getAttribute('data-user-id') || userDiv.textContent.trim() || null;
+        return [userDiv, userDiv.getAttribute('data-user-id') || userDiv.textContent.trim() || null];
     }
-
     // 未找到则返回 null
-    return null;
+    return [node, null];
+}
+async function showGeniusCard(event) {
+    // 显示用户的排名信息的卡片
+    let [userHtml, userId] = getUserId(event.target);
+    if (userId) {
+        userId = userId.substring(0, 7);
+        console.log(userHtml, userId);
+        const { result, savedTimestamp } = await getSingleRankByUserId(userId);
+        // result, savedTimestamp, rankInfo2Html(result)
+        if (card.enable(userId)) {
+            console.log('Card enabled');
+            card.updateDataId(userId);
+            card.updateCursor(event.clientX, event.clientY);
+            card.updateTargetHtml(userHtml);
+            cardTitle = `${userId} 排名信息`;
+            cardContent = rankInfo2Html(result);
+            // console.log(cardContent);
+            card.updateData(cardTitle, cardContent);
+        }
+        return;
+    }
+    card.disable();  
+}
+
+var targetSelectorButton = '#root > div > div.genius__container > div > div > div.genius__header';
+
+function watchForElementAndInsertButton(){
+    
+
+    // Use MutationObserver to watch for DOM changes
+    var observer = new MutationObserver(() => {
+        if (document.querySelector(targetSelectorButton) && !document.getElementById('WQButtonContainer')) {
+            insertButton(); // Insert the button when the target element is available
+            observer.disconnect();
+        }
+    });
+    
+    // Configure the MutationObserver
+    observer.observe(document.body, { childList: true, subtree: true });
 }
 
 
+watchForElementAndInsertButton();
+document.addEventListener("mouseover", showGeniusCard);
+document.addEventListener("mousemove", (ev) => card.updateCursor(ev.pageX, ev.pageY));
 
-document.addEventListener("mouseover", showGeniusProfile);
-document.addEventListener("mousemove", (ev) => geniusRankProfileCard.updateCursor(ev.pageX, ev.pageY));
-
-async function showGeniusProfile(event) {
-    let userId = getUserId(event.target);
-    if (!userId) {
-        geniusRankProfileCard.hide();
-    }
-    userId = userId.substring(0, 7);
-    console.log(userId);
-    const { result, savedTimestamp } = await getSingleRankByUserId(userId);
-    if (geniusRankProfileCard.enable(userId)) {
-        geniusRankProfileCard.updateDataId(userId, result, savedTimestamp, rankInfo2Html(result));
-        geniusRankProfileCard.updateCursor(event.clientX, event.clientY);
-        geniusRankProfileCard.updateData();
-    }
-}

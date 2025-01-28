@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WorldQuant Scope 配置</title>
+    <link rel="stylesheet" href="popup.css">
+</head>
+
+<body>
+    <div class="container">
+        <form id="settingsForm">
+            <div class="input-group">
+                <label for="dbAddress">中文搜索 API 地址</label>
+                <input id="dbAddress" type="text" placeholder="请输入 API 地址" required />
+            </div>
+            <div class="checkbox-container">
+                <input type="checkbox" id="dataAnalysis">
+                <label for="dataAnalysis">启用数据分析</label>
+            </div>
+            <div class="checkbox-container">
+                <input type="checkbox" id="hiddenFeature">
+                <label for="hiddenFeature">启用隐藏功能</label>
+            </div>
+            <h2>Genius 排名分析</h2>
+            <div class="checkbox-container">
+                <input type="checkbox" id="geniusCombineTag">
+                <label for="geniusCombineTag">是否考虑Combined Performance</label>
+            </div>
+            <div class="input-group">
+                <label for="geniusAlphaCount">Genius Alpha 数量</label>
+                <input id="geniusAlphaCount" type="number" placeholder="请输入 Genius Alpha 数量" required />
+            </div>
+            <button type="submit" id="saveBtn" disabled>保存设置</button>
+        </form>
+        <p id="status" aria-live="polite"></p>
+    </div>
+    <script src="popup.js"></script>
+</body>
+
+</html>

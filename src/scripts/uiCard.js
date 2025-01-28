@@ -1,55 +1,57 @@
-function getGeniusRankProfileCardHTML() {
-    return `
-        <div id="biliscope-id-card" style="position: absolute;padding:20px;">
-            <div id="biliscope-id-card-data">
-            <div class="idc-content">
-                <b id="GeniuseRanktitle" class="idc-uname">排名信息</b>
-                
+// uiCard.js: UI Card Component
+console.log('uiCard.js loaded');
 
+function getCommonCardHTML() {
+    return `
+        <div id="wqscope-id-card" style="position: absolute; padding:20px;">
+            <div id="wqscope-id-card-data">
+            <div class="idc-content">
+                <b id="wqscope-title" class="idc-uname"></b>
             </div>
-            <div id="rank-info"></div>
+            <div id="wqscope-info"></div>
             </div>
         </div>
     `
 }
 
+function Card() {
+    this.cardTitle = null;
+    this.cardContent = null;
 
-function GeniusRankProfileCard() {
     this.dataId = null;
     this.data = {};
     this.cursorX = 0;
     this.cursorY = 0;
-    this.target = null;
     this.enabled = false;
     this.wordCloud = null;
     this.lastDisable = 0;
     this.el = document.createElement("div");
     this.el.style.position = "absolute";
-    this.el.innerHTML = getGeniusRankProfileCardHTML(); //this.data
+    this.el.innerHTML = getCommonCardHTML(); //this.data
+    this.el.style.display = "none";
     this.disable();
     document.body.appendChild(this.el);
 }
-GeniusRankProfileCard.prototype.enable = function (dataId) {
+
+Card.prototype.enable = function (dataId) {
     if (dataId != null && dataId != this.dataId) {
         this.enabled = true;
+        this.el.style.display = 'flex';
         return true;
     }
     return false;
 }
 
-GeniusRankProfileCard.prototype.hide = function () {
+
+
+Card.prototype.disable = function () {
+    this.dataId = null;
+    this.enabled = false;
     this.el.style.display = "none";
 }
 
-GeniusRankProfileCard.prototype.disable = function () {
-    this.dataId = null;
-    this.enabled = false;
-    if (this.el) {
-        this.el.style.display = "none";
-    }
-}
 
-GeniusRankProfileCard.prototype.updateCursor = function (cursorX, cursorY) {
+Card.prototype.updateCursor = function (cursorX, cursorY) {
     const cursorPadding = 10;
     const windowPadding = 20;
 
@@ -81,30 +83,27 @@ GeniusRankProfileCard.prototype.updateCursor = function (cursorX, cursorY) {
     }
 }
 
-GeniusRankProfileCard.prototype.updateDataId = function (dataId, data, savedTimestamp, dataHtml) {
+
+Card.prototype.updateDataId = function (dataId) {
     this.dataId = dataId;
-    this.data = data;
-    this.savedTimestamp = savedTimestamp;
-    this.dataHtml = dataHtml;
 }
 
-GeniusRankProfileCard.prototype.updateTarget = function (target) {
-    this.target = target;
+Card.prototype.updateTargetHtml = function (targetHtml) {
+    this.targetHtml = targetHtml;
     upc = this
-    this.target.addEventListener("mouseleave", function leaveHandle(ev) {
+    this.targetHtml.addEventListener("mouseleave", function leaveHandle(ev) {
         upc.disable();
         upc.lastDisable = Date.now();
         this.removeEventListener("mouseleave", leaveHandle);
     })
 }
-GeniusRankProfileCard.prototype.updateData = function () {
-    this.el.innerHTML = getGeniusRankProfileCardHTML();
+
+Card.prototype.updateData = function (cardTitle, cardContent) {
+    this.el.innerHTML = getCommonCardHTML();
     this.el.style.display = "flex";
 
-    document.getElementById("GeniuseRanktitle").innerHTML = `${this.dataId} 排名信息`;
-    document.getElementById("rank-info").innerHTML = this.dataHtml;
-
-
-
+    document.getElementById("wqscope-title").innerHTML = cardTitle; //`${this.dataId} 排名信息`;
+    document.getElementById("wqscope-info").innerHTML = cardContent;
 }
-geniusRankProfileCard = new GeniusRankProfileCard();
+
+var card = new Card();

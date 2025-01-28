@@ -1,22 +1,19 @@
 {
     "manifest_version": 3,
     "name": "WorldQuant Scope",
+    "description": "WorldQuant Scope is a browser extension that provides a set of tools to help you navigate the WorldQuant platform.",
     "version": "0.8.1",
-    "description": "可以显示数据分析特征",
     "author": "zhangkaihua@buaa.edu.cn",
     "icons": {
         "128": "img/logo.png"
     },
     "action": {
-        "default_popup": "html/popup.html",
-        "default_icon": {
-            "16": "img/logo.png",
-            "48": "img/logo.png",
-            "128": "img/logo.png"
-        }
+        "default_title": "WorldQuant Scope - Tools for WorldQuant Platform",
+        "default_popup": "src/html/popup/popup.html",
+        "default_icon": "img/logo.png"
     },
     "background": {
-        "service_worker": "scripts/background.js",
+        "service_worker": "src/scripts/background.js",
         "type": "module"
     },
     "content_scripts": [
@@ -24,15 +21,18 @@
             "matches": [
                 "*://platform.worldquantbrain.com/*"
             ],
+            "exclude_matches":[
+                "*://platform.worldquantbrain.com/genius/*"
+            ],
             "js": [
-                "scripts/msgpack.min.js",
-                "scripts/pako.min.js",
-                "scripts/chart.js",
-                "scripts/ui.js",
-                "scripts/main.js"
+                "src/scripts/lib/msgpack.min.js",
+                "src/scripts/lib/pako.min.js",
+                "src/scripts/lib/chart.js",
+                "src/scripts/uiCard.js",
+                "src/scripts/dataAna.js"
             ],
             "css": [
-                "css/idcard.css"
+                "src/css/idcard.css"
             ]
         },
         {
@@ -40,7 +40,7 @@
                 "*://support.worldquantbrain.com/hc/en-us/search*"
             ],
             "js": [
-                "scripts/search.js"
+                "src/scripts/search.js"
             ]
         },
         {
@@ -49,27 +49,27 @@
                 "*://support.worldquantbrain.com/hc/en-us/profiles/*"
             ],
             "js": [
-                "scripts/utils.js",
-                "scripts/voteup.js"
+                "src/scripts/utils.js",
+                "src/scripts/voteup.js"
             ],
             "css": [
-                "css/menu.css"
+                "src/css/menu.css"
             ]
 
-        },
-        {
-            "matches": [
-                "*://platform.worldquantbrain.com/genius/*"
-            ],
-            "js": [
-                "scripts/utils.js",
-                "scripts/ui_genius.js",
-                "scripts/genius.js"
-            ],
-            "css": [
-                "css/genius.css"
-            ]
         }
+        // {
+        //     "matches": [
+        //         "*://platform.worldquantbrain.com/genius/*"
+        //     ],
+        //     "js": [
+        //         "src/scripts/utils.js",
+        //         "src/scripts/uiCard.js",
+        //         "src/scripts/genius.js"
+        //     ],
+        //     "css": [
+        //         "src/css/genius.css"
+        //     ]
+        // }
     ],
     "web_accessible_resources": [
         {

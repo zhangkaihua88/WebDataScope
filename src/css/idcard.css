@@ -1,4 +1,4 @@
-#biliscope-id-card {
+#wqscope-id-card {
     background: #fff;
     box-shadow: 0 0 2px rgba(0,0,0,.3);
     border-radius: 4px;
@@ -8,7 +8,7 @@
 }
 
 
-#biliscope-id-card .canvas-container {
+#wqscope-id-card .canvas-container {
   display: flex;
   flex-wrap: wrap; /* 允许内容换行 */
   /* justify-content: space-around; 水平方向上的对齐方式，这里是均匀分布 */
@@ -17,41 +17,41 @@
   margin: 10px;
 }
 
-#biliscope-id-card .canvas-container .canvas {
+#wqscope-id-card .canvas-container .canvas {
   margin: 0px; /* 给canvas元素周围添加一些间距 */
   width: 20%; /* 根据父容器的宽度设置canvas的宽度，确保一行可以放置5个canvas */
   height: 200px; 
   margin: 0px;
 }
 
-#biliscope-id-card .canvas-container .canvasDataInfo {
+#wqscope-id-card .canvas-container .canvasDataInfo {
     margin: 0px; /* 给canvas元素周围添加一些间距 */
     width: 50%; /* 根据父容器的宽度设置canvas的宽度，确保一行可以放置5个canvas */
     height: 220px; 
     margin: 0px;
 }
-#biliscope-id-card .canvas-container .dataInfo {
+#wqscope-id-card .canvas-container .dataInfo {
     margin: 0px; /* 给canvas元素周围添加一些间距 */
     /* display: flex; */
     /* flex-wrap: wrap; 允许内容换行 */
     width: 50%; /* 根据父容器的宽度设置canvas的宽度，确保一行可以放置5个canvas */
-    height: 220px; 
+    height: 240px; 
     margin: 10px 0px 0px 0px;
 }
-#biliscope-id-card .canvas-container .dataInfo span{
+#wqscope-id-card .canvas-container .dataInfo span{
     flex-shrink: 1; /* 允许缩小 */
     min-width: 0; /* 允许元素宽度小于其内容的宽度，这样就可以换行了 */
     word-wrap: break-word; /* 允许在长单词或URL等无法在容器宽度内显示完整时进行断行 */
 }
   
 
-#biliscope-id-card .idc-laoding-text {
+#wqscope-id-card .idc-laoding-text {
     padding: 10px;
     font-size: 12px;
     color: #222
 }
 
-#biliscope-id-card .idc-theme-img {
+#wqscope-id-card .idc-theme-img {
     border-radius: 4px 4px 0 0;
     display: block;
     width: 375px;
@@ -60,19 +60,19 @@
     background-position: 50%
 }
 
-#biliscope-id-card .idc-content {
+#wqscope-id-card .idc-content {
     display: flex; 
     justify-content: center; 
     align-items: center; 
     margin-top: 10px;
 }
 
-#biliscope-id-card .idc-info {
+#wqscope-id-card .idc-info {
     padding: 7px 40px 10px 90px;
     position: relative
 }
 
-#biliscope-id-card .idc-info .idc-avatar-container {
+#wqscope-id-card .idc-info .idc-avatar-container {
     position: absolute;
     top: -15px;
     left: 20px;
@@ -80,7 +80,7 @@
     height: 54px
 }
 
-#biliscope-id-card .idc-avatar {
+#wqscope-id-card .idc-avatar {
     border: 2px solid #fff;
     border-radius: 50px;
     display: block;
@@ -92,11 +92,11 @@
     left: 0
 }
 
-#biliscope-id-card .idc-uname {
+#wqscope-id-card .idc-uname {
     display: inline-block;
     font-size: 20px;
     vertical-align: top;
-    max-width: 20em;
+    max-width: 90%;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -105,39 +105,39 @@
 }
 
 
-#biliscope-id-card .idc-gender {
+#wqscope-id-card .idc-gender {
     vertical-align: middle
 }
 
-#biliscope-id-card .idc-m-level {
+#wqscope-id-card .idc-m-level {
     vertical-align: middle;
     margin-top: 1px
 }
 
-#biliscope-id-card .idc-meta {
+#wqscope-id-card .idc-meta {
     font-size: 12px;
     margin-top: 6px
 }
 
-#biliscope-id-card .idc-meta-item {
+#wqscope-id-card .idc-meta-item {
     margin-right: 20px
 }
 
-#biliscope-id-card .idc-tag-list {
+#wqscope-id-card .idc-tag-list {
     display: none;
     padding-bottom: 0
 }
 
-#biliscope-id-card .idc-certification {
+#wqscope-id-card .idc-certification {
     color: #ff931e;
     margin: 7px 0 0
 }
 
-#biliscope-id-card .idc-certification:empty {
+#wqscope-id-card .idc-certification:empty {
     display: none
 }
 
-#biliscope-id-card .idc-certified-icon {
+#wqscope-id-card .idc-certified-icon {
     background-position: -213px -791px;
     width: 20px;
     height: 20px;
@@ -145,33 +145,33 @@
     margin-right: 5px
 }
 
-#biliscope-id-card .idc-auth-description {
+#wqscope-id-card .idc-auth-description {
     line-height: 20px;
     font-size: 12px;
     margin-top: 6px;
     color: #6d757a
 }
 
-#biliscope-id-card .idc-auth-description.no-desc {
+#wqscope-id-card .idc-auth-description.no-desc {
     color: #99a2aa
 }
 
-#biliscope-id-card .idc-sign {
+#wqscope-id-card .idc-sign {
     color: #999;
     line-height: 1.7;
     padding: 7px 0 5px
 }
 
-#biliscope-id-card .idc-sign:empty {
+#wqscope-id-card .idc-sign:empty {
     display: none
 }
 
-#biliscope-id-card .idc-action {
+#wqscope-id-card .idc-action {
     text-align: center;
     padding: 0 20px 20px 29px
 }
 
-#biliscope-id-card .idc-btn {
+#wqscope-id-card .idc-btn {
     display: inline-block;
     cursor: pointer;
     line-height: 24px;
@@ -181,29 +181,29 @@
     font-size: 12px
 }
 
-#biliscope-id-card .idc-btn.blue {
+#wqscope-id-card .idc-btn.blue {
     color: #fff;
     background-color: #00a1d6;
     border: 1px solid #00a1d6
 }
 
-#biliscope-id-card .idc-btn.blue:hover {
+#wqscope-id-card .idc-btn.blue:hover {
     background-color: #00b5e5;
     border: 1px solid #00b5e5;
     color: #fff
 }
 
-#biliscope-id-card .idc-btn.unfollow {
+#wqscope-id-card .idc-btn.unfollow {
     background-color: #edf2f9;
     border-color: #edf2f9;
     color: #999
 }
 
-#biliscope-id-card .idc-btn .btn-content {
+#wqscope-id-card .idc-btn .btn-content {
     line-height: 24px
 }
 
-.biliscope-auth-icon {
+.wqscope-auth-icon {
     display: flex;
     -ms-flex-negative: 0;
     flex-shrink: 0;
@@ -214,15 +214,15 @@
     margin-right: 6px
 }
 
-.biliscope-personal-auth-icon {
+.wqscope-personal-auth-icon {
     background-position: -39px -54px;
 }
 
-.biliscope-organization-auth-icon {
+.wqscope-organization-auth-icon {
     background-position: -5px -54px;
 }
 
-.biliscope-icon {
+.wqscope-icon {
     display: inline-block;
     background-image: url(//s1.hdslb.com/bfs/static/jinkela/space/assets/icons.png)
 }

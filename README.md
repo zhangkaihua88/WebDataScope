@@ -18,8 +18,8 @@ WebDataScope是一个正在为WorldQuant平台打造的Chrome/Edge插件。它�
 - 支持Genius排名分析
 
 # 存储的变量
-- `WQPApiAddress`: 中文搜索的api地址
-- `WQPHiddenFeatureEnabled`: 隐藏功能是否启用
+- `WQPApiAddress`: 中文搜索的api地址, from `popup.js`
+- `WQPHiddenFeatureEnabled`: 隐藏功能是否启用, from `popup.js`
 - `WQPOPSAna`: Genius运算符使用分析结果
 - `WQPRankData`: Genius排名分析结果
 
