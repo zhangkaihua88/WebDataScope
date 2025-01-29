@@ -275,8 +275,8 @@ function createStartMenu() {
 // Use MutationObserver to watch for DOM changes
 function voteUpMain() {
     // observer.disconnect();
-    chrome.storage.local.get(['WQPHiddenFeatureEnabled'], (result) => {
-        if (result.WQPHiddenFeatureEnabled) {
+    chrome.storage.local.get('WQPSettings', ({ WQPSettings }) => {
+        if (WQPSettings.hiddenFeatureEnabled) {
             // 如果为 true，则执行特定代码
             console.log('隐藏功能已启用');
             createStartMenu();
