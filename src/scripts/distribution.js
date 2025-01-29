@@ -1,24 +1,18 @@
 var dataSets = {
     "fundamental": "Fundamental data",
     "analyst": "Analyst data",
-
     "broker": "Broker",
-    
     "news": "News data",
     "socialmedia": "Social media data",
     "sentiment": "Sentiment data",
-
     "pv": "Price volume data",
     "option": "Option data",
     "earnings": "Earnings",
-
     "insiders": "Insiders",
     "institutions": "Instiutional Ownership Data",
-
     "shortinterest": "Short interest data",
     "macro": "Macro data",
     "other": "Other",
-
     "risk": "Risk data",
     "model": "Model data",
 };
@@ -137,29 +131,6 @@ var non_data_delay0 = [
     {'x': 'HKG', 'y': 'Model data'},
     {'x': 'JPN', 'y': 'Model data'}
 ]
-
-// content.js
-function waitForElement(selector, timeout = 30000) {
-    return new Promise((resolve, reject) => {
-        const observer = new MutationObserver((mutations, me) => {
-            if (document.querySelector(selector)) {
-                resolve(document.querySelector(selector));
-                me.disconnect(); // stop observing
-                return;
-            }
-        });
-
-        observer.observe(document.body, {
-            childList: true,
-            subtree: true
-        });
-
-        setTimeout(() => {
-            reject(new Error("Timeout waiting for element"));
-            observer.disconnect();
-        }, timeout);
-    });
-}
 
 waitForElement(".card__wrapper").then(() => {
     var newElement = document.createElement('div');

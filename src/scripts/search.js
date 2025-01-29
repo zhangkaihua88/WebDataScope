@@ -1,3 +1,6 @@
+// search.js: 用于支持中文搜索功能的脚本
+console.log('search.js loaded');
+
 // 获取查询字符串中的 `query` 参数
 function getQueryParam(param) {
     const urlParams = new URLSearchParams(window.location.search);
@@ -46,8 +49,8 @@ if (queryValue) {
         button.innerText = '加载中...';
         button.disabled = true; // 禁用按钮，防止多次点击
         // 获取存储的 API 地址
-        chrome.storage.local.get(['WQPApiAddress'], function (result) {
-            const WQPApiAddress = result.WQPApiAddress;
+        chrome.storage.local.get(['WQPSettings'], ({ WQPSettings }) => {
+            const WQPApiAddress = WQPSettings.apiAddress;
             if (WQPApiAddress) {
                 // 拼接请求 URL
                 const url = `${WQPApiAddress}/search?q=${queryValue}`;
@@ -105,11 +108,6 @@ if (queryValue) {
                         mainContent.insertBefore(h1Element, firstChild);
                         mainContent.insertBefore(ulElement, firstChild);
                         mainContent.insertBefore(pElement, firstChild);
-
-
-
-
-
                     })
                     .catch(error => {
                         console.error('请求失败:', error);

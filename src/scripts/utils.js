@@ -32,6 +32,25 @@ async function getDataFromUrl(url) {
 }
 
 
+function waitForElement(selector, nonselector) {
+    return new Promise((resolve, reject) => {
+        const interval = setInterval(() => {
+            const element = document.querySelector(selector);
+            const nonElement = document.querySelector(nonselector);
+            if (element && !nonElement) {
+                clearInterval(interval);
+                resolve(element);
+            }
+        }, 100); // 每100毫秒检查一次
+
+        // 设置一个超时时间防止无限等待
+        const timeout = setTimeout(() => {
+            clearInterval(interval);
+            reject(new Error('元素查找超时或非期望元素存在'));
+        }, 30000); // 5秒后超时
+    });
+}
+
 
 
 

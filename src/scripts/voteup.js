@@ -1,3 +1,6 @@
+// voteup.js: 点赞帖子和评论的脚本
+console.log("voteup.js script loaded");
+
 let csrfToken = null;
 let upCount = 0;
 let quarterStartTime = getStartTime();
