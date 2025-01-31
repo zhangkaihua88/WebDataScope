@@ -10,7 +10,7 @@ chrome.runtime.onInstalled.addListener(async () => {
         // 如果没有找到 WQPSettings，则设置默认值
         if (!WQPSettings) {
             const defaultSettings = {
-                apiAddress: "https://wg-backend.vercel.app",
+                apiAddress: "https://wq-backend.vercel.app",
                 hiddenFeatureEnabled: false,
                 dataAnalysisEnabled: true,
                 geniusAlphaCount: 40,
@@ -35,7 +35,11 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
         injectionDistributionScript(tabId);
     } else if (changeInfo.status === 'complete' && tab.url.startsWith("https://platform.worldquantbrain.com/genius")) {
         injectionGeniusScript(tabId);
-    } else if (changeInfo.status === 'complete' && tab.url.startsWith("https://platform.worldquantbrain.com/data/data-sets")) {
+    } else if (changeInfo.status === 'complete' && (
+        tab.url.includes("data/data-sets") || 
+        tab.url.includes("data/search/data-fields") || 
+        tab.url.includes("data/data-fields")
+    )) {
         injectionDataFlagScript(tabId, tab);
     }
 });

@@ -8,11 +8,13 @@ let sum = function (x, y) { return x + y; };
 
 function getDataFieldId(node) {
     // 从当前节点开始向上查找，直到找到包含指定类名的节点
+    // console.log('raw', node)
 
     const className = "rt-tr";
     while (node) {
         if (node && node.classList && node.classList.contains(className)) {
             const linkElement = node.querySelector('.link--wrap');
+            // console.log('last', node)
             return {
                 dataFieldHtml: node,
                 dataFieldUrl: linkElement ? linkElement.href : null
@@ -23,14 +25,23 @@ function getDataFieldId(node) {
     return { dataFieldHtml: null, dataFieldUrl: null };
 }
 
-function getDataFieldData(dataFieldUrl) {
+function getDataFieldData(dataFieldHtml, dataFieldUrl) {
     // 从URL中提取数据集和数据字段
 
-    const regex = /\/data-sets\/([^?#]+)(\?.*)?/;
-    const currentUrl = window.location.href;
-    const match = currentUrl.match(regex);
+    let regex = null;
+    let currentUrl = window.location.href;
+    // console.log('currentUrl', currentUrl)
+    if (!currentUrl.includes('data-sets') && currentUrl.includes('data-fields')) {
+        currentUrl = dataFieldHtml.parentNode.parentNode.querySelector('.link--wrap').href;
+        regex = /\/data-sets\/([^?#]+)(.*)?/;
+    } else {
+        regex = /\/data-sets\/([^?#]+)(\?.*)?/;
+    }
 
-    if (!match) {
+    const match = currentUrl.match(regex);
+    // console.log('currentUrl', currentUrl, match)
+
+    if (!match || dataFieldUrl.includes('data-sets')) {
         return null;
     }
 
@@ -53,6 +64,8 @@ function getDataFieldData(dataFieldUrl) {
     } else {
         return null;
     }
+
+    // console.log('data', data)
     return data;
 }
 
@@ -98,7 +111,7 @@ async function fetchDataDetails(fileName, dataFieldData) {
         cacheData[fileName] = decodedData;
         return decodedData, perfectMatch, universe;
     } catch (error) {
-        console.log("error", error);
+        // console.log("error", error);
         return;
     }
 }
@@ -284,15 +297,20 @@ async function showDataCard(event) {
         if (WQPSettings.dataAnalysisEnabled) {
             const { dataFieldHtml, dataFieldUrl } = getDataFieldId(event.target);
             if (dataFieldUrl) {
-                const data = getDataFieldData(dataFieldUrl);
+                const data = getDataFieldData(dataFieldHtml, dataFieldUrl);
                 if (data) {
                     const dataId = data.dataSet + "_" + data.region + "_" + data.universe + "_Delay" + data.delay + "_" + data.dataField;
                     if (card.enable(dataId)) {
-                        card.updateDataId(dataId);
-                        card.updateCursor(event.clientX, event.clientY);
-                        card.updateTargetHtml(dataFieldHtml);
-                        await updateCardInfo(dataId, data, (cardTitle, cardContent) => card.updateData(cardTitle, cardContent));
-                        return;
+                        try {
+                            card.updateDataId(dataId);
+                            card.updateCursor(event.clientX, event.clientY);
+                            card.updateTargetHtml(dataFieldHtml);
+                            await updateCardInfo(dataId, data, (cardTitle, cardContent) => card.updateData(cardTitle, cardContent));
+                            return;
+                        } catch (error) {
+                            card.el.innerHTML = getCommonCardHTML();
+                            card.disable();
+                        }
                     } else {
                         return;
                     }

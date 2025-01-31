@@ -16,6 +16,9 @@ function dataFlagFunc(dataSetList, url) {
             try {
                 let a_element = element.querySelector(".link.link--wrap");
                 // console.log(a_element)
+                if (a_element.href.includes("data-fields")){
+                    return;
+                }
                 let parts = a_element.href.split("/");
 
                 let lastPart = parts[parts.length - 1];
@@ -26,8 +29,8 @@ function dataFlagFunc(dataSetList, url) {
 
 
                 if (!dataSetList.includes(fileName)) {
-                    const startPrefix = `${dataFieldData.dataSet}_${dataFieldData.region}_`;
-                    const endPrefix = `_Delay${dataFieldData.delay}`;
+                    const startPrefix = `${lastPart}_${region}_`;
+                    const endPrefix = `_Delay${delay}`;
                     const partialMatchRegion = dataSetList.find(item => item.startsWith(startPrefix) && item.endsWith(endPrefix));
                     if (partialMatchRegion) {
                         flagMapOtherUniverse[fileName] = true;
@@ -35,7 +38,7 @@ function dataFlagFunc(dataSetList, url) {
                         flagMapOtherUniverse[fileName] = false;
                     }
                 }
-                
+                console.log("dataFlag name", fileName, flagMapOtherUniverse);
                 if (dataSetList.includes(fileName)) {
                     a_element.innerHTML = `<span style="color: red;">★★★</span>${a_element.innerHTML}`
                 } else if (flagMapOtherUniverse[fileName]) {
