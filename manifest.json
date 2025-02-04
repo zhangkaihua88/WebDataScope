@@ -21,7 +21,7 @@
             "matches": [
                 "*://platform.worldquantbrain.com/*"
             ],
-            "exclude_matches":[
+            "exclude_matches": [
                 "*://platform.worldquantbrain.com/genius/*"
             ],
             "js": [
@@ -55,7 +55,6 @@
             "css": [
                 "src/css/menu.css"
             ]
-
         }
     ],
     "web_accessible_resources": [
@@ -78,6 +77,8 @@
         "cookies",
         "tabs",
         "storage",
-        "activeTab"
+        "activeTab",
+        "alarms",
+        "notifications"
     ]
 }

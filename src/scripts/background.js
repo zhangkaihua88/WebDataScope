@@ -3,6 +3,11 @@ console.log('Background script is running.');
 
 const dataSetListUrl = chrome.runtime.getURL(`data/dataSetList.json`);
 let dataSetList = null; // 定义全局变量
+const REPO_OWNER = "zhangkaihua88";
+const REPO_NAME = "WebDataScope";
+const CHECK_INTERVAL = 24 * 60 * 60 * 1000; // 24小时检查一次
+
+
 
 // 初始化设置
 chrome.runtime.onInstalled.addListener(async () => {
@@ -27,17 +32,25 @@ chrome.runtime.onInstalled.addListener(async () => {
     });
     // 获取数据集列表
     dataSetList = await getDataSetList();
+    checkUpdate();
+});
+
+// 设置定时器，每天检查一次更新
+chrome.runtime.onStartup.addListener(() => {
+    checkUpdate();
 });
 
 
+
+// 监听标签页更新事件
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
     if (changeInfo.status === 'complete' && tab.url == "https://platform.worldquantbrain.com/alphas/distribution") {
         injectionDistributionScript(tabId);
     } else if (changeInfo.status === 'complete' && tab.url.startsWith("https://platform.worldquantbrain.com/genius")) {
         injectionGeniusScript(tabId);
     } else if (changeInfo.status === 'complete' && (
-        tab.url.includes("data/data-sets") || 
-        tab.url.includes("data/search/data-fields") || 
+        tab.url.includes("data/data-sets") ||
+        tab.url.includes("data/search/data-fields") ||
         tab.url.includes("data/data-fields")
     )) {
         injectionDataFlagScript(tabId, tab);
@@ -45,12 +58,77 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
 });
 
 
-// chrome.action.onClicked.addListener(() => {
-//     const extensionUrl = chrome.runtime.getURL("html/WQScope.html");
-//     chrome.tabs.create({ url: extensionUrl });
-// });
 
 
+// ############################## 以下为辅助函数 #################################
+
+
+// 版本比较函数
+function compareVersions(v1, v2) {
+    const parts1 = v1.split('.').map(Number);
+    const parts2 = v2.split('.').map(Number);
+    for (let i = 0; i < Math.max(parts1.length, parts2.length); i++) {
+        const num1 = parts1[i] || 0;
+        const num2 = parts2[i] || 0;
+        if (num1 !== num2) return num1 - num2;
+    }
+    return 0;
+}
+
+// 获取最新版本
+async function checkUpdate() {
+    try {
+        const today = new Date().toISOString().split('T')[0]; // 获取当前日期 (YYYY-MM-DD)
+        
+        // 读取存储的上次提醒日期
+        chrome.storage.local.get('lastNotifyDate', async ({lastNotifyDate}) => {
+            console.log('上次提醒日期:', lastNotifyDate);
+            if (lastNotifyDate === today) {
+                console.log('今天已经提醒过，无需重复提醒');
+                return;
+            }
+            console.log('今天尚未提醒过，开始检查更新');
+
+            // 获取 GitHub 上的最新版本
+            const response = await fetch(
+                `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/releases/latest`
+            );
+            const data = await response.json();
+            const latestVersion = data.tag_name.replace(/^v/, ''); // 去除可能的v前缀
+            const currentVersion = chrome.runtime.getManifest().version;
+            console.log('最新版本:', latestVersion, '当前版本:', currentVersion);
+
+            // 版本对比
+            if (compareVersions(latestVersion, currentVersion) > 0) {
+                showNotification(latestVersion, `https://github.com/${REPO_OWNER}/${REPO_NAME}/archive/refs/tags/${latestVersion}.zip`);
+
+                // 记录今天已经提醒过
+                chrome.storage.local.set({ lastNotifyDate: today });
+            }
+        });
+
+    } catch (error) {
+        console.error('检查更新失败:', error);
+    }
+}
+
+// 显示通知
+function showNotification(version, url) {
+    chrome.notifications.create({
+        type: 'basic',
+        iconUrl: chrome.runtime.getURL('img/logo-128.png'), // 使用插件内的图片
+        title: '发现新版本(WorldQuant Scope插件)',
+        message: `点击下载 ${version}`,
+    }, () => {
+        chrome.notifications.onClicked.addListener(() => {
+            chrome.tabs.create({ url });
+        });
+    });
+}
+
+
+
+// 获取数据集列表
 async function getDataSetList() {
     const response = await fetch(dataSetListUrl);
     if (!response.ok) {
@@ -60,7 +138,7 @@ async function getDataSetList() {
     return data
 }
 
-
+// 注入分布图脚本
 function injectionDistributionScript(tabId) {
     try {
         chrome.scripting.insertCSS({
@@ -69,13 +147,13 @@ function injectionDistributionScript(tabId) {
         });
         chrome.scripting.executeScript({
             target: { tabId: tabId },
-            files: ['src/scripts/lib/chart.js', "src/scripts/utils.js",  'src/scripts/distribution.js'],
+            files: ['src/scripts/lib/chart.js', "src/scripts/utils.js", 'src/scripts/distribution.js'],
         });
     } catch (error) {
         console.error('Script injection failed: ', error);
     }
 }
-
+// 注入数据标记脚本
 async function injectionDataFlagScript(tabId, tab) {
     if (dataSetList === null) {
         dataSetList = await getDataSetList();
@@ -98,7 +176,7 @@ async function injectionDataFlagScript(tabId, tab) {
     }
 }
 
-
+// 注入 Genius 脚本
 function injectionGeniusScript(tabId) {
     try {
         // 注入 CSS 文件
