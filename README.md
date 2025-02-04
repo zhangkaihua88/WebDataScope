@@ -8,13 +8,6 @@ WebDataScope是一个正在为WorldQuant平台打造的Chrome/Edge插件。它�
 - `WQPOPSAna`: Genius运算符使用分析结果
 - `WQPRankData`: Genius排名分析结果
 
-# TODO
-
-# 没处理
-- 没跑完
-  <!-- - `analyst39_GLB_TOP3000_Delay1`
-  - `analyst46_GLB_TOP3000_Delay1` -->
-
 # 更新日志
 - V0.9.0(20250202)
   - 重构代码
