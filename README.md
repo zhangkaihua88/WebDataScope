@@ -10,7 +10,10 @@ WebDataScope是一个正在为WorldQuant平台打造的Chrome/Edge插件。它�
 
 # 更新日志
 - V0.9.x(20250216)
-  - fix: 运算符分析中的bug(未考虑and or not的缩写)
+  - fix: 运算符分析中的bug
+    - 未考虑and or not的缩写
+    - `<=`,`>=`名称改动
+    - 排除带符号的数字时引起的bug
 - V0.9.0(20250202)
   - 重构代码
   - add: 版本检测
