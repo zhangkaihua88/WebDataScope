@@ -66,12 +66,13 @@ function escapeRegExp(str) {
 }
 
 function findSingleOps(text) {
+    // 删除掉以+-号开头的数字
+    text = text.replace(/([+-])\d+/g, 'none');
     const singleOps = ['+', '-', '*', '/', '^', '<=', '>=', '<', '>', '==', '!=', '?', '&&', '||'];
     let count = [];
     singleOps.sort((a, b) => b.length - a.length);  // Sort by operator length in descending order
     singleOps.forEach(op => {
-        // Adjusting regex to avoid matching '+' and '-' when followed by a number
-        let regex = new RegExp(`(?<!\\d)${escapeRegExp(op)}(?!\\d)`, 'g');
+        let regex = new RegExp(`${escapeRegExp(op)}`, 'g'); 
         let matches = [...text.matchAll(regex)];
         count = count.concat(Array(matches.length).fill(op));  // Add matched operator to the count
         text = text.replace(regex, ' ');  // Replace matched operators with spaces
