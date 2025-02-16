@@ -66,7 +66,7 @@ function escapeRegExp(str) {
 }
 
 function findSingleOps(text) {
-    const singleOps = ['+', '-', '*', '/', '^', '<=', '>=', '<', '>', '==', '!=', '?'];
+    const singleOps = ['+', '-', '*', '/', '^', '<=', '>=', '<', '>', '==', '!=', '?', '&&', '||'];
     let count = [];
     singleOps.sort((a, b) => b.length - a.length);  // Sort by operator length in descending order
     singleOps.forEach(op => {
@@ -80,7 +80,7 @@ function findSingleOps(text) {
 }
 
 const splitFunc = (item) => {
-    return item.replace(' ', '').split(/[(),:+\-*/^<>=!?;\n#]+/).filter(part => part).map(item => item.replace(' ', ''));
+    return item.replace(' ', '').split(/[(),:+\-*/^<>=!?;\n#&|]+/).filter(part => part).map(item => item.replace(' ', ''));
 };
 
 function findOps(regular, operators) {

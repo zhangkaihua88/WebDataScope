@@ -98,7 +98,10 @@ async function opsAna() {
         '>': 'greater',
         '==': 'equal',
         '!=': 'not_equal',
-        '?': 'if_else'
+        '?': 'if_else',
+        '&&': 'and',
+        '||': 'or',
+        '!': 'not'
     };
 
     use_ops = use_ops.map(op => operatorMapping[op] || op);
