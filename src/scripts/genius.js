@@ -386,7 +386,7 @@ function rankInfo2Html(result){
 
     <div style="flex: 1;">
         <h4>以 Master 为 Universe</h4>
-        <p><strong>总排名:</strong> ${result.master.rank} / ${Math.round(result.gold.baseCount * 0.1)}</p>
+        <p><strong>总排名:</strong> ${result.master.rank} / ${Math.round(result.gold.baseCount * 0.08)}</p>
         <ul>
             <li>Operator Count: ${result.master.operatorCountRank} 名</li>
             <li>Operator Avg: ${result.master.operatorAvgRank} 名</li>
