@@ -123,7 +123,6 @@ async function upVoteSinglePostBody(document, url) {
         let itemData = await _upVote(_getUrl(url));
         // 检查返回的值
         if (itemData["value"] === "up") {
-            upCount += 1;
             console.log("点赞成功:", itemButton);
             logCount();
         }
@@ -143,7 +142,6 @@ async function upVoteSinglePostComment(document, url) {
                 let itemData = await _upVote(_getUrl(url) + "/comments/" + commentId);
                 // 检查返回的值
                 if (itemData["value"] === "up") {
-                    upCount += 1;
                     console.log("点赞成功:", commentId);
                     logCount();
                 }

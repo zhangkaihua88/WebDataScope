@@ -15,6 +15,7 @@ WebDataScope是一个正在为WorldQuant平台打造的Chrome/Edge插件。它�
     - `<=`,`>=`名称改动
     - 排除带符号的数字时引起的bug
   - fix: Genius排名分析中Master最终的人数计算错误的bug
+  - fix: 修复某已知bug
 - V0.9.0(20250202)
   - 重构代码
   - add: 版本检测
