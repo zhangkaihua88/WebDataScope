@@ -30,10 +30,27 @@ async function fetchAllAlphas() {
     const year = currentDate.getUTCFullYear();
     const quarter = Math.floor((currentDate.getMonth() + 3) / 3);
     const quarters = [
-        { start: `${year}-01-01T00:00:00.000Z`, end: `${year}-03-31T23:59:59.000Z` },  // 第一季度
-        { start: `${year}-04-01T00:00:00.000Z`, end: `${year}-06-30T23:59:59.000Z` },  // 第二季度
-        { start: `${year}-07-01T00:00:00.000Z`, end: `${year}-09-30T23:59:59.000Z` },  // 第三季度
-        { start: `${year}-10-01T00:00:00.000Z`, end: `${year}-12-31T23:59:59.000Z` }   // 第四季度
+        // https://api.worldquantbrain.com/users/self/alphas?limit=30&offset=0&status!=UNSUBMITTED%1FIS-FAIL&dateSubmitted%3E
+        // 2025-02-01T05:00:00.000Z
+        // &dateSubmitted%3C
+        // 2025-02-28T05:00:00.000Z
+        // &order=-dateCreated&hidden=false
+
+        // https://api.worldquantbrain.com/users/self/alphas?limit=30&offset=0&status!=UNSUBMITTED%1FIS-FAIL&
+        // dateSubmitted%3E
+        // 2025-01-01T05:00:00.000Z
+        // &dateSubmitted%3C
+        // 2025-03-31T04:00:00.000Z
+        // &order=-dateCreated&hidden=false
+
+        // https://api.worldquantbrain.com/users/self/alphas?limit=30&offset=0&status!=UNSUBMITTED%1FIS-FAIL&dateSubmitted%3E2024-04-01T04:00:00.000Z&dateSubmitted%3C2024-06-30T04:00:00.000Z&order=-dateCreated&hidden=false
+        // https://api.worldquantbrain.com/users/self/alphas?limit=30&offset=0&status!=UNSUBMITTED%1FIS-FAIL&dateSubmitted%3E2024-07-01T04:00:00.000Z&dateSubmitted%3C2024-09-30T04:00:00.000Z&order=-dateCreated&hidden=false
+        // https://api.worldquantbrain.com/users/self/alphas?limit=30&offset=0&status!=UNSUBMITTED%1FIS-FAIL&dateSubmitted%3E2024-10-01T04:00:00.000Z&dateSubmitted%3C2024-12-31T05:00:00.000Z&order=-dateCreated&hidden=false
+        
+        { start: `${year}-01-01T05:00:00.000Z`, end: `${year}-04-01T04:00:00.000Z` },  // 第一季度
+        { start: `${year}-04-01T04:00:00.000Z`, end: `${year}-07-01T04:00:00.000Z` },  // 第二季度
+        { start: `${year}-07-01T04:00:00.000Z`, end: `${year}-10-01T04:00:00.000Z` },  // 第三季度
+        { start: `${year}-10-01T04:00:00.000Z`, end: `${year}-01-01T05:00:00.000Z` }   // 第四季度
     ];
     const { start, end } = quarters[quarter - 1];
     const dateRange = `dateSubmitted%3E${start}&dateSubmitted%3C${end}`;
