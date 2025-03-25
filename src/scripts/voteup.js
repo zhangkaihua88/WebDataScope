@@ -152,6 +152,8 @@ async function upVoteSinglePostComment(document, url) {
 }
 
 // ############################## 点赞单个用户的所有帖子和评论 ##############################
+
+
 async function upVoteSingleUser() {
     await fetchCsrfToken();
     updateButton("upVoteSingleUserButton", "正在点赞...");
@@ -160,16 +162,37 @@ async function upVoteSingleUser() {
     let urlPath = window.location.pathname; // 获取路径部分
     let userTag = urlPath.substring(urlPath.lastIndexOf('/') + 1); // 获取最后一段
     console.log(userTag);
-    let userPostUrl = "https://support.worldquantbrain.com/hc/en-us/profiles/" + userTag + "?sort_by=recent_user_activity&filter_by=posts";
-    await upVoteSingleUserPosts(userPostUrl);
-
-
-    let userCommentUrl = "https://support.worldquantbrain.com/hc/en-us/profiles/" + userTag + "?sort_by=recent_user_activity&filter_by=comments";
-    await upVoteSingleUserComments(userCommentUrl);
-
+    await _upVoteSingleUser(userTag);
 
     resetButton("upVoteSingleUserButton", "开始点赞该用户");
 }
+
+async function upVoteMultiUser() {
+    await fetchCsrfToken();
+    // userTags 上传用户标签
+    // 输入的是一个dict，有键有值，键是名字，值是usertags
+    let data = prompt("输入dict", "{}");
+    data = JSON.parse(data);
+    console.log(data);
+    for (let [idx, [name, userTag]] of Object.entries(Object.entries(data))) {
+        before_upcont = upCount;
+        updateButton("upVoteMultiUserButton", `正在点赞(${idx}/${Object.keys(data).length} user)... ` + name);
+        await _upVoteSingleUser(userTag);
+        console.log(name, upCount - before_upcont);
+        document.getElementById("egg_setting_info").innerText = document.getElementById("egg_setting_info").innerText + "\n" + name + ": " + (upCount - before_upcont);
+    }
+
+    resetButton("upVoteMultiUserButton", `批量点赞用户完成(共${Object.keys(data).length} user)`);
+}
+
+async function _upVoteSingleUser(userTag) {
+    let userPostUrl = "https://support.worldquantbrain.com/hc/en-us/profiles/" + userTag + "?sort_by=recent_user_activity&filter_by=posts";
+    await upVoteSingleUserPosts(userPostUrl);
+
+    let userCommentUrl = "https://support.worldquantbrain.com/hc/en-us/profiles/" + userTag + "?sort_by=recent_user_activity&filter_by=comments";
+    await upVoteSingleUserComments(userCommentUrl);
+}
+
 async function upVoteSingleUserPosts(url) {
     nextTag = true;
     let response = await fetch(url);  // Use await with fetch
@@ -264,6 +287,23 @@ function createStartMenu() {
     startButton.addEventListener("click", upVoteSingleUser, false);
     //插入节点
     baseButtons.append(startButton)
+
+
+    startButton = document.createElement("button");
+    startButton.setAttribute("id", "upVoteMultiUserButton");
+    startButton.innerText = "开始批量点赞用户";
+    startButton.className = "egg_study_btn egg_menu";
+    //添加事件监听
+    startButton.addEventListener("click", upVoteMultiUser, false);
+    //插入节点
+    baseButtons.append(startButton)
+
+    // 添加一个p标签可以通过id往里面插入内容
+    let p = document.createElement("p");
+    p.setAttribute("id", "egg_setting_info");
+    p.innerText = "";
+    baseButtons.append(p);
+
 
     baseMenu.append(baseButtons);
     let body = document.getElementsByTagName("body")[0];
