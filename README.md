@@ -8,14 +8,23 @@ WebDataScope是一个正在为WorldQuant平台打造的Chrome/Edge插件。它�
 - `WQPOPSAna`: Genius运算符使用分析结果
 - `WQPRankData`: Genius排名分析结果
 
+# TODO
+- [ ] **fields的逐年覆盖率** (优先处理)
+- [ ] Genius排名分析的优化, 以增加准确性
+- [ ] 论坛中文搜索支持改为本地进行
+  - 逐个抓取论坛数据
+  - 之后进行本地搜索
+
 # 更新日志
-- V0.9.x(20250216)
+- V0.9.1(20250330)
   - fix: 运算符分析中的bug
     - 未考虑and or not的缩写
     - `<=`,`>=`名称改动
     - 排除带符号的数字时引起的bug
   - fix: Genius排名分析中Master最终的人数计算错误的bug
+  - fix: Genius的运算符分析中起始采取时间出错的bug
   - fix: 修复某已知bug
+  - add: 论坛的未知功能1_multi-user
 - V0.9.0(20250202)
   - 重构代码
   - add: 版本检测
