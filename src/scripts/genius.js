@@ -98,8 +98,8 @@ async function opsAna() {
     let operators = await getDataFromUrl(OptUrl);
     operators = operators.filter(item => item.scope.includes('REGULAR') || item.scope.includes('COMBO'));
 
-    // regulars = data.map(item => item.regular.code);
-    regulars = data.map(item => item.type === 'REGULAR' ? item.regular.code : item.combo.code);
+    regulars = data.map(item => item.type === 'REGULAR' ? item.regular.code : '');
+    // regulars = data.map(item => item.type === 'REGULAR' ? item.regular.code : item.combo.code);
     console.log(regulars);
     let use_ops = regulars.map(item => findOps(item, operators)).flat();
 
@@ -178,6 +178,7 @@ function insertOpsTable() {
             <div class="card_wrapper">
             <div class="card__content" style="padding-bottom: 26px;">
                 <h3>在你可用的运算符中，共有${nonZeroCount}种运算符被使用，${zeroCount}种运算符未被使用。</h3>
+                <p>'-'有两种含义分别是substract和revers, 此处统一为substract</p>
                 
                 
                 <div class="operator-table">
@@ -516,7 +517,7 @@ async function fetchAllUsers() {
     // const season = quarters[quarter - 1];
 	const season = getSeason();
 	console.log(season, "season")
-    
+
     const limit = 100;
     // 获取初始数据
     const initialUrl = `https://api.worldquantbrain.com/consultant/boards/genius?limit=${limit}&offset=0&date=${season}&aggregate=user`;
