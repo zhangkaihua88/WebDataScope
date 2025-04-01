@@ -136,7 +136,8 @@ async function opsAna() {
             category: op.category,
             definition: op.definition,
             count: counts[op.name] || 0,
-            scope: op.scope
+            scope: op.scope,
+            level: op.level === 'ALL' ? 'base' : 'genius',
         };
     });
     let currentTime = new Date().toISOString();
@@ -189,6 +190,7 @@ function insertOpsTable() {
                                 <th data-sort="definition">Definition</th>
                                 <th data-sort="count">Count</th>
                                 <th data-sort="scope">Scope</th>
+                                <th data-sort="level">Level</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -203,6 +205,7 @@ function insertOpsTable() {
                     <td>${item.definition}</td>
                     <td>${item.count}</td>
                     <td>${item.scope}</td>
+                    <td>${item.level}</td>
                 </tr>
                 `;
             });
