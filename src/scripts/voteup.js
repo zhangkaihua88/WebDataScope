@@ -6,12 +6,16 @@ let upCount = 0;
 let quarterStartTime = getStartTime();
 
 // ############################## 通用函数 ##############################
+updateButton('WQPRankFetchButton', `开始抓取`);
+
 function getStartTime() {
     const now = new Date();
+    const options = { timeZone: 'America/New_York' };
+    const easternDate = new Date(now.toLocaleString('en-US', options));
 
     // 获取当前年份和月份 (世界时)
-    const year = now.getUTCFullYear();
-    const month = now.getUTCMonth(); // 0 = January, 1 = February, ...
+    const year = easternDate.getUTCFullYear();
+    const month = easternDate.getUTCMonth(); // 0 = January, 1 = February, ...
     
     // 计算当前季度的开始时间 (UTC)
     const quarterStartMonth = Math.floor(month / 3) * 3; // 0 (Q1), 3 (Q2), 6 (Q3), 9 (Q4)
