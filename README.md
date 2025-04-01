@@ -15,8 +15,8 @@ WebDataScope是一个正在为WorldQuant平台打造的Chrome/Edge插件。它�
   - 逐个抓取论坛数据
   - 之后进行本地搜索
 - [ ] BUG: Genius排名分析有时需要刷新一下才能显示数据
-- [ ] genius可以选择赛季
 - [ ] 未知功能可以选择起始时间
+- [ ] 运算符分析排除SA
 
 # 更新日志
 - V0.9.x
