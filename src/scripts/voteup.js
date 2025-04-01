@@ -6,7 +6,6 @@ let upCount = 0;
 let quarterStartTime = getStartTime();
 
 // ############################## 通用函数 ##############################
-updateButton('WQPRankFetchButton', `开始抓取`);
 
 function getStartTime() {
     const now = new Date();
