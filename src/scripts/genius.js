@@ -516,6 +516,7 @@ async function fetchAllUsers() {
     // const season = quarters[quarter - 1];
 	const season = getSeason();
 	console.log(season, "season")
+    
     const limit = 100;
     // 获取初始数据
     const initialUrl = `https://api.worldquantbrain.com/consultant/boards/genius?limit=${limit}&offset=0&date=${season}&aggregate=user`;
