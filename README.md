@@ -19,6 +19,7 @@ WebDataScope是一个正在为WorldQuant平台打造的Chrome/Edge插件。它�
 # 更新日志
 - V0.9.x
   - fix: Genius排名分析中获取的时间未转化为美东时间的错误
+  - fix: 修复某已知bug
 - V0.9.1(20250330)
   - fix: 运算符分析中的bug
     - 未考虑and or not的缩写
