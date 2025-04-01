@@ -481,30 +481,42 @@ async function insertMyRankInfo() {
     }
 
 }
-
+function getSeason(){
+    // 获取当前季度
+	// 2025-Q1、2025-Q2 (Current)
+	let text = document.querySelector('.dropdown-custom--quarter').innerText;
+	text = text.split('(')[0];
+	text = text.trim();
+	text = text.replace('Q1', '01-01');
+	text = text.replace('Q2', '04-01');
+	text = text.replace('Q3', '07-01');
+	text = text.replace('Q4', '10-01');
+	return text;
+}
 async function fetchAllUsers() {
     // 抓取所有用户的排名信息
 
     updateButton('WQPRankFetchButton', `开始抓取`);
-    const currentDate = new Date();
+    // const currentDate = new Date();
 
     // Convert to Eastern Time (ET)
-    const options = { timeZone: 'America/New_York' };
-    const easternDate = new Date(currentDate.toLocaleString('en-US', options));
+    // const options = { timeZone: 'America/New_York' };
+    // const easternDate = new Date(currentDate.toLocaleString('en-US', options));
 
     // Get year and quarter in Eastern Time
-    const year = easternDate.getFullYear();
-    const quarter = Math.floor((easternDate.getMonth() + 3) / 3);
+    // const year = easternDate.getFullYear();
+    // const quarter = Math.floor((easternDate.getMonth() + 3) / 3);
 
-    const quarters = [
-        `${year}-01-01`, // 第一季度
-        `${year}-04-01`, // 第二季度
-        `${year}-07-01`, // 第三季度
-        `${year}-10-01`  // 第四季度
-    ];
-    const season = quarters[quarter - 1];
+    // const quarters = [
+    //     `${year}-01-01`, // 第一季度
+    //     `${year}-04-01`, // 第二季度
+    //     `${year}-07-01`, // 第三季度
+    //     `${year}-10-01`  // 第四季度
+    // ];
+    // const season = quarters[quarter - 1];
+	const season = getSeason();
+	console.log(season, "season")
     const limit = 100;
-
     // 获取初始数据
     const initialUrl = `https://api.worldquantbrain.com/consultant/boards/genius?limit=${limit}&offset=0&date=${season}&aggregate=user`;
     const initialData = await getDataFromUrl(initialUrl);
