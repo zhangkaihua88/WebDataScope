@@ -487,8 +487,15 @@ async function fetchAllUsers() {
 
     updateButton('WQPRankFetchButton', `开始抓取`);
     const currentDate = new Date();
-    const year = currentDate.getUTCFullYear();
-    const quarter = Math.floor((currentDate.getMonth() + 3) / 3);
+
+    // Convert to Eastern Time (ET)
+    const options = { timeZone: 'America/New_York' };
+    const easternDate = new Date(currentDate.toLocaleString('en-US', options));
+
+    // Get year and quarter in Eastern Time
+    const year = easternDate.getFullYear();
+    const quarter = Math.floor((easternDate.getMonth() + 3) / 3);
+
     const quarters = [
         `${year}-01-01`, // 第一季度
         `${year}-04-01`, // 第二季度
