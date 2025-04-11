@@ -96,7 +96,7 @@ async function opsAna() {
 
     const data = await fetchAllAlphas();
     let operators = await getDataFromUrl(OptUrl);
-    operators = operators.filter(item => item.scope.includes('REGULAR') || item.scope.includes('COMBO'));
+    operators = operators.filter(item => item.scope.includes('REGULAR'));
 
     regulars = data.map(item => item.type === 'REGULAR' ? item.regular.code : '');
     // regulars = data.map(item => item.type === 'REGULAR' ? item.regular.code : item.combo.code);
