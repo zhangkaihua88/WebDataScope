@@ -11,8 +11,8 @@ const OptUrl = 'https://api.worldquantbrain.com/operators';
 // genius level criteria
 const levelCriteria = {
     "expert": { "alphaCount": 20, "pyramidCount": 10, "combinedAlphaPerformance": 0.5, "combinedSelectedAlphaPerformance": 0.5 },
-    "master": { "alphaCount": 120, "pyramidCount": 30, "combinedAlphaPerformance": 1, "combinedSelectedAlphaPerformance": 1 },
-    "grandmaster": { "alphaCount": 220, "pyramidCount": 60, "combinedAlphaPerformance": 2, "combinedSelectedAlphaPerformance": 2 }
+    "master": { "alphaCount": 120, "pyramidCount": 20, "combinedAlphaPerformance": 1, "combinedSelectedAlphaPerformance": 1 },
+    "grandmaster": { "alphaCount": 220, "pyramidCount": 50, "combinedAlphaPerformance": 2, "combinedSelectedAlphaPerformance": 2 }
 }
 
 const CONCURRENCY = 10; // 同时进行的请求数
