@@ -93,3 +93,19 @@ function findOps(regular, operators) {
     ];
     return ops;
 }
+
+
+
+function rankDense(arr, ascending = true) {
+  // 1. 拷贝并排序唯一值
+  const sortedUnique = Array.from(new Set(arr)).sort((a, b) => ascending ? a - b : b - a);
+
+  // 2. 创建值到 rank 的映射
+  const rankMap = new Map();
+  sortedUnique.forEach((val, index) => {
+    rankMap.set(val, index + 1); // dense rank 从 1 开始
+  });
+
+  // 3. 映射原数组为 rank 数组
+  return arr.map(val => rankMap.get(val));
+}

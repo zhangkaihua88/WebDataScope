@@ -301,6 +301,103 @@ function determineUserLevel(userData, geniusCombineTag) {
     return 'gold';
 }
 
+async function getAllRank() {
+    // 根据用户ID获取单个用户的排名信息
+
+    return new Promise((resolve, reject) => {
+        chrome.storage.local.get(['WQPRankData', 'WQPSettings'], function ({WQPRankData, WQPSettings}) {
+            if (chrome.runtime.lastError) {
+                reject(chrome.runtime.lastError);
+                return;
+            }
+
+            const data = WQPRankData?.array || [];
+            const savedTimestamp = WQPRankData?.timestamp || 'N/A';
+            const userData = data.find(item => item.user === userId);
+            
+
+            if (!userData) {
+                reject(`User with ID ${userId} not found.`);
+                return;
+            }
+
+            data.forEach(item => item['currentLevel'] = determineUserLevel(item, WQPSettings.geniusCombineTag));
+            data.forEach(item => item['finalLevel'] = 'gold');
+
+            for (const model of ["gold", "expert", "master", "grandmaster"]) {
+                if (model === 'gold') {
+                    let itemData = data.map((item, index) => ({ ...item, originalIndex: index }));
+                } else {
+                    let itemData = data.map((item, index) => ({ ...item, originalIndex: index })).filter(item => item.alphaCount >= levelCriteria[model].alphaCount && item.pyramidCount >= levelCriteria[model].pyramidCount);
+                    if (WQPSettings.geniusCombineTag) {
+                        itemData = itemData.filter(item => item.combinedAlphaPerformance >= levelCriteria[model].combinedAlphaPerformance || item.combinedSelectedAlphaPerformance >= levelCriteria[model].combinedSelectedAlphaPerformance);
+                    }
+                }
+
+
+                data.forEach(item => item['goldTotalRank'] = 0);
+                for (const col of ["operatorCount", "fieldCount", "communityActivity", "completedReferrals", "maxSimulationStreak"]) {
+                    let sorted = itemData.map(item => item[col]).sort((a, b) => b - a);
+                    itemData.forEach(item => item['gold' + col + 'Rank'] = sorted.indexOf(item[col]) + 1);
+                    itemData.forEach(item => item['goldTotalRank'] = item['goldTotalRank'] + item[col + 'Rank']);
+                }
+                for (const col of ["operatorAvg", "fieldAvg"]) {
+                    let sorted = itemData.map(item => item[col]).sort((a, b) => a - b);
+                    itemData.forEach(item => item['gold' + col + 'Rank'] = sorted.indexOf(item[col]) + 1);
+                    itemData.forEach(item => item['goldTotalRank'] = item['goldTotalRank'] + item[col + 'Rank']);
+                }
+            }
+
+
+            const result = {};
+            result['info'] = {
+                "currentLevel":determineUserLevel(userData, WQPSettings.geniusCombineTag),
+                "baseAlphaCount":WQPSettings.geniusAlphaCount,
+            };
+            // filter以item.name Rank结尾的
+            result['gold'] = Object.fromEntries(Object.entries(userData).filter(([key, value]) => key.endsWith('Rank')));
+            result['gold']['rank'] = data.filter(item => item.totalRank < userData.totalRank).length;
+            result['gold']['count'] = data.length;
+            result['gold']['baseCount'] = data.filter(item => item.alphaCount >= WQPSettings.geniusAlphaCount).length;
+
+            for (const model of ["expert", "master", "grandmaster"]) {
+                let itemData = data.filter(item => item.alphaCount >= levelCriteria[model].alphaCount && item.pyramidCount >= levelCriteria[model].pyramidCount);
+                if (WQPSettings.geniusCombineTag) {
+                    itemData = itemData.filter(item => item.combinedAlphaPerformance >= levelCriteria[model].combinedAlphaPerformance || item.combinedSelectedAlphaPerformance >= levelCriteria[model].combinedSelectedAlphaPerformance);
+                }
+                result['gold'][model + 'Rank'] = itemData.filter(item => item.totalRank < userData.totalRank).length + 1;
+
+                item_count = itemData.length;
+
+                let itemUserData = itemData.find(item => item.user === userId);
+                if (!itemUserData) {
+                    itemData.push(userData);
+                }
+
+                itemData.forEach(item => item['totalRank'] = 0);
+                for (const col of ["operatorCount", "fieldCount", "communityActivity", "completedReferrals", "maxSimulationStreak"]) {
+                    let sorted = itemData.map(item => item[col]).sort((a, b) => b - a);
+                    itemData.forEach(item => item[col + 'Rank'] = sorted.indexOf(item[col]) + 1);
+                    itemData.forEach(item => item['totalRank'] = item['totalRank'] + item[col + 'Rank']);
+                }
+                for (const col of ["operatorAvg", "fieldAvg"]) {
+                    let sorted = itemData.map(item => item[col]).sort((a, b) => a - b);
+                    itemData.forEach(item => item[col + 'Rank'] = sorted.indexOf(item[col]) + 1);
+                    itemData.forEach(item => item['totalRank'] = item['totalRank'] + item[col + 'Rank']);
+                }
+
+                itemUserData = itemData.find(item => item.user === userId);
+                result[model] = Object.fromEntries(Object.entries(itemUserData).filter(([key, value]) => key.endsWith('Rank')));
+                result[model]['rank'] = itemData.filter(item => item.totalRank < itemUserData.totalRank).length;
+                result[model]['count'] = item_count;
+            }
+
+            resolve({ result, savedTimestamp });
+        });
+    });
+}
+
+
 async function getSingleRankByUserId(userId) {
     // 根据用户ID获取单个用户的排名信息
 
@@ -561,18 +658,18 @@ async function fetchAllUsers() {
         batchData.forEach(page => data = data.concat(page.results));
     }
 
-    // 保持原有的排名计算逻辑
-    data.forEach(item => item['totalRank'] = 0);
-    for (const col of ["operatorCount", "fieldCount", "communityActivity", "completedReferrals", "maxSimulationStreak"]) {
-        let sorted = data.map(item => item[col]).sort((a, b) => b - a);
-        data.forEach(item => item[col + 'Rank'] = sorted.indexOf(item[col]) + 1);
-        data.forEach(item => item['totalRank'] += item[col + 'Rank']);
-    }
-    for (const col of ["operatorAvg", "fieldAvg"]) {
-        let sorted = data.map(item => item[col]).sort((a, b) => a - b);
-        data.forEach(item => item[col + 'Rank'] = sorted.indexOf(item[col]) + 1);
-        data.forEach(item => item['totalRank'] += item[col + 'Rank']);
-    }
+    // // 保持原有的排名计算逻辑
+    // data.forEach(item => item['totalRank'] = 0);
+    // for (const col of ["operatorCount", "fieldCount", "communityActivity", "completedReferrals", "maxSimulationStreak"]) {
+    //     let sorted = data.map(item => item[col]).sort((a, b) => b - a);
+    //     data.forEach(item => item[col + 'Rank'] = sorted.indexOf(item[col]) + 1);
+    //     data.forEach(item => item['totalRank'] += item[col + 'Rank']);
+    // }
+    // for (const col of ["operatorAvg", "fieldAvg"]) {
+    //     let sorted = data.map(item => item[col]).sort((a, b) => a - b);
+    //     data.forEach(item => item[col + 'Rank'] = sorted.indexOf(item[col]) + 1);
+    //     data.forEach(item => item['totalRank'] += item[col + 'Rank']);
+    // }
 
     console.log(`Fetched ${data.length} results, expected ${totalCount}`);
     return data;
