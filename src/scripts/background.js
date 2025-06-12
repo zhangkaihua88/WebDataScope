@@ -181,8 +181,18 @@ function injectionGeniusScript(tabId) {
     try {
         // 注入 CSS 文件
         chrome.scripting.insertCSS({
-            target: { tabId: tabId },
-            files: ["src/css/genius.css", "src/css/idcard.css"],
+        target: { tabId: tabId },
+        files: [
+            "src/css/genius.css",
+            "src/css/idcard.css",
+            "src/css/dataTables.dataTables.css"
+        ],
+        }, () => {
+        if (chrome.runtime.lastError) {
+            console.error("CSS注入失败", chrome.runtime.lastError.message);
+        } else {
+            console.log("CSS注入成功");
+        }
         });
 
         // 检查是否已经注入了js脚本
@@ -196,7 +206,12 @@ function injectionGeniusScript(tabId) {
                 // 如果 OptUrl 未定义，则注入脚本
                 chrome.scripting.executeScript({
                     target: { tabId: tabId },
-                    files: ["src/scripts/utils.js", "src/scripts/uiCard.js", "src/scripts/genius.js"],
+                    files: [
+                        "src/scripts/lib/jquery-3.7.0.min.js",
+                        "src/scripts/lib/jquery.dataTables.min.js",
+                        "src/scripts/utils.js",
+                        "src/scripts/uiCard.js",
+                        "src/scripts/genius.js"],
                 });
             }
             else {
@@ -208,7 +223,7 @@ function injectionGeniusScript(tabId) {
                 });
             }
         });
-        console.log(tab.url);
+        console.log(tabId.url);
     } catch (error) {
         console.error('Script injection failed: ', error);
     }
