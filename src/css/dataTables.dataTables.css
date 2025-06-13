@@ -1,3 +1,17 @@
+:root {
+  --dt-row-selected: 13, 110, 253;
+  --dt-row-selected-text: 255, 255, 255;
+  --dt-row-selected-link: 9, 10, 11;
+  --dt-row-stripe: 0, 0, 0;
+  --dt-row-hover: 0, 0, 0;
+  --dt-column-ordering: 0, 0, 0;
+  --dt-header-align-items: center;
+  --dt-html-background: white;
+}
+:root.dark {
+  --dt-html-background: rgb(33, 37, 41);
+}
+
 table.dataTable tbody td.dt-control {
   text-align: center;
   cursor: pointer;

@@ -61,7 +61,9 @@
         {
             "resources": [
                 "data/*.bin",
-                "data/*.json"
+                "data/*.json",
+                "src/css/*.css",
+                "src/scripts/lib/*.js"
             ],
             "matches": [
                 "*://platform.worldquantbrain.com/*"

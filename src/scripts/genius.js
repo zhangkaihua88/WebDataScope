@@ -46,7 +46,7 @@ async function fetchAllAlphas() {
         // https://api.worldquantbrain.com/users/self/alphas?limit=30&offset=0&status!=UNSUBMITTED%1FIS-FAIL&dateSubmitted%3E2024-04-01T04:00:00.000Z&dateSubmitted%3C2024-06-30T04:00:00.000Z&order=-dateCreated&hidden=false
         // https://api.worldquantbrain.com/users/self/alphas?limit=30&offset=0&status!=UNSUBMITTED%1FIS-FAIL&dateSubmitted%3E2024-07-01T04:00:00.000Z&dateSubmitted%3C2024-09-30T04:00:00.000Z&order=-dateCreated&hidden=false
         // https://api.worldquantbrain.com/users/self/alphas?limit=30&offset=0&status!=UNSUBMITTED%1FIS-FAIL&dateSubmitted%3E2024-10-01T04:00:00.000Z&dateSubmitted%3C2024-12-31T05:00:00.000Z&order=-dateCreated&hidden=false
-        
+
         { start: `${year}-01-01T05:00:00.000Z`, end: `${year}-04-01T04:00:00.000Z` },  // 第一季度
         { start: `${year}-04-01T04:00:00.000Z`, end: `${year}-07-01T04:00:00.000Z` },  // 第二季度
         { start: `${year}-07-01T04:00:00.000Z`, end: `${year}-10-01T04:00:00.000Z` },  // 第三季度
@@ -305,7 +305,7 @@ async function getAllRank() {
     // 根据用户ID获取单个用户的排名信息
 
     return new Promise((resolve, reject) => {
-        chrome.storage.local.get(['WQPRankData', 'WQPSettings'], function ({WQPRankData, WQPSettings}) {
+        chrome.storage.local.get(['WQPRankData', 'WQPSettings'], function ({ WQPRankData, WQPSettings }) {
             if (chrome.runtime.lastError) {
                 reject(chrome.runtime.lastError);
                 return;
@@ -346,15 +346,15 @@ async function getAllRank() {
                     data[item.originalIndex]['achievedLevel'] = model;
                 });
             }
-            
+
 
 
             baseCount = data.filter(item => item.alphaCount >= WQPSettings.geniusAlphaCount).length;
             grandmasterCount = Math.round(baseCount * 0.02);
             masterCount = Math.round(baseCount * 0.08);
             expertCount = Math.round(baseCount * 0.2);
-            
-            
+
+
             console.log('baseCount:', baseCount);
             console.log('expertCount:', expertCount);
             console.log('masterCount:', masterCount);
@@ -404,13 +404,13 @@ async function getAllRank() {
             data.forEach((item, index) => {
                 switch (item.finalLevel) {
                     case 'grandmaster':
-                        item.showRank = 300000-parseInt(item.grandmasterTotalRank) || Number.MAX_SAFE_INTEGER;
+                        item.showRank = 300000 - parseInt(item.grandmasterTotalRank) || Number.MAX_SAFE_INTEGER;
                         break;
                     case 'master':
-                        item.showRank = 200000-parseInt(item.masterTotalRank) || Number.MAX_SAFE_INTEGER;
+                        item.showRank = 200000 - parseInt(item.masterTotalRank) || Number.MAX_SAFE_INTEGER;
                         break;
                     case 'expert':
-                        item.showRank = 100000-parseInt(item.expertTotalRank) || Number.MAX_SAFE_INTEGER;
+                        item.showRank = 100000 - parseInt(item.expertTotalRank) || Number.MAX_SAFE_INTEGER;
                         break;
                     case 'gold':
                     default:
@@ -425,16 +425,20 @@ async function getAllRank() {
             console.log('Data:', data);
 
 
-            
-           
+
+
 
             resolve({ data, savedTimestamp });
         });
     });
 }
 
+
+
+
 async function insertRankListInfo() {
     const { data, savedTimestamp } = await getAllRank();
+
 
     let tableHTML = `
         <div id='rankListCard'>
@@ -446,10 +450,20 @@ async function insertRankListInfo() {
         <article class="card" style="flex-direction: column-reverse;">
         <div class="card_wrapper">
         <div class="card__content" style="padding-bottom: 26px;max-width: 100%">
-        <h3 style="font-size: 1.5rem; font-weight: bold; margin-bottom: 10px;">最后排名信息</h3>
+        <h3 style="font-size: 1.5rem; font-weight: bold; margin-bottom: 10px;">排名信息</h3>
         <small class="genius__hint genius__hint--dark">
             <span>${savedTimestamp}</span>
         </small>
+        <table id="WQScope_RankListTable_RankSearch" class="inputs">
+        <tbody><tr>
+            <td>Minimum 排名:</td>
+            <td><input type="text" id="min" name="min"></td>
+        </tr>
+        <tr>
+            <td>Maximum 排名:</td>
+            <td><input type="text" id="max" name="max"></td>
+        </tr>
+        </tbody></table>
         <table id="WQScope_RankListTable" class="display">
         </div>
         </div>
@@ -469,10 +483,6 @@ async function insertRankListInfo() {
         const progressContainer = mainContent.querySelector('#WQButtonContainer');
         progressContainer.insertAdjacentHTML('afterend', tableHTML);
 
-
-        
-
-        // 为每个数据项添加递增的 index 字段（从 1 开始）
         data.forEach((item, idx) => {
             item.index = idx + 1;
         });
@@ -484,24 +494,59 @@ async function insertRankListInfo() {
             { title: '用户ID', data: 'user' },
             { title: '达成等级', data: 'achievedLevel' },
             { title: '最终等级', data: 'finalLevel' },
-            { title: '国家/地区', data: 'country' },
+            { title: '国家/地区', data: 'country', render: function (data,type){return `<i title="${data}" class="${data.toLowerCase()} flag"></i>` + data; } },
         ];
+        const minEl = document.querySelector('#min');
+        const maxEl = document.querySelector('#max');
+        
 
-        $(document).ready(function () {
-            $('#WQScope_RankListTable').DataTable({
-                lengthMenu: [5, 10, 25, 50, grandmasterCount],   // 選單值設定
-            data: data,
-            columns: columns,
-            order: [[1, 'desc']], // 仍然按 showRank 排序
+        const table = new DataTable('#WQScope_RankListTable',{
+            lengthMenu: [5, 10, 25, 50, grandmasterCount],
+            data,
+            columns,
+            order: [[1, 'desc']], // 按“最终等级”排序，默认升序
             columnDefs: [
-                {
-                targets: 1,
-                visible: false, // 隐藏排序值列
-                searchable: false
-                }
-            ]
-            });
+            { targets: 1, visible: false, searchable: false },
+            { targets: 4, orderDataType: 'level-order'},
+            { targets: 3, orderDataType: 'level-order'},
+            ],
+            stateSave: true
         });
+        table.search.fixed('range', function (searchStr, data, index) {
+            console.log(data)
+            var min = parseFloat(minEl.value);
+            var max = parseFloat(maxEl.value);
+            var age = parseFloat(data['index']); // use data for the age column
+            console.log(`Searching for range: ${min} - ${max}, current value: ${age}`);
+
+        
+            if (
+                (isNaN(min) && isNaN(max)) ||
+                (isNaN(min) && age <= max) ||
+                (min <= age && isNaN(max)) ||
+                (min <= age && age <= max)
+            ) {
+                return true;
+            }
+        
+            return false;
+        });
+        // Changes to the inputs will trigger a redraw to update the table
+        minEl.addEventListener('input', function () {
+            table.draw();
+        });
+        maxEl.addEventListener('input', function () {
+            table.draw();
+        });
+
+
+        // 自定义排序：grandmaster > master > expert > gold
+        $.fn.dataTable.ext.order['level-order'] = function(settings, col) {
+            const levelOrder = { grandmaster: 1, master: 2, expert: 3, gold: 4 };
+            return this.api().column(col, { order: 'index' }).data().map(function(level) {
+            return levelOrder[level] || 99;
+            });
+        };
 
         // mainContent.innerHTML = tableHTML + mainContent.innerHTML;
     } else {
@@ -513,7 +558,7 @@ async function getSingleRankByUserId(userId) {
     // 根据用户ID获取单个用户的排名信息
 
     return new Promise((resolve, reject) => {
-        chrome.storage.local.get(['WQPRankData', 'WQPSettings'], function ({WQPRankData, WQPSettings}) {
+        chrome.storage.local.get(['WQPRankData', 'WQPSettings'], function ({ WQPRankData, WQPSettings }) {
             if (chrome.runtime.lastError) {
                 reject(chrome.runtime.lastError);
                 return;
@@ -522,7 +567,7 @@ async function getSingleRankByUserId(userId) {
             const data = WQPRankData?.array || [];
             const savedTimestamp = WQPRankData?.timestamp || 'N/A';
             const userData = data.find(item => item.user === userId);
-            
+
 
             if (!userData) {
                 reject(`User with ID ${userId} not found.`);
@@ -531,8 +576,8 @@ async function getSingleRankByUserId(userId) {
 
             const result = {};
             result['info'] = {
-                "currentLevel":determineUserLevel(userData, WQPSettings.geniusCombineTag),
-                "baseAlphaCount":WQPSettings.geniusAlphaCount,
+                "currentLevel": determineUserLevel(userData, WQPSettings.geniusCombineTag),
+                "baseAlphaCount": WQPSettings.geniusAlphaCount,
             };
             // filter以item.name Rank结尾的
             result['gold'] = Object.fromEntries(Object.entries(userData).filter(([key, value]) => key.endsWith('Rank')));
@@ -577,7 +622,7 @@ async function getSingleRankByUserId(userId) {
     });
 }
 
-function rankInfo2Html(result){
+function rankInfo2Html(result) {
     // 将排名信息转换为HTML格式
     return `
     <p>
@@ -694,17 +739,17 @@ async function insertMyRankInfo() {
 }
 
 
-function getSeason(){
+function getSeason() {
     // 获取当前季度
-	// 2025-Q1、2025-Q2 (Current)
-	let text = document.querySelector('.dropdown-custom--quarter').innerText;
-	text = text.split('(')[0];
-	text = text.trim();
-	text = text.replace('Q1', '01-01');
-	text = text.replace('Q2', '04-01');
-	text = text.replace('Q3', '07-01');
-	text = text.replace('Q4', '10-01');
-	return text;
+    // 2025-Q1、2025-Q2 (Current)
+    let text = document.querySelector('.dropdown-custom--quarter').innerText;
+    text = text.split('(')[0];
+    text = text.trim();
+    text = text.replace('Q1', '01-01');
+    text = text.replace('Q2', '04-01');
+    text = text.replace('Q3', '07-01');
+    text = text.replace('Q4', '10-01');
+    return text;
 }
 async function fetchAllUsers() {
     // 抓取所有用户的排名信息
@@ -727,8 +772,8 @@ async function fetchAllUsers() {
     //     `${year}-10-01`  // 第四季度
     // ];
     // const season = quarters[quarter - 1];
-	const season = getSeason();
-	console.log(season, "season")
+    const season = getSeason();
+    console.log(season, "season")
 
     const limit = 100;
     // 获取初始数据
@@ -736,24 +781,24 @@ async function fetchAllUsers() {
     const initialData = await getDataFromUrl(initialUrl);
     const totalCount = initialData.count;
     let data = initialData.results;
-    
+
     // 初始化进度
     let fetchedCount = data.length;
     updateButton('WQPRankFetchButton', `正在抓取 ${fetchedCount} / ${totalCount}`);
-    
+
     // 计算剩余请求
     const remainingPages = Math.ceil(totalCount / limit) - 1;
     const offsets = Array.from({ length: remainingPages }, (_, i) => (i + 1) * limit);
-    const urls = offsets.map(offset => 
+    const urls = offsets.map(offset =>
         `https://api.worldquantbrain.com/consultant/boards/genius?limit=${limit}&offset=${offset}&date=${season}&aggregate=user`
     );
 
     // 并发控制配置
-    
-    
+
+
     // 分批请求函数
     const fetchBatch = async (batchUrls) => {
-        const batchRequests = batchUrls.map(url => 
+        const batchRequests = batchUrls.map(url =>
             getDataFromUrl(url).then(page => {
                 fetchedCount += page.results.length;
                 updateButton('WQPRankFetchButton', `正在抓取 ${fetchedCount} / ${totalCount}`);
@@ -845,7 +890,7 @@ function insertButton() {
     if (targetElement) {
         // Disconnect observer to avoid duplicate insertions
         console.log('Disconnecting observer');
-        
+
 
         // Create a container div to hold both buttons
         const buttonContainer = document.createElement('div');
@@ -871,7 +916,7 @@ function insertButton() {
         // // Append the table to the button container
         // targetElement.insertAdjacentElement('afterend', table);
 
-        
+
     }
 
 }
@@ -919,13 +964,13 @@ async function showGeniusCard(event) {
         }
         return;
     }
-    card.disable();  
+    card.disable();
 }
 
 
 
-function watchForElementAndInsertButton(){
-    
+function watchForElementAndInsertButton() {
+
 
     // Use MutationObserver to watch for DOM changes
     var observer = new MutationObserver(() => {
@@ -934,7 +979,7 @@ function watchForElementAndInsertButton(){
             observer.disconnect();
         }
     });
-    
+
     // Configure the MutationObserver
     observer.observe(document.body, { childList: true, subtree: true });
 }

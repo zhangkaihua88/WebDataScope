@@ -79,9 +79,9 @@ function compareVersions(v1, v2) {
 async function checkUpdate() {
     try {
         const today = new Date().toISOString().split('T')[0]; // 获取当前日期 (YYYY-MM-DD)
-        
+
         // 读取存储的上次提醒日期
-        chrome.storage.local.get('lastNotifyDate', async ({lastNotifyDate}) => {
+        chrome.storage.local.get('lastNotifyDate', async ({ lastNotifyDate }) => {
             console.log('上次提醒日期:', lastNotifyDate);
             if (lastNotifyDate === today) {
                 console.log('今天已经提醒过，无需重复提醒');
@@ -181,18 +181,18 @@ function injectionGeniusScript(tabId) {
     try {
         // 注入 CSS 文件
         chrome.scripting.insertCSS({
-        target: { tabId: tabId },
-        files: [
-            "src/css/genius.css",
-            "src/css/idcard.css",
-            "src/css/dataTables.dataTables.css"
-        ],
+            target: { tabId: tabId },
+            files: [
+                "src/css/genius.css",
+                "src/css/idcard.css",
+                "src/css/dataTables.dataTables.css"
+            ],
         }, () => {
-        if (chrome.runtime.lastError) {
-            console.error("CSS注入失败", chrome.runtime.lastError.message);
-        } else {
-            console.log("CSS注入成功");
-        }
+            if (chrome.runtime.lastError) {
+                console.error("CSS注入失败", chrome.runtime.lastError.message);
+            } else {
+                console.log("CSS注入成功");
+            }
         });
 
         // 检查是否已经注入了js脚本
