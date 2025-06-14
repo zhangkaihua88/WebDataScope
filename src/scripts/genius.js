@@ -464,7 +464,7 @@ async function insertRankListInfo() {
             <td><input type="text" id="max" name="max"></td>
         </tr>
         </tbody></table>
-        <table id="WQScope_RankListTable" class="display">
+        <table id="WQScope_RankListTable" class="display nowrap">
         </div>
         </div>
         </div>
@@ -494,23 +494,36 @@ async function insertRankListInfo() {
             { title: '用户ID', data: 'user' },
             { title: '达成等级', data: 'achievedLevel' },
             { title: '最终等级', data: 'finalLevel' },
-            { title: '国家/地区', data: 'country', render: function (data,type){return `<i title="${data}" class="${data.toLowerCase()} flag"></i>` + data; } },
+            { title: '国家/地区', data: 'country', render: function (data, type) { return `<i title="${data}" class="${data.toLowerCase()} flag"></i>` + data; } },
         ];
         const minEl = document.querySelector('#min');
         const maxEl = document.querySelector('#max');
-        
 
-        const table = new DataTable('#WQScope_RankListTable',{
+
+        const table = new DataTable('#WQScope_RankListTable', {
             lengthMenu: [5, 10, 25, 50, grandmasterCount],
             data,
             columns,
             order: [[1, 'desc']], // 按“最终等级”排序，默认升序
             columnDefs: [
-            { targets: 1, visible: false, searchable: false },
-            { targets: 4, orderDataType: 'level-order'},
-            { targets: 3, orderDataType: 'level-order'},
+                { targets: 1, visible: false, searchable: false },
+                { targets: 4, orderDataType: 'level-order' },
+                { targets: 3, orderDataType: 'level-order' },
+                { targets: [3,4,5], columnControl: ['order', ['searchList']] }
             ],
-            stateSave: true
+            stateSave: true,
+            columnControl: [
+                // ['order', ['searchList']],
+                {
+                    target: 0,
+                    content: ['orderStatus',]
+                },
+                {
+                    target: 1,
+                    content: ['search']
+                }
+            ],
+            responsive: true
         });
         table.search.fixed('range', function (searchStr, data, index) {
             console.log(data)
@@ -519,7 +532,7 @@ async function insertRankListInfo() {
             var age = parseFloat(data['index']); // use data for the age column
             console.log(`Searching for range: ${min} - ${max}, current value: ${age}`);
 
-        
+
             if (
                 (isNaN(min) && isNaN(max)) ||
                 (isNaN(min) && age <= max) ||
@@ -528,7 +541,7 @@ async function insertRankListInfo() {
             ) {
                 return true;
             }
-        
+
             return false;
         });
         // Changes to the inputs will trigger a redraw to update the table
@@ -541,10 +554,10 @@ async function insertRankListInfo() {
 
 
         // 自定义排序：grandmaster > master > expert > gold
-        $.fn.dataTable.ext.order['level-order'] = function(settings, col) {
+        $.fn.dataTable.ext.order['level-order'] = function (settings, col) {
             const levelOrder = { grandmaster: 1, master: 2, expert: 3, gold: 4 };
-            return this.api().column(col, { order: 'index' }).data().map(function(level) {
-            return levelOrder[level] || 99;
+            return this.api().column(col, { order: 'index' }).data().map(function (level) {
+                return levelOrder[level] || 99;
             });
         };
 
