@@ -20,7 +20,9 @@ WebDataScope是一个正在为WorldQuant平台打造的Chrome/Edge插件。它�
 - [ ] 计算Self Corr
 
 # 更新日志
-- V0.9.x
+- V0.9.3(20250614)
+  - add: Genius预估排名信息
+  - add: Genius排名分析可以修改六维查看排名信息
 - V0.9.2(20250610)
   - fix: Genius排名分析中获取的时间未转化为美东时间的错误
   - fix: 修复某已知bug
