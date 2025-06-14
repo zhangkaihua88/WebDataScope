@@ -556,7 +556,6 @@ async function insertRankListInfo() {
 
 async function getSingleRankByUserId(userId) {
     // 根据用户ID获取单个用户的排名信息
-
     return new Promise((resolve, reject) => {
         chrome.storage.local.get(['WQPRankData', 'WQPSettings'], function ({ WQPRankData, WQPSettings }) {
             if (chrome.runtime.lastError) {
@@ -566,63 +565,72 @@ async function getSingleRankByUserId(userId) {
 
             const data = WQPRankData?.array || [];
             const savedTimestamp = WQPRankData?.timestamp || 'N/A';
-            const userData = data.find(item => item.user === userId);
 
-
-            if (!userData) {
-                reject(`User with ID ${userId} not found.`);
-                return;
-            }
-
-            const result = {};
-            result['info'] = {
-                "currentLevel": determineUserLevel(userData, WQPSettings.geniusCombineTag),
-                "baseAlphaCount": WQPSettings.geniusAlphaCount,
-            };
-            // filter以item.name Rank结尾的
-            result['gold'] = Object.fromEntries(Object.entries(userData).filter(([key, value]) => key.endsWith('Rank')));
-            result['gold']['rank'] = data.filter(item => item.totalRank < userData.totalRank).length;
-            result['gold']['count'] = data.length;
-            result['gold']['baseCount'] = data.filter(item => item.alphaCount >= WQPSettings.geniusAlphaCount).length;
-
-            for (const model of ["expert", "master", "grandmaster"]) {
-                let itemData = data.filter(item => item.alphaCount >= levelCriteria[model].alphaCount && item.pyramidCount >= levelCriteria[model].pyramidCount);
-                if (WQPSettings.geniusCombineTag) {
-                    itemData = itemData.filter(item => item.combinedAlphaPerformance >= levelCriteria[model].combinedAlphaPerformance || item.combinedSelectedAlphaPerformance >= levelCriteria[model].combinedSelectedAlphaPerformance);
-                }
-                result['gold'][model + 'Rank'] = itemData.filter(item => item.totalRank < userData.totalRank).length + 1;
-
-                item_count = itemData.length;
-
-                let itemUserData = itemData.find(item => item.user === userId);
-                if (!itemUserData) {
-                    itemData.push(userData);
-                }
-
-                itemData.forEach(item => item['totalRank'] = 0);
-                for (const col of ["operatorCount", "fieldCount", "communityActivity", "completedReferrals", "maxSimulationStreak"]) {
-                    let sorted = itemData.map(item => item[col]).sort((a, b) => b - a);
-                    itemData.forEach(item => item[col + 'Rank'] = sorted.indexOf(item[col]) + 1);
-                    itemData.forEach(item => item['totalRank'] = item['totalRank'] + item[col + 'Rank']);
-                }
-                for (const col of ["operatorAvg", "fieldAvg"]) {
-                    let sorted = itemData.map(item => item[col]).sort((a, b) => a - b);
-                    itemData.forEach(item => item[col + 'Rank'] = sorted.indexOf(item[col]) + 1);
-                    itemData.forEach(item => item['totalRank'] = item['totalRank'] + item[col + 'Rank']);
-                }
-
-                itemUserData = itemData.find(item => item.user === userId);
-                result[model] = Object.fromEntries(Object.entries(itemUserData).filter(([key, value]) => key.endsWith('Rank')));
-                result[model]['rank'] = itemData.filter(item => item.totalRank < itemUserData.totalRank).length;
-                result[model]['count'] = item_count;
-            }
-
-            resolve({ result, savedTimestamp });
+            calculateRanks(data, userId, WQPSettings)
+                .then(result => resolve({ result, savedTimestamp }))
+                .catch(reject);
         });
     });
 }
 
+async function calculateRanks(data, userId, WQPSettings) {
+	const userData = data.find(item => item.user === userId);
+
+	if (!userData) {
+		reject(`User with ID ${userId} not found.`);
+		return;
+	}
+
+	const result = {};
+	result['userData'] = userData;
+	result['info'] = {
+		"currentLevel": determineUserLevel(userData, WQPSettings.geniusCombineTag),
+		"baseAlphaCount": WQPSettings.geniusAlphaCount,
+	};
+	// filter以item.name Rank结尾的
+	result['gold'] = Object.fromEntries(Object.entries(userData).filter(([key, value]) => key.endsWith('Rank')));
+	result['gold']['rank'] = data.filter(item => item.totalRank < userData.totalRank).length;
+	result['gold']['count'] = data.length;
+	result['gold']['baseCount'] = data.filter(item => item.alphaCount >= WQPSettings.geniusAlphaCount).length;
+
+	for (const model of ["expert", "master", "grandmaster"]) {
+		let itemData = data.filter(item => item.alphaCount >= levelCriteria[model].alphaCount && item.pyramidCount >= levelCriteria[model].pyramidCount);
+		if (WQPSettings.geniusCombineTag) {
+			itemData = itemData.filter(item => item.combinedAlphaPerformance >= levelCriteria[model].combinedAlphaPerformance || item.combinedSelectedAlphaPerformance >= levelCriteria[model].combinedSelectedAlphaPerformance);
+		}
+		result['gold'][model + 'Rank'] = itemData.filter(item => item.totalRank < userData.totalRank).length + 1;
+
+		item_count = itemData.length;
+
+		let itemUserData = itemData.find(item => item.user === userId);
+		if (!itemUserData) {
+			itemData.push(userData);
+		}
+
+		itemData.forEach(item => item['totalRank'] = 0);
+		for (const col of ["operatorCount", "fieldCount", "communityActivity", "completedReferrals", "maxSimulationStreak"]) {
+			let sorted = itemData.map(item => item[col]).sort((a, b) => b - a);
+			itemData.forEach(item => item[col + 'Rank'] = sorted.indexOf(item[col]) + 1);
+			itemData.forEach(item => item['totalRank'] = item['totalRank'] + item[col + 'Rank']);
+		}
+		for (const col of ["operatorAvg", "fieldAvg"]) {
+			let sorted = itemData.map(item => item[col]).sort((a, b) => a - b);
+			itemData.forEach(item => item[col + 'Rank'] = sorted.indexOf(item[col]) + 1);
+			itemData.forEach(item => item['totalRank'] = item['totalRank'] + item[col + 'Rank']);
+		}
+
+		itemUserData = itemData.find(item => item.user === userId);
+		result[model] = Object.fromEntries(Object.entries(itemUserData).filter(([key, value]) => key.endsWith('Rank')));
+		result[model]['rank'] = itemData.filter(item => item.totalRank < itemUserData.totalRank).length;
+		result[model]['count'] = item_count;
+	}
+
+	return result;
+}
+
 function rankInfo2Html(result) {
+	const userData = result['userData'] ;
+
     // 将排名信息转换为HTML格式
     return `
     <p>
@@ -642,6 +650,37 @@ function rankInfo2Html(result) {
     该用户目前满足的级别: <strong>${result.info.currentLevel}</strong>
     </p>
 
+    <button id="editRankButton" style="margin-bottom: 10px; padding: 5px 10px; background-color: #4CAF50; color: white; border: none; border-radius: 4px; cursor: pointer;">编辑六维指标</button>
+    <div id="editRankForm" style="display: none; margin-bottom: 20px; padding: 15px; border: 1px solid #ddd; border-radius: 4px;">
+        <h4>编辑六维指标数据</h4>
+        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px;">
+            <div>
+                <label>Operator Count:</label>
+                <input type="number" id="operatorCount" value="${userData.operatorCount || 0}" style="width: 100%;">
+            </div>
+            <div>
+                <label>Operator Avg:</label>
+                <input type="number" id="operatorAvg" value="${userData.operatorAvg || 0}" style="width: 100%;">
+            </div>			
+            <div>
+                <label>Field Count:</label>
+                <input type="number" id="fieldCount" value="${userData.fieldCount || 0}" style="width: 100%;">
+            </div>
+            <div>
+                <label>Field Avg:</label>
+                <input type="number" id="fieldAvg" value="${userData.fieldAvg || 0}" style="width: 100%;">
+            </div>			
+            <div>
+                <label>Community Activity:</label>
+                <input type="number" id="communityActivity" value="${userData.communityActivity || 0}" style="width: 100%;">
+            </div>
+            <div>
+                <label>Max Simulation Streak:</label>
+                <input type="number" id="maxSimulationStreak" value="${userData.maxSimulationStreak || 0}" style="width: 100%;">
+            </div>
+        </div>
+        <button id="updateRankButton" style="margin-top: 10px; padding: 5px 10px; background-color: #4CAF50; color: white; border: none; border-radius: 4px; cursor: pointer;">更新排名</button>
+    </div>
     <div style="display: flex; justify-content: space-between; gap: 20px;">
     <div style="flex: 1;">
         <h4>以 Expert 为 Universe</h4>
@@ -733,11 +772,78 @@ async function insertMyRankInfo() {
         const progressContainer = mainContent.querySelector('#WQButtonContainer');
         progressContainer.insertAdjacentHTML('afterend', tableHTML);
         // mainContent.innerHTML = tableHTML + mainContent.innerHTML;
+		// 绑定事件监听器
+		bindRankEditEvents(userId, savedTimestamp);
     } else {
         console.error('未找到mainContent元素');
     }
 }
 
+
+function bindRankEditEvents(userId, savedTimestamp) {
+    const editButton = document.getElementById('editRankButton');
+    const editForm = document.getElementById('editRankForm');
+    const updateButton = document.getElementById('updateRankButton');
+
+    if (editButton && editForm && updateButton) {
+        editButton.addEventListener('click', () => {
+            editForm.style.display = editForm.style.display === 'none' ? 'block' : 'none';
+        });
+
+        updateButton.addEventListener('click', async () => {
+            const newData = {
+                operatorCount: parseInt(document.getElementById('operatorCount').value) || 0,
+                operatorAvg: parseFloat(document.getElementById('operatorAvg').value) || 0,
+                fieldCount: parseInt(document.getElementById('fieldCount').value) || 0,
+                fieldAvg: parseFloat(document.getElementById('fieldAvg').value) || 0,
+                communityActivity: parseFloat(document.getElementById('communityActivity').value) || 0,
+                // completedReferrals: parseInt(document.getElementById('completedReferrals').value) || 0,
+                maxSimulationStreak: parseInt(document.getElementById('maxSimulationStreak').value) || 0
+            };
+            console.debug('newData', newData);
+
+            // 更新数据并重新计算排名
+            const updatedResult = await updateUserRankings(userId, newData);
+            
+            // 更新显示
+            const rankCard = document.getElementById('rankCard');
+            if (rankCard) {
+                rankCard.querySelector('.card__content').innerHTML = `
+                    <h3 style="font-size: 1.5rem; font-weight: bold; margin-bottom: 10px;">我的排名信息</h3>
+                    <small class="genius__hint genius__hint--dark">
+                        <span>${savedTimestamp}</span>
+                    </small>
+                    ${rankInfo2Html(updatedResult)}
+                `;
+                // 重新绑定事件监听器
+                bindRankEditEvents(userId, savedTimestamp);
+            }
+        });
+    }
+}
+
+async function updateUserRankings(userId, newData) {
+    // 获取所有用户数据
+    const { WQPRankData, WQPSettings } = await new Promise(resolve => {
+        chrome.storage.local.get(['WQPRankData', 'WQPSettings'], resolve);
+    });
+
+    if (!WQPRankData || !WQPRankData.array) {
+        throw new Error('No rank data available');
+    }
+
+    // 找到当前用户的数据
+    const userData = WQPRankData.array.find(item => item.user === userId);
+    if (!userData) {
+        throw new Error('User data not found');
+    }
+
+    // 更新用户数据
+    Object.assign(userData, newData);
+
+    // 使用通用的排名计算函数
+    return await calculateRanks(WQPRankData.array, userId, WQPSettings);
+}
 
 function getSeason() {
     // 获取当前季度
