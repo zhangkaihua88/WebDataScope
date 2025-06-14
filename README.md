@@ -1,5 +1,5 @@
 # WebDataScope
-WebDataScope是一个正在为WorldQuant平台打造的Chrome/Edge插件。它可以让你在WorldQuant平台上方便的获得其数据分析报告
+WebDataScope是一个正在打造的Chrome/Edge插件。它可以让你在平台上方便的获得其数据分析报告
 
 使用方法和功能详见使用教程
 
