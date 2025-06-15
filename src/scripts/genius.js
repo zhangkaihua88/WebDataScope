@@ -311,12 +311,13 @@ async function getAllRank() {
                 return;
             }
 
-            const data = WQPRankData?.array || [];
+            let data = WQPRankData?.array || [];
             const savedTimestamp = WQPRankData?.timestamp || 'N/A';
             let itemData;
 
             // data.forEach(item => item['achievedLevel'] = determineUserLevel(item, WQPSettings.geniusCombineTag));
             data.forEach(item => item['finalLevel'] = 'gold');
+            data = data.filter(item => item.alphaCount > 0);
 
             for (const model of ["gold", "expert", "master", "grandmaster"]) {
                 if (model === 'gold') {
@@ -495,35 +496,170 @@ async function insertRankListInfo() {
             { title: '达成等级', data: 'achievedLevel' },
             { title: '最终等级', data: 'finalLevel' },
             { title: '国家/地区', data: 'country', render: function (data, type) { return `<i title="${data}" class="${data.toLowerCase()} flag"></i>` + data; } },
+            // 基础信息
+            { title: 'Signals', data: 'alphaCount', className: 'none' }, // 信号数量
+            { title: 'Pyramids', data: 'pyramidCount', className: 'none' }, // 金字塔数量
+            { title: 'Combined Alpha Performance', data: 'combinedAlphaPerformance', className: 'none' }, // 综合Alpha表现
+            { title: 'Combined Selected Alpha Performance', data: 'combinedSelectedAlphaPerformance', className: 'none' }, // 综合选择的Alpha表现
+
+            
+            
+            // 六维
+            { title: 'Operators used', data: 'operatorCount', className: 'none' },
+            { title: 'Operator Avg', data: 'operatorAvg', className: 'none' },
+            { title: 'Fields used', data: 'fieldCount', className: 'none' },
+            { title: 'Field Avg', data: 'fieldAvg', className: 'none' },
+            { title: 'Community Activity', data: 'communityActivity', className: 'none' },
+            { title: 'Max Simulation Streak', data: 'maxSimulationStreak', className: 'none' },
+
+            // 排名
+            { title: 'Gold Total Rank', data: 'goldTotalRank', className: 'none' },
+            { title: 'Gold Operator Count Rank', data: 'goldoperatorCountRank', className: 'none' },
+            { title: 'Gold Operator Avg Rank', data: 'goldoperatorAvgRank', className: 'none' },
+            { title: 'Gold Field Count Rank', data: 'goldfieldCountRank', className: 'none' },
+            { title: 'Gold Field Avg Rank', data: 'goldfieldAvgRank', className: 'none' },
+            { title: 'Gold Community Activity Rank', data: 'goldcommunityActivityRank', className: 'none' },
+            { title: 'Gold Max Simulation Streak Rank', data: 'goldmaxSimulationStreakRank', className: 'none' },
+            
+
+            { title: 'Expert Total Rank', data: 'expertTotalRank', className: 'none' },
+            { title: 'Expert Operator Count Rank', data: 'expertoperatorCountRank', className: 'none' },
+            { title: 'Expert Operator Avg Rank', data: 'expertoperatorAvgRank', className: 'none' },
+            { title: 'Expert Field Count Rank', data: 'expertfieldCountRank', className: 'none' },
+            { title: 'Expert Field Avg Rank', data: 'expertfieldAvgRank', className: 'none' },
+            { title: 'Expert Community Activity Rank', data: 'expertcommunityActivityRank', className: 'none' },
+            { title: 'Expert Max Simulation Streak Rank', data: 'expertmaxSimulationStreakRank', className: 'none' },
+
+            { title: 'Master Total Rank', data: 'masterTotalRank', className: 'none' },
+            { title: 'Master Operator Count Rank', data: 'masteroperatorCountRank', className: 'none' },
+            { title: 'Master Operator Avg Rank', data: 'masteroperatorAvgRank', className: 'none' },
+            { title: 'Master Field Count Rank', data: 'masterfieldCountRank', className: 'none' },
+            { title: 'Master Field Avg Rank', data: 'masterfieldAvgRank', className: 'none' },
+            { title: 'Master Community Activity Rank', data: 'mastercommunityActivityRank', className: 'none' },
+            { title: 'Master Max Simulation Streak Rank', data: 'mastermaxSimulationStreakRank', className: 'none' },
+
+            { title: 'Grandmaster Total Rank', data: 'grandmasterTotalRank', className: 'none' },
+            { title: 'Grandmaster Operator Count Rank', data: 'grandmasteroperatorCountRank', className: 'none' },
+            { title: 'Grandmaster Operator Avg Rank', data: 'grandmasteroperatorAvgRank', className: 'none' },
+            { title: 'Grandmaster Field Count Rank', data: 'grandmasterfieldCountRank', className: 'none' },
+            { title: 'Grandmaster Field Avg Rank', data: 'grandmasterfieldAvgRank', className: 'none' },
+            { title: 'Grandmaster Community Activity Rank', data: 'grandmastercommunityActivityRank', className: 'none' },
+            { title: 'Grandmaster Max Simulation Streak Rank', data: 'grandmastermaxSimulationStreakRank', className: 'none' },
         ];
+
+
         const minEl = document.querySelector('#min');
         const maxEl = document.querySelector('#max');
 
 
+
+        // 安全初始化 DataTable，数据缺失时自动填充 null
+        const safeData = Array.isArray(data)
+            ? data.map(row => {
+            // 确保每个 columns.data 字段都存在，否则填 null
+            const safeRow = {};
+            columns.forEach(col => {
+                // 支持自定义 render 字段
+                if (typeof col.data === 'string') {
+                safeRow[col.data] = row[col.data] !== undefined ? row[col.data] : null;
+                }
+            });
+            // 保留原始字段
+            return { ...row, ...safeRow };
+            })
+            : [];
+
         const table = new DataTable('#WQScope_RankListTable', {
             lengthMenu: [5, 10, 25, 50, grandmasterCount],
-            data,
+            data: safeData,
             columns,
             order: [[1, 'desc']], // 按“最终等级”排序，默认升序
             columnDefs: [
-                { targets: 1, visible: false, searchable: false },
-                { targets: 4, orderDataType: 'level-order' },
-                { targets: 3, orderDataType: 'level-order' },
-                { targets: [3,4,5], columnControl: ['order', ['searchList']] }
+            { targets: 1, visible: false, searchable: false },
+            { targets: 4, orderDataType: 'level-order' },
+            { targets: 3, orderDataType: 'level-order' },
+            { targets: [3,4,5], columnControl: ['order', ['searchList']] }
             ],
             stateSave: true,
             columnControl: [
-                // ['order', ['searchList']],
-                {
-                    target: 0,
-                    content: ['orderStatus',]
-                },
-                {
-                    target: 1,
-                    content: ['search']
-                }
+            {
+                target: 0,
+                content: ['orderStatus',]
+            },
+            {
+                target: 1,
+                content: ['search']
+            }
             ],
-            responsive: true
+            responsive: {
+                details: {
+                    renderer: function ( api, rowIdx, columns ) {
+                        // 基础信息
+                        var baseFields = [
+                            'Signals', 'Pyramids', 'Combined Alpha Performance', 'Combined Selected Alpha Performance',
+                        ];
+                        // 六维类
+                        var sixFields = [
+                            'Operators used', 'Operator Avg', 'Fields used', 'Field Avg', 'Community Activity', 'Max Simulation Streak'
+                        ];
+                        // rank类
+
+                        baseFields = columns.filter(function(col) {
+                            return baseFields.includes(col.title);
+                        });
+
+                        sixFields = columns.filter(function(col) {
+                            return sixFields.includes(col.title);
+                        });
+
+                        function toRows(dataArr, colNum) {
+                            let html = '';
+                            for (let i = 0; i < dataArr.length; i += colNum) {
+                                html += '<div style="display: flex; width: 100%;">';
+                                for (let j = 0; j < colNum; j++) {
+                                    if (dataArr[i+j]) {
+                                        html += '<div style="flex:1; min-width: 180px; padding: 2px 8px;">' + dataArr[i+j].title + ': ' + dataArr[i+j].data + '</div>';                                        
+                                    } else {
+                                        html += '<div style="flex:1; min-width: 180px; padding: 2px 8px;"></div>';
+                                    }
+                                }
+                                html += '</div>';
+                            }
+                            return html;
+                        }
+
+                        let html = '';
+                        if (baseFields.length) {
+                            html += '<div style="margin-bottom:8px;"><b>基础信息</b></div>';
+                            html += '<div style="display: flex; flex-direction: column;">' + toRows(baseFields, 2) + '</div>';
+                        }
+                        if (sixFields.length) {
+                            html += '<div style="margin-bottom:8px;"><b>六维</b></div>';
+                            html += '<div style="display: flex; flex-direction: column;">' + toRows(sixFields, 3) + '</div>';
+                        }
+                        for (const model of ["gold", "expert", "master", "grandmaster"]) {
+                            var modelFields = columns.filter(function(col) {
+                                return col.title && col.title.toLowerCase().startsWith(model);
+                            });
+                            if (modelFields.length) {
+                                html += `<div style="margin:12px 0 8px 0;"><b>${model.charAt(0).toUpperCase() + model.slice(1)} 排名总和: ${modelFields[0].data}</b></div>`;
+                                modelFields = modelFields.filter(function(col) {
+                                    return !col.title.toLowerCase().includes('total');
+                                });
+                                html += '<div style="display: flex; flex-direction: column;">' + toRows(modelFields, 3) + '</div>';
+                            }
+                        }
+                        // var rankFields = columns.filter(function(col) {
+                        //     return col.title && col.title.toLowerCase().includes('rank');
+                        // });
+                        // if (rankFields.length) {
+                        //     html += '<div style="margin:12px 0 8px 0;"><b>Rank 相关</b></div>';
+                        //     html += '<div style="display: flex; flex-direction: column;">' + toRows(rankFields, 3) + '</div>';
+                        // }
+                        return html || false;
+                    }
+                }
+            }
         });
         table.search.fixed('range', function (searchStr, data, index) {
             console.log(data)
@@ -628,7 +764,7 @@ async function calculateRanks(data, userId, WQPSettings) {
 		}
 		for (const col of ["operatorAvg", "fieldAvg"]) {
 			let sorted = itemData.map(item => item[col]).sort((a, b) => a - b);
-			itemData.forEach(item => item[col + 'Rank'] = sorted.indexOf(item[col]) + 1);
+		 itemData.forEach(item => item[col + 'Rank'] = sorted.indexOf(item[col]) + 1);
 			itemData.forEach(item => item['totalRank'] = item['totalRank'] + item[col + 'Rank']);
 		}
 

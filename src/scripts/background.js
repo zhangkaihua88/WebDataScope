@@ -186,7 +186,8 @@ function injectionGeniusScript(tabId) {
                 "src/css/genius.css",
                 "src/css/idcard.css",
                 "src/css/dataTables.dataTables.css",
-                "src/css/columnControl.dataTables.min.css"
+                "src/css/columnControl.dataTables.min.css",
+                "src/css/responsive.dataTables.min.css",
             ],
         }, () => {
             if (chrome.runtime.lastError) {
