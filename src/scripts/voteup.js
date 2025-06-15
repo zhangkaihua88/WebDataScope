@@ -182,11 +182,25 @@ async function upVoteMultiUser() {
     data = JSON.parse(data);
     console.log(data);
     for (let [idx, [name, userTag]] of Object.entries(Object.entries(data))) {
+        let displayName = name[0] + '*'.repeat(name.length - 1);
         before_upcont = upCount;
-        updateButton("upVoteMultiUserButton", `正在点赞(${idx}/${Object.keys(data).length} user)... ` + name);
+        updateButton("upVoteMultiUserButton", `正在点赞(${idx}/${Object.keys(data).length} user)... ` + displayName);
         await _upVoteSingleUser(userTag);
         console.log(name, upCount - before_upcont);
-        document.getElementById("egg_setting_info").innerText = document.getElementById("egg_setting_info").innerText + "\n" + name + ": " + (upCount - before_upcont);
+        
+        // 多列显示：每5个用户换一行
+        let infoElem = document.getElementById("egg_setting_info");
+        let lines = infoElem.innerText.split('\n').filter(Boolean);
+        let lastLine = lines.length > 0 ? lines[lines.length - 1] : "";
+        if (lastLine.split(" | ").length >= 5) {
+            // 新起一行
+            lines.push(`${displayName}: ${upCount - before_upcont}`);
+        } else if (lines.length === 0) {
+            lines = [`${displayName}: ${upCount - before_upcont}`];
+        } else {
+            lines[lines.length - 1] += ` | ${displayName}: ${upCount - before_upcont}`;
+        }
+        infoElem.innerText = lines.join('\n');
     }
 
     resetButton("upVoteMultiUserButton", `批量点赞用户完成(共${Object.keys(data).length} user)`);
