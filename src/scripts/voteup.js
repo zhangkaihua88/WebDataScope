@@ -29,27 +29,31 @@ function logCount() {
 }
 
 async function _upVote(url) {
-    // Vote Comment by commentId
-    const response = await fetch(url + "/vote", {
-        "headers": {
-            "accept": "application/json, text/javascript, */*; q=0.01",
-            "content-type": "application/x-www-form-urlencoded; charset=UTF-8",
-            "x-csrf-token": csrfToken,
-            "x-requested-with": "XMLHttpRequest"
-        },
-        "referrerPolicy": "strict-origin-when-cross-origin",
-        "body": "value=up",
-        "method": "POST",
-        "mode": "cors",
-        "credentials": "include"
-    });
-    const data = await response.json();
-    if (data["value"] === "up") {
-        upCount += 1;
-        console.log("点赞成功:", url);
-        logCount();
+    try {
+        const response = await fetch(url + "/vote", {
+            "headers": {
+                "accept": "application/json, text/javascript, */*; q=0.01",
+                "content-type": "application/x-www-form-urlencoded; charset=UTF-8",
+                "x-csrf-token": csrfToken,
+                "x-requested-with": "XMLHttpRequest"
+            },
+            "referrerPolicy": "strict-origin-when-cross-origin",
+            "body": "value=up",
+            "method": "POST",
+            "mode": "cors",
+            "credentials": "include"
+        });
+        const data = await response.json();
+        if (data["value"] === "up") {
+            upCount += 1;
+            console.log("点赞成功:", url);
+            logCount();
+        }
+        return data;
+    } catch (error) {
+        console.error("点赞失败:", url, error);
+        return { error: error.message || error };
     }
-    return data;
 }
 function _getUrl(url){
     url = new URL(url);
