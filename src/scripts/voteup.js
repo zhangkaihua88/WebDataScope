@@ -15,11 +15,11 @@ function getStartTime() {
     // 获取当前年份和月份 (世界时)
     const year = easternDate.getUTCFullYear();
     const month = easternDate.getUTCMonth(); // 0 = January, 1 = February, ...
-    
+
     // 计算当前季度的开始时间 (UTC)
     const quarterStartMonth = Math.floor(month / 3) * 3; // 0 (Q1), 3 (Q2), 6 (Q3), 9 (Q4)
     const quarterStartTime = new Date(Date.UTC(year, quarterStartMonth, 1, 0, 0, 0)); // UTC 开始时间
-    
+
     return quarterStartTime;
 }
 
@@ -55,7 +55,7 @@ async function _upVote(url) {
         return { error: error.message || error };
     }
 }
-function _getUrl(url){
+function _getUrl(url) {
     url = new URL(url);
     let currentUrl = url.origin + url.pathname;
     return currentUrl;
@@ -98,7 +98,7 @@ async function upVoteSinglePost() {
     resetButton("upVoteSinglePostButton", "开始点赞该条帖子");
 }
 
-async function fetchNextCommentPage(url, reNum=0) {
+async function fetchNextCommentPage(url, reNum = 0) {
     try {
         // Fetch the next page of comments
         let response = await fetch(url);  // Use await with fetch
@@ -109,7 +109,7 @@ async function fetchNextCommentPage(url, reNum=0) {
 
         // Upvote the comments on the page, if any
         // if reNum == 0, upvote the post body
-        if (reNum == 0){
+        if (reNum == 0) {
             await upVoteSinglePostBody(newDoc, url);
         }
         await upVoteSinglePostComment(newDoc, url);  // Use await to wait for this async function to finish
@@ -117,7 +117,7 @@ async function fetchNextCommentPage(url, reNum=0) {
         // Check if there is a next page
         let nextLink = newDoc.querySelector('a.pagination-next-link');
         if (nextLink) {
-            await fetchNextCommentPage(nextLink.href, reNum+1);  // Recursively call the function for the next page
+            await fetchNextCommentPage(nextLink.href, reNum + 1);  // Recursively call the function for the next page
         }
     } catch (error) {
         console.error('Error fetching the page:', error);
@@ -181,15 +181,47 @@ async function upVoteMultiUser() {
     let data = prompt("输入dict", "{}");
     data = JSON.parse(data);
     console.log(data);
+
+
+    const scripts = document.getElementsByTagName('script');
+    let helpCenterData = null;
+
+    for (const script of scripts) {
+        if (script.textContent.includes('HelpCenter')) {
+            // 使用正则表达式匹配 HelpCenter.user 对象
+            const regex = /HelpCenter\.user\s*=\s*({.*?});/s;
+            const match = script.textContent.match(regex);
+            if (match && match[1]) {
+                try {
+                    // 解析 JSON 数据
+                    const userData = JSON.parse(match[1]);
+                    const userName = userData.name;
+                    console.log("解析的用户名:", userName);
+                    helpCenterData = userName;
+                    break;
+                } catch (error) {
+                    console.error("解析 JSON 失败:", error);
+                }
+            }
+        }
+    }
+
+    let infoElem = document.getElementById("egg_setting_info");
+    const now = new Date();
+    const beijingTime = now.toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai', hour12: false });
+    const infoDiv = document.createElement("div");
+    infoDiv.innerHTML = `<b>${helpCenterData}: ${beijingTime}</b>`;
+    infoElem.parentNode.insertBefore(infoDiv, infoElem);
+
     for (let [idx, [name, userTag]] of Object.entries(Object.entries(data))) {
         let displayName = name[0] + '*'.repeat(name.length - 1);
         before_upcont = upCount;
         updateButton("upVoteMultiUserButton", `正在点赞(${idx}/${Object.keys(data).length} user)... ` + displayName);
         await _upVoteSingleUser(userTag);
         console.log(name, upCount - before_upcont);
-        
+
         // 多列显示：每5个用户换一行
-        let infoElem = document.getElementById("egg_setting_info");
+
         let lines = infoElem.innerText.split('\n').filter(Boolean);
         let lastLine = lines.length > 0 ? lines[lines.length - 1] : "";
         if (lastLine.split(" | ").length >= 5) {
@@ -283,7 +315,7 @@ function createStartMenu() {
     baseInfo += "<a style=\"text-decoration: none;\"><div style=\"color:#5F5F5F;font-size:14px;\" class=\"egg_setting_item\"><label style=\"cursor: default;\" id=\"logCount\">本次已点赞 0 个<\/label><\/div><\/a>"
     baseInfo += "<\/form>";
     baseMenu.innerHTML = baseInfo;
-    
+
 
     let baseButtons = document.createElement("div");
     baseButtons.classList.add("egg_button_container");
