@@ -286,9 +286,25 @@ async function upVoteSingleUserComments(url) {
         let parentLi = item.closest('li');
         let siblings = Array.from(parentLi.parentElement.children).filter(el => el !== parentLi);
         let siblingWithTime = siblings.find(sibling => sibling.querySelector('time'));
-        let commentTime = new Date(siblingWithTime.querySelector('time').dateTime)
+        let commentTime = new Date(siblingWithTime.querySelector('time').dateTime);
+        let commentId = _getUrl(item.href);
         if (commentTime >= quarterStartTime) {
-            await _upVote(item.href);
+            await new Promise(resolve => {
+                getLikedIds(async function(likedIds) {
+                    if (likedIds.includes(commentId)) {
+                        console.log("已点赞过评论，跳过:", commentId);
+                        resolve();
+                        return;
+                    }
+                    let itemData = await _upVote(commentId);
+                    if (itemData["value"] === "up") {
+                        saveLikedId(commentId);
+                        console.log("点赞成功:", commentId);
+                        logCount();
+                    }
+                    resolve();
+                });
+            });
         } else {
             nextTag = false;
             break;
@@ -384,3 +400,18 @@ voteUpMain()
 
 // // Configure the MutationObserver
 // observer.observe(document.body, { childList: true, subtree: true });
+
+// 已点赞帖子和评论的ID缓存
+function getLikedIds(callback) {
+    chrome.storage.local.get(['likedIds'], function(result) {
+        callback(result.likedIds || []);
+    });
+}
+function saveLikedId(id) {
+    getLikedIds(function(likedIds) {
+        if (!likedIds.includes(id)) {
+            likedIds.push(id);
+            chrome.storage.local.set({ likedIds });
+        }
+    });
+}
