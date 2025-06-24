@@ -3,9 +3,25 @@ console.log("voteup.js script loaded");
 
 let csrfToken = null;
 let upCount = 0;
+let upCountFromCache = 0; // 用于缓存上次点赞数量
 let quarterStartTime = getStartTime();
 
 // ############################## 通用函数 ##############################
+
+async function getLikedIds() {
+    return new Promise((resolve) => {
+        chrome.storage.local.get(['WQPLikedIds'], function({ WQPLikedIds }) {
+            resolve(WQPLikedIds || []);
+        });
+    });
+}
+async function saveLikedId(id) {
+    let WQPLikedIds = await getLikedIds();
+    if (!WQPLikedIds.includes(id)) {
+        WQPLikedIds.push(id);
+        await chrome.storage.local.set({ WQPLikedIds });
+    }
+}
 
 function getStartTime() {
     const now = new Date();
@@ -25,11 +41,21 @@ function getStartTime() {
 
 function logCount() {
     // log the upCount
-    document.getElementById("logCount").innerHTML = "本次已点赞" + upCount + "个";
+    document.getElementById("logCount").innerHTML = `本次已点赞 ${upCount} 个 (来自缓存 ${upCountFromCache} 个)`;
 }
 
 async function _upVote(url) {
     try {
+        let WQPLikedIds = await getLikedIds();
+        if (WQPLikedIds.includes(url)) {
+            console.log("已点赞:", url);
+            upCountFromCache += 1; // 增加缓存的点赞数量
+            upCount += 1;
+            logCount();
+            return ;
+        }
+        await saveLikedId(url);  // 保存已点赞的ID
+
         const response = await fetch(url + "/vote", {
             "headers": {
                 "accept": "application/json, text/javascript, */*; q=0.01",
@@ -286,25 +312,9 @@ async function upVoteSingleUserComments(url) {
         let parentLi = item.closest('li');
         let siblings = Array.from(parentLi.parentElement.children).filter(el => el !== parentLi);
         let siblingWithTime = siblings.find(sibling => sibling.querySelector('time'));
-        let commentTime = new Date(siblingWithTime.querySelector('time').dateTime);
-        let commentId = _getUrl(item.href);
+        let commentTime = new Date(siblingWithTime.querySelector('time').dateTime)
         if (commentTime >= quarterStartTime) {
-            await new Promise(resolve => {
-                getLikedIds(async function(likedIds) {
-                    if (likedIds.includes(commentId)) {
-                        console.log("已点赞过评论，跳过:", commentId);
-                        resolve();
-                        return;
-                    }
-                    let itemData = await _upVote(commentId);
-                    if (itemData["value"] === "up") {
-                        saveLikedId(commentId);
-                        console.log("点赞成功:", commentId);
-                        logCount();
-                    }
-                    resolve();
-                });
-            });
+            await _upVote(item.href);
         } else {
             nextTag = false;
             break;
@@ -367,6 +377,15 @@ function createStartMenu() {
     //插入节点
     baseButtons.append(startButton)
 
+    // 添加清空点赞记录按钮
+    let clearButton = document.createElement("button");
+    clearButton.setAttribute("id", "clearLikedIdsButton");
+    clearButton.innerText = "清空点赞记录";
+    clearButton.className = "egg_study_btn egg_menu";
+    clearButton.addEventListener("click", clearLikedIds, false);
+    baseButtons.append(clearButton);
+
+
     // 添加一个p标签可以通过id往里面插入内容
     let p = document.createElement("p");
     p.setAttribute("id", "egg_setting_info");
@@ -374,9 +393,23 @@ function createStartMenu() {
     baseButtons.append(p);
 
 
+
     baseMenu.append(baseButtons);
     let body = document.getElementsByTagName("body")[0];
     body.append(baseMenu)
+}
+
+// 清空点赞记录函数
+function clearLikedIds() {
+    if (confirm('确定要清空所有点赞记录吗？此操作不可恢复。')) {
+        if (confirm('请再次确认，是否真的要清空所有点赞记录？')) {
+            chrome.storage.local.remove('WQPLikedIds', function() {
+                alert('点赞记录已清空！');
+                upCount = 0;
+                logCount();
+            });
+        }
+    }
 }
 
 // Use MutationObserver to watch for DOM changes
@@ -400,18 +433,3 @@ voteUpMain()
 
 // // Configure the MutationObserver
 // observer.observe(document.body, { childList: true, subtree: true });
-
-// 已点赞帖子和评论的ID缓存
-function getLikedIds(callback) {
-    chrome.storage.local.get(['likedIds'], function(result) {
-        callback(result.likedIds || []);
-    });
-}
-function saveLikedId(id) {
-    getLikedIds(function(likedIds) {
-        if (!likedIds.includes(id)) {
-            likedIds.push(id);
-            chrome.storage.local.set({ likedIds });
-        }
-    });
-}
