@@ -188,6 +188,7 @@ function injectionGeniusScript(tabId) {
                 "src/css/dataTables.dataTables.css",
                 "src/css/columnControl.dataTables.min.css",
                 "src/css/responsive.dataTables.min.css",
+                "src/css/buttons.dataTables.min.css",
             ],
         }, () => {
             if (chrome.runtime.lastError) {
@@ -215,6 +216,8 @@ function injectionGeniusScript(tabId) {
                         "src/scripts/lib/columnControl.dataTables.min.js",
                         "src/scripts/lib/dataTables.responsive.min.js",
                         "src/scripts/lib/responsive.dataTables.min.js",
+                        "src/scripts/lib/dataTables.buttons.min.js",
+                        "src/scripts/lib/buttons.colVis.min.js",
                         "src/scripts/utils.js",
                         "src/scripts/uiCard.js",
                         "src/scripts/genius.js"],
