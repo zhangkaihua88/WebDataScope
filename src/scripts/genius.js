@@ -1,11 +1,8 @@
-//新
 // genius.js: genius相关功能的 JS 文件
 // 1. Operator Analysis
 // 2. Rank Analysis 
 console.log('genius.js loaded');
-console.log('jQuery version:', typeof $ !== 'undefined' ? $.fn.jquery : 'not loaded');
-console.log('DataTables version:', typeof $.fn.dataTable !== 'undefined' ? $.fn.dataTable.version : 'not loaded');
-console.log('DataTables Buttons version:', typeof $.fn.dataTable.Buttons !== 'undefined' ? $.fn.dataTable.Buttons.version : 'not loaded');
+
 
 
 // ############################## 常数变量 ##############################
@@ -156,14 +153,7 @@ async function opsAna() {
     resetButton('WQPOPSFetchButton', `运算符分析完成${data.length}`);
 }
 
-function formatSavedTimestamp(isoString){
-	try{
-		return new Date(isoString).toLocaleString();
-	}catch(error){
-		console.error('格式化保存时间戳失败:', error);
-		return isoString;
-	}
-}
+
 function insertOpsTable() {
     // 插入运算符分析的表格, button 插入表格的调用函数
 
@@ -182,7 +172,10 @@ function insertOpsTable() {
             let tableHTML = `
             <div class="research-paradigm__header">
                 <h2 class="genius__subtitle">Operator Analysis</h2>
-                <small class="genius__hint genius__hint--dark"><span>${formatSavedTimestamp(savedTimestamp)}</span></small>
+                <small class="genius__hint genius__hint--dark">
+                    <span>美东时间: ${formatSavedTimestamp(savedTimestamp)[0]}</span>
+                    <span>北京时间: ${formatSavedTimestamp(savedTimestamp)[1]}</span>
+                </small>
             </div>
 
             <article class="card">
@@ -455,7 +448,10 @@ async function insertRankListInfo() {
         <div id='rankListCard'>
         <div class="research-paradigm__header">
             <h2 class="genius__subtitle">Genius Rank List</h2>
-            <small class="genius__hint genius__hint--dark"><span>${formatSavedTimestamp(savedTimestamp)}</span></small>
+            <small class="genius__hint genius__hint--dark">
+                <span>美东时间: ${formatSavedTimestamp(savedTimestamp)[0]}</span>
+                <span>北京时间: ${formatSavedTimestamp(savedTimestamp)[1]}</span>
+            </small>
         </div>
 
         <article class="card" style="flex-direction: column-reverse;">
@@ -463,7 +459,8 @@ async function insertRankListInfo() {
         <div class="card__content" style="padding-bottom: 26px;max-width: 100%">
         <h3 style="font-size: 1.5rem; font-weight: bold; margin-bottom: 10px;">排名信息</h3>
         <small class="genius__hint genius__hint--dark">
-            <span>${formatSavedTimestamp(savedTimestamp)}</span>
+            <span>美东时间: ${formatSavedTimestamp(savedTimestamp)[0]}</span>
+            <span>北京时间: ${formatSavedTimestamp(savedTimestamp)[1]}</span>
         </small>
         <table id="WQScope_RankListTable_RankSearch" class="inputs">
         <tbody><tr>
@@ -500,69 +497,60 @@ async function insertRankListInfo() {
         grandmasterCount = data.filter(item => item.finalLevel === 'grandmaster').length;
 
         let columns = [
-            {
-                title: '',
-                data: null,
-                className: 'details-control',
-                orderable: false,
-                defaultContent: '<span style="cursor:pointer;">+</span>',
-                width: '12px'
-            },
-            { title: '排名', data: 'index' },
-            { title: '排序值', data: 'showRank', className: 'none' }, // 不显示排序值列
+            { title: '排名', data: 'index', type: 'num', render: function (data, type) { return `<span style="cursor:pointer;margin-right: 8px;">&#9654;</span>` + data; }, className: 'details-control', },
             { title: '用户ID', data: 'user' },
             { title: '达成等级', data: 'achievedLevel' },
             { title: '最终等级', data: 'finalLevel' },
             { title: '国家/地区', data: 'country', render: function (data, type) { return `<i title="${data}" class="${data.toLowerCase()} flag"></i>` + data; } },
             // 基础信息
-            { title: 'Signals', data: 'alphaCount'}, // 信号数量
-            { title: 'Pyramids', data: 'pyramidCount'}, // 金字塔数量
-            { title: 'Combined Alpha Performance', data: 'combinedAlphaPerformance'}, // 综合Alpha表现
-            { title: 'Combined Selected Alpha Performance', data: 'combinedSelectedAlphaPerformance'}, // 综合选择的Alpha表现
+            { title: 'Signals', data: 'alphaCount', visible: false }, // 信号数量
+            { title: 'Pyramids', data: 'pyramidCount', visible: false }, // 金字塔数量
+            { title: 'Combined Alpha Performance', data: 'combinedAlphaPerformance', visible: false }, // 综合Alpha表现
+            { title: 'Combined Selected Alpha Performance', data: 'combinedSelectedAlphaPerformance', visible: false }, // 综合选择的Alpha表现
 
-            
-            
+
+
             // 六维
-            { title: 'Operators used', data: 'operatorCount'},
-            { title: 'Operator Avg', data: 'operatorAvg'},
-            { title: 'Fields used', data: 'fieldCount'},
-            { title: 'Field Avg', data: 'fieldAvg'},
-            { title: 'Community Activity', data: 'communityActivity'},
-            { title: 'Max Simulation Streak', data: 'maxSimulationStreak'},
+            { title: 'Operators used', data: 'operatorCount', visible: false },
+            { title: 'Operator Avg', data: 'operatorAvg', visible: false },
+            { title: 'Fields used', data: 'fieldCount', visible: false },
+            { title: 'Field Avg', data: 'fieldAvg', visible: false },
+            { title: 'Community Activity', data: 'communityActivity', visible: false },
+            { title: 'Max Simulation Streak', data: 'maxSimulationStreak', visible: false },
 
             // 排名
-            { title: 'Gold Total Rank', data: 'goldTotalRank'},
-            { title: 'Gold Operator Count Rank', data: 'goldoperatorCountRank'},
-            { title: 'Gold Operator Avg Rank', data: 'goldoperatorAvgRank'},
-            { title: 'Gold Field Count Rank', data: 'goldfieldCountRank'},
-            { title: 'Gold Field Avg Rank', data: 'goldfieldAvgRank'},
-            { title: 'Gold Community Activity Rank', data: 'goldcommunityActivityRank'},
-            { title: 'Gold Max Simulation Streak Rank', data: 'goldmaxSimulationStreakRank'},
-            
+            { title: 'Gold Total Rank', data: 'goldTotalRank', visible: false },
+            { title: 'Gold Operator Count Rank', data: 'goldoperatorCountRank', visible: false },
+            { title: 'Gold Operator Avg Rank', data: 'goldoperatorAvgRank', visible: false },
+            { title: 'Gold Field Count Rank', data: 'goldfieldCountRank', visible: false },
+            { title: 'Gold Field Avg Rank', data: 'goldfieldAvgRank', visible: false },
+            { title: 'Gold Community Activity Rank', data: 'goldcommunityActivityRank', visible: false },
+            { title: 'Gold Max Simulation Streak Rank', data: 'goldmaxSimulationStreakRank', visible: false },
 
-            { title: 'Expert Total Rank', data: 'expertTotalRank'},
-            { title: 'Expert Operator Count Rank', data: 'expertoperatorCountRank'},
-            { title: 'Expert Operator Avg Rank', data: 'expertoperatorAvgRank'},
-            { title: 'Expert Field Count Rank', data: 'expertfieldCountRank'},
-            { title: 'Expert Field Avg Rank', data: 'expertfieldAvgRank'},
-            { title: 'Expert Community Activity Rank', data: 'expertcommunityActivityRank'},
-            { title: 'Expert Max Simulation Streak Rank', data: 'expertmaxSimulationStreakRank'},
 
-            { title: 'Master Total Rank', data: 'masterTotalRank'},
-            { title: 'Master Operator Count Rank', data: 'masteroperatorCountRank'},
-            { title: 'Master Operator Avg Rank', data: 'masteroperatorAvgRank'},
-            { title: 'Master Field Count Rank', data: 'masterfieldCountRank'},
-            { title: 'Master Field Avg Rank', data: 'masterfieldAvgRank'},
-            { title: 'Master Community Activity Rank', data: 'mastercommunityActivityRank'},
-            { title: 'Master Max Simulation Streak Rank', data: 'mastermaxSimulationStreakRank'},
+            { title: 'Expert Total Rank', data: 'expertTotalRank', visible: false },
+            { title: 'Expert Operator Count Rank', data: 'expertoperatorCountRank', visible: false },
+            { title: 'Expert Operator Avg Rank', data: 'expertoperatorAvgRank', visible: false },
+            { title: 'Expert Field Count Rank', data: 'expertfieldCountRank', visible: false },
+            { title: 'Expert Field Avg Rank', data: 'expertfieldAvgRank', visible: false },
+            { title: 'Expert Community Activity Rank', data: 'expertcommunityActivityRank', visible: false },
+            { title: 'Expert Max Simulation Streak Rank', data: 'expertmaxSimulationStreakRank', visible: false },
 
-            { title: 'Grandmaster Total Rank', data: 'grandmasterTotalRank'},
-            { title: 'Grandmaster Operator Count Rank', data: 'grandmasteroperatorCountRank'},
-            { title: 'Grandmaster Operator Avg Rank', data: 'grandmasteroperatorAvgRank'},
-            { title: 'Grandmaster Field Count Rank', data: 'grandmasterfieldCountRank'},
-            { title: 'Grandmaster Field Avg Rank', data: 'grandmasterfieldAvgRank'},
-            { title: 'Grandmaster Community Activity Rank', data: 'grandmastercommunityActivityRank'},
-            { title: 'Grandmaster Max Simulation Streak Rank', data: 'grandmastermaxSimulationStreakRank'},
+            { title: 'Master Total Rank', data: 'masterTotalRank', visible: false },
+            { title: 'Master Operator Count Rank', data: 'masteroperatorCountRank', visible: false },
+            { title: 'Master Operator Avg Rank', data: 'masteroperatorAvgRank', visible: false },
+            { title: 'Master Field Count Rank', data: 'masterfieldCountRank', visible: false },
+            { title: 'Master Field Avg Rank', data: 'masterfieldAvgRank', visible: false },
+            { title: 'Master Community Activity Rank', data: 'mastercommunityActivityRank', visible: false },
+            { title: 'Master Max Simulation Streak Rank', data: 'mastermaxSimulationStreakRank', visible: false },
+
+            { title: 'Grandmaster Total Rank', data: 'grandmasterTotalRank', visible: false },
+            { title: 'Grandmaster Operator Count Rank', data: 'grandmasteroperatorCountRank', visible: false },
+            { title: 'Grandmaster Operator Avg Rank', data: 'grandmasteroperatorAvgRank', visible: false },
+            { title: 'Grandmaster Field Count Rank', data: 'grandmasterfieldCountRank', visible: false },
+            { title: 'Grandmaster Field Avg Rank', data: 'grandmasterfieldAvgRank', visible: false },
+            { title: 'Grandmaster Community Activity Rank', data: 'grandmastercommunityActivityRank', visible: false },
+            { title: 'Grandmaster Max Simulation Streak Rank', data: 'grandmastermaxSimulationStreakRank', visible: false },
         ];
 
 
@@ -574,41 +562,46 @@ async function insertRankListInfo() {
         // 安全初始化 DataTable，数据缺失时自动填充 null
         const safeData = Array.isArray(data)
             ? data.map(row => {
-            // 确保每个 columns.data 字段都存在，否则填 null
-            const safeRow = {};
-            columns.forEach(col => {
-                // 支持自定义 render 字段
-                if (typeof col.data === 'string') {
-                safeRow[col.data] = row[col.data] !== undefined ? row[col.data] : null;
-                }
-            });
-            // 保留原始字段
-            return { ...row, ...safeRow };
+                // 确保每个 columns.data 字段都存在，否则填 null
+                const safeRow = {};
+                columns.forEach(col => {
+                    // 支持自定义 render 字段
+                    if (typeof col.data === 'string') {
+                        safeRow[col.data] = row[col.data] !== undefined ? row[col.data] : null;
+                    }
+                });
+                // 保留原始字段
+                return { ...row, ...safeRow };
             })
             : [];
 
         const table = new DataTable('#WQScope_RankListTable', {
-            lengthMenu: [5, 10, 25, 50, grandmasterCount],
+            lengthMenu: [10, 25, 50, grandmasterCount],
             data: safeData,
             columns,
-            order: [[2, 'desc']],
+            // order: [[0, 'acs']],
             columnDefs: [
-                { targets: [7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44], visible: false },
-                { targets: 2, visible: false, searchable: false },
-                { targets: 5, orderDataType: 'level-order' },
-                { targets: 4, orderDataType: 'level-order' },
-                { targets: [4,5,6], columnControl: ['order', ['searchList']] }
+                { targets: 0, type: 'num' },
+                { targets: 3, orderDataType: 'level-order' },
+                { targets: 2, orderDataType: 'level-order' },
+                { targets: [2, 3, 4], columnControl: ['order', ['searchList']] }
             ],
             scrollX: true,
             responsive: false,
-            stateSave: true,			
+            stateSave: true,
             layout: {
-                topStart: 'pageLength',
+                topStart: ['pageLength'],
                 topEnd: ['search', 'buttons'],
                 bottomStart: 'info',
                 bottomEnd: 'paging'
             },
             buttons: [
+                {
+                    text: '下载原始JSON',
+                    action: function (e, dt, button, config) {
+                        DataTable.fileSave(new Blob([JSON.stringify(safeData)]), 'Export.json');
+                    }
+                },
                 {
                     extend: 'colvis',
                     text: '显示/隐藏列',
@@ -617,25 +610,19 @@ async function insertRankListInfo() {
                 }
             ],
             columnControl: [
-                // {
-                //     target: 1,
-                //     content: ['orderStatus',]
-                // },
-                // {
-                //     target: 2,
-                //     content: ['search']
-                // }
-            ],			
+                {
+                    target: 0,
+                    content: ['orderStatus',]
+                },
+                {
+                    target: 1,
+                    content: ['search']
+                }
+            ],
         });
 
-        // 行展开内容渲染函数
         function renderRowDetail(rowData, columnsArr) {
-            var baseFields = [
-                'Signals', 'Pyramids', 'Combined Alpha Performance', 'Combined Selected Alpha Performance',
-            ];
-            var sixFields = [
-                'Operators used', 'Operator Avg', 'Fields used', 'Field Avg', 'Community Activity', 'Max Simulation Streak'
-            ];
+
             function toRows(fields, colNum) {
                 let html = '';
                 for (let i = 0; i < fields.length; i += colNum) {
@@ -660,6 +647,13 @@ async function insertRankListInfo() {
                         value: rowData[col.data] !== undefined ? rowData[col.data] : ''
                     }));
             }
+
+            var baseFields = [
+                'Signals', 'Pyramids', 'Combined Alpha Performance', 'Combined Selected Alpha Performance',
+            ];
+            var sixFields = [
+                'Operators used', 'Operator Avg', 'Fields used', 'Field Avg', 'Community Activity', 'Max Simulation Streak'
+            ];
             let html = '';
             let base = getFields(baseFields);
             let six = getFields(sixFields);
@@ -668,19 +662,20 @@ async function insertRankListInfo() {
                 html += '<div style="display: flex; flex-direction: column;">' + toRows(base, 2) + '</div>';
             }
             if (six.length) {
-                html += '<div style="margin-bottom:8px;"><b>六维</b></div>';
+                html += '<div style="margin:12px 0 8px 0;"><b>六维</b></div>';
                 html += '<div style="display: flex; flex-direction: column;">' + toRows(six, 3) + '</div>';
             }
             for (const model of ["gold", "expert", "master", "grandmaster"]) {
-                var modelFields = columnsArr.filter(function(col) {
+                var modelFields = columnsArr.filter(function (col) {
                     return col.title && col.title.toLowerCase().startsWith(model);
                 });
+                if (rowData[model + "TotalRank"] === null) continue;
                 if (modelFields.length) {
-                    html += `<div style="margin:12px 0 8px 0;"><b>${model.charAt(0).toUpperCase() + model.slice(1)} 排名总和: ${rowData[model+"TotalRank"]}</b></div>`;
-                    modelFields = modelFields.filter(function(col) {
+                    html += `<div style="margin:12px 0 8px 0;"><b>${model.charAt(0).toUpperCase() + model.slice(1)} 排名总和: ${rowData[model + "TotalRank"]}</b></div>`;
+                    modelFields = modelFields.filter(function (col) {
                         return !col.title.toLowerCase().includes('total');
                     });
-                    html += '<div style="display: flex; flex-direction: column;">' + toRows(modelFields.map(col => ({title: col.title, value: rowData[col.data]})), 3) + '</div>';
+                    html += '<div style="display: flex; flex-direction: column;">' + toRows(modelFields.map(col => ({ title: col.title, value: rowData[col.data] })), 3) + '</div>';
                 }
             }
             return html || false;
@@ -693,14 +688,14 @@ async function insertRankListInfo() {
             if (row.child.isShown()) {
                 row.child.hide();
                 tr.removeClass('shown');
-                $(this).find('span').text('+');
+                $(this).find('span').text('▶');
             } else {
                 var rowData = row.data();
                 var columnsArr = table.settings().init().columns;
                 var html = renderRowDetail(rowData, columnsArr);
                 row.child(html).show();
                 tr.addClass('shown');
-                $(this).find('span').text('-');
+                $(this).find('span').text('▼');
             }
         });
 
@@ -766,62 +761,62 @@ async function getSingleRankByUserId(userId) {
 }
 
 async function calculateRanks(data, userId, WQPSettings) {
-	const userData = data.find(item => item.user === userId);
+    const userData = data.find(item => item.user === userId);
 
-	if (!userData) {
-		reject(`User with ID ${userId} not found.`);
-		return;
-	}
+    if (!userData) {
+        reject(`User with ID ${userId} not found.`);
+        return;
+    }
 
-	const result = {};
-	result['userData'] = userData;
-	result['info'] = {
-		"currentLevel": determineUserLevel(userData, WQPSettings.geniusCombineTag),
-		"baseAlphaCount": WQPSettings.geniusAlphaCount,
-	};
-	// filter以item.name Rank结尾的
-	result['gold'] = Object.fromEntries(Object.entries(userData).filter(([key, value]) => key.endsWith('Rank')));
-	result['gold']['rank'] = data.filter(item => item.totalRank < userData.totalRank).length;
-	result['gold']['count'] = data.length;
-	result['gold']['baseCount'] = data.filter(item => item.alphaCount >= WQPSettings.geniusAlphaCount).length;
+    const result = {};
+    result['userData'] = userData;
+    result['info'] = {
+        "currentLevel": determineUserLevel(userData, WQPSettings.geniusCombineTag),
+        "baseAlphaCount": WQPSettings.geniusAlphaCount,
+    };
+    // filter以item.name Rank结尾的
+    result['gold'] = Object.fromEntries(Object.entries(userData).filter(([key, value]) => key.endsWith('Rank')));
+    result['gold']['rank'] = data.filter(item => item.totalRank < userData.totalRank).length;
+    result['gold']['count'] = data.length;
+    result['gold']['baseCount'] = data.filter(item => item.alphaCount >= WQPSettings.geniusAlphaCount).length;
 
-	for (const model of ["expert", "master", "grandmaster"]) {
-		let itemData = data.filter(item => item.alphaCount >= levelCriteria[model].alphaCount && item.pyramidCount >= levelCriteria[model].pyramidCount);
-		if (WQPSettings.geniusCombineTag) {
-			itemData = itemData.filter(item => item.combinedAlphaPerformance >= levelCriteria[model].combinedAlphaPerformance || item.combinedSelectedAlphaPerformance >= levelCriteria[model].combinedSelectedAlphaPerformance);
-		}
-		result['gold'][model + 'Rank'] = itemData.filter(item => item.totalRank < userData.totalRank).length + 1;
+    for (const model of ["expert", "master", "grandmaster"]) {
+        let itemData = data.filter(item => item.alphaCount >= levelCriteria[model].alphaCount && item.pyramidCount >= levelCriteria[model].pyramidCount);
+        if (WQPSettings.geniusCombineTag) {
+            itemData = itemData.filter(item => item.combinedAlphaPerformance >= levelCriteria[model].combinedAlphaPerformance || item.combinedSelectedAlphaPerformance >= levelCriteria[model].combinedSelectedAlphaPerformance);
+        }
+        result['gold'][model + 'Rank'] = itemData.filter(item => item.totalRank < userData.totalRank).length + 1;
 
-		item_count = itemData.length;
+        item_count = itemData.length;
 
-		let itemUserData = itemData.find(item => item.user === userId);
-		if (!itemUserData) {
-			itemData.push(userData);
-		}
+        let itemUserData = itemData.find(item => item.user === userId);
+        if (!itemUserData) {
+            itemData.push(userData);
+        }
 
-		itemData.forEach(item => item['totalRank'] = 0);
-		for (const col of ["operatorCount", "fieldCount", "communityActivity", "completedReferrals", "maxSimulationStreak"]) {
-			let sorted = itemData.map(item => item[col]).sort((a, b) => b - a);
-			itemData.forEach(item => item[col + 'Rank'] = sorted.indexOf(item[col]) + 1);
-			itemData.forEach(item => item['totalRank'] = item['totalRank'] + item[col + 'Rank']);
-		}
-		for (const col of ["operatorAvg", "fieldAvg"]) {
-			let sorted = itemData.map(item => item[col]).sort((a, b) => a - b);
-		 itemData.forEach(item => item[col + 'Rank'] = sorted.indexOf(item[col]) + 1);
-			itemData.forEach(item => item['totalRank'] = item['totalRank'] + item[col + 'Rank']);
-		}
+        itemData.forEach(item => item['totalRank'] = 0);
+        for (const col of ["operatorCount", "fieldCount", "communityActivity", "completedReferrals", "maxSimulationStreak"]) {
+            let sorted = itemData.map(item => item[col]).sort((a, b) => b - a);
+            itemData.forEach(item => item[col + 'Rank'] = sorted.indexOf(item[col]) + 1);
+            itemData.forEach(item => item['totalRank'] = item['totalRank'] + item[col + 'Rank']);
+        }
+        for (const col of ["operatorAvg", "fieldAvg"]) {
+            let sorted = itemData.map(item => item[col]).sort((a, b) => a - b);
+            itemData.forEach(item => item[col + 'Rank'] = sorted.indexOf(item[col]) + 1);
+            itemData.forEach(item => item['totalRank'] = item['totalRank'] + item[col + 'Rank']);
+        }
 
-		itemUserData = itemData.find(item => item.user === userId);
-		result[model] = Object.fromEntries(Object.entries(itemUserData).filter(([key, value]) => key.endsWith('Rank')));
-		result[model]['rank'] = itemData.filter(item => item.totalRank < itemUserData.totalRank).length;
-		result[model]['count'] = item_count;
-	}
+        itemUserData = itemData.find(item => item.user === userId);
+        result[model] = Object.fromEntries(Object.entries(itemUserData).filter(([key, value]) => key.endsWith('Rank')));
+        result[model]['rank'] = itemData.filter(item => item.totalRank < itemUserData.totalRank).length;
+        result[model]['count'] = item_count;
+    }
 
-	return result;
+    return result;
 }
 
 function rankInfo2Html(result) {
-	const userData = result['userData'] ;
+    const userData = result['userData'];
 
     // 将排名信息转换为HTML格式
     return `
@@ -964,8 +959,8 @@ async function insertMyRankInfo() {
         const progressContainer = mainContent.querySelector('#WQButtonContainer');
         progressContainer.insertAdjacentHTML('afterend', tableHTML);
         // mainContent.innerHTML = tableHTML + mainContent.innerHTML;
-		// 绑定事件监听器
-		bindRankEditEvents(userId, savedTimestamp);
+        // 绑定事件监听器
+        bindRankEditEvents(userId, savedTimestamp);
     } else {
         console.error('未找到mainContent元素');
     }
@@ -996,7 +991,7 @@ function bindRankEditEvents(userId, savedTimestamp) {
 
             // 更新数据并重新计算排名
             const updatedResult = await updateUserRankings(userId, newData);
-            
+
             // 更新显示
             const rankCard = document.getElementById('rankCard');
             if (rankCard) {

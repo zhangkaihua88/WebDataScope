@@ -71,8 +71,7 @@
         }
     ],
     "host_permissions": [
-        "https://*/*",
-        "chrome-extension://*/*"
+        "https://*/*"
     ],
     "permissions": [
         "scripting",

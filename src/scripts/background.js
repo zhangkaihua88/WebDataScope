@@ -218,6 +218,7 @@ function injectionGeniusScript(tabId) {
                         "src/scripts/lib/responsive.dataTables.min.js",
                         "src/scripts/lib/dataTables.buttons.min.js",
                         "src/scripts/lib/buttons.colVis.min.js",
+                        "src/scripts/lib/buttons.html5.min.js",
                         "src/scripts/utils.js",
                         "src/scripts/uiCard.js",
                         "src/scripts/genius.js"],

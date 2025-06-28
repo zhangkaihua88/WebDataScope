@@ -109,3 +109,21 @@ function rankDense(arr, ascending = true) {
   // 3. 映射原数组为 rank 数组
   return arr.map(val => rankMap.get(val));
 }
+
+function formatSavedTimestamp(dateString) {
+    const date = new Date(dateString);
+
+    // 美东时间 (Eastern Time, America/New_York)
+    const easternTime = date.toLocaleString("zh-CN", {
+        timeZone: "America/New_York",
+        hour12: false
+    });
+
+    // 北京时间 (Asia/Shanghai)
+    const beijingTime = date.toLocaleString("zh-CN", {
+        timeZone: "Asia/Shanghai",
+        hour12: false
+    });
+
+    return [easternTime, beijingTime];
+}
