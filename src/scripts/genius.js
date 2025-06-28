@@ -930,7 +930,10 @@ async function insertMyRankInfo() {
         <div id='rankCard'>
         <div class="research-paradigm__header">
             <h2 class="genius__subtitle">Genius Rank Analysis</h2>
-            <small class="genius__hint genius__hint--dark"><span>${formatSavedTimestamp(savedTimestamp)}</span></small>
+            <small class="genius__hint genius__hint--dark">
+                <span>美东时间: ${formatSavedTimestamp(savedTimestamp)[0]}</span>
+                <span>北京时间: ${formatSavedTimestamp(savedTimestamp)[1]}</span>
+            </small>
         </div>
 
         <article class="card" style="flex-direction: column-reverse;">
@@ -938,7 +941,8 @@ async function insertMyRankInfo() {
         <div class="card__content" style="padding-bottom: 26px;max-width: 100%">
         <h3 style="font-size: 1.5rem; font-weight: bold; margin-bottom: 10px;">我的排名信息</h3>
         <small class="genius__hint genius__hint--dark">
-            <span>${formatSavedTimestamp(savedTimestamp)}</span>
+            <span>美东时间: ${formatSavedTimestamp(savedTimestamp)[0]}</span>
+            <span>北京时间: ${formatSavedTimestamp(savedTimestamp)[1]}</span>
         </small>
         ${rankInfo2Html(result)}
         </div>
@@ -998,7 +1002,8 @@ function bindRankEditEvents(userId, savedTimestamp) {
                 rankCard.querySelector('.card__content').innerHTML = `
                     <h3 style="font-size: 1.5rem; font-weight: bold; margin-bottom: 10px;">我的排名信息</h3>
                     <small class="genius__hint genius__hint--dark">
-                        <span>${formatSavedTimestamp(savedTimestamp)}</span>
+                        <span>美东时间: ${formatSavedTimestamp(savedTimestamp)[0]}</span>
+                        <span>北京时间: ${formatSavedTimestamp(savedTimestamp)[1]}</span>
                     </small>
                     ${rankInfo2Html(updatedResult)}
                 `;
