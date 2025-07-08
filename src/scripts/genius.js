@@ -10,9 +10,9 @@ console.log('genius.js loaded');
 const OptUrl = 'https://api.worldquantbrain.com/operators';
 // genius level criteria
 const levelCriteria = {
-    "expert": { "alphaCount": 20, "pyramidCount": 10, "combinedAlphaPerformance": 0.5, "combinedSelectedAlphaPerformance": 0.5 },
-    "master": { "alphaCount": 120, "pyramidCount": 20, "combinedAlphaPerformance": 1, "combinedSelectedAlphaPerformance": 1 },
-    "grandmaster": { "alphaCount": 220, "pyramidCount": 50, "combinedAlphaPerformance": 2, "combinedSelectedAlphaPerformance": 2 }
+    "expert": { "alphaCount": 20, "pyramidCount": 10, "combinedAlphaPerformance": 0.5, "combinedSelectedAlphaPerformance": 0.5, "combinedPowerPoolAlphaPerformance": 0.5 },
+    "master": { "alphaCount": 120, "pyramidCount": 20, "combinedAlphaPerformance": 1, "combinedSelectedAlphaPerformance": 1, "combinedPowerPoolAlphaPerformance": 1  },
+    "grandmaster": { "alphaCount": 220, "pyramidCount": 50, "combinedAlphaPerformance": 2, "combinedSelectedAlphaPerformance": 2, "combinedPowerPoolAlphaPerformance": 2  }
 }
 
 const CONCURRENCY = 10; // 同时进行的请求数
@@ -292,7 +292,8 @@ function determineUserLevel(userData, geniusCombineTag) {
             // 如果 geniusCombineTag 为 true，需要同时满足 combinedAlphaPerformance 和 combinedSelectedAlphaPerformance
             isPerformanceConditionMet = (
                 userData.combinedAlphaPerformance >= criteria.combinedAlphaPerformance ||
-                userData.combinedSelectedAlphaPerformance >= criteria.combinedSelectedAlphaPerformance
+                userData.combinedSelectedAlphaPerformance >= criteria.combinedSelectedAlphaPerformance||
+                userData.combinedPowerPoolAlphaPerformance >= criteria.combinedPowerPoolAlphaPerformance
             );
         }
 
@@ -328,7 +329,7 @@ async function getAllRank() {
                 } else {
                     itemData = data.map((item, index) => ({ ...item, originalIndex: index })).filter(item => item.alphaCount >= levelCriteria[model].alphaCount && item.pyramidCount >= levelCriteria[model].pyramidCount);
                     if (WQPSettings.geniusCombineTag) {
-                        itemData = itemData.filter(item => item.combinedAlphaPerformance >= levelCriteria[model].combinedAlphaPerformance || item.combinedSelectedAlphaPerformance >= levelCriteria[model].combinedSelectedAlphaPerformance);
+                        itemData = itemData.filter(item => item.combinedAlphaPerformance >= levelCriteria[model].combinedAlphaPerformance || item.combinedSelectedAlphaPerformance >= levelCriteria[model].combinedSelectedAlphaPerformance || item.combinedPowerPoolAlphaPerformance >= levelCriteria[model].combinedPowerPoolAlphaPerformance);
                     }
                 }
                 itemData.forEach(item => item['TotalRank'] = 0);
@@ -507,6 +508,7 @@ async function insertRankListInfo() {
             { title: 'Pyramids', data: 'pyramidCount', visible: false }, // 金字塔数量
             { title: 'Combined Alpha Performance', data: 'combinedAlphaPerformance', visible: false }, // 综合Alpha表现
             { title: 'Combined Selected Alpha Performance', data: 'combinedSelectedAlphaPerformance', visible: false }, // 综合选择的Alpha表现
+            { title: 'Combined Power Pool Alpha Performance', data: 'combinedPowerPoolAlphaPerformance', visible: false }, // 综合Power Pool的Alpha表现
 
 
 
@@ -783,7 +785,7 @@ async function calculateRanks(data, userId, WQPSettings) {
     for (const model of ["expert", "master", "grandmaster"]) {
         let itemData = data.filter(item => item.alphaCount >= levelCriteria[model].alphaCount && item.pyramidCount >= levelCriteria[model].pyramidCount);
         if (WQPSettings.geniusCombineTag) {
-            itemData = itemData.filter(item => item.combinedAlphaPerformance >= levelCriteria[model].combinedAlphaPerformance || item.combinedSelectedAlphaPerformance >= levelCriteria[model].combinedSelectedAlphaPerformance);
+            itemData = itemData.filter(item => item.combinedAlphaPerformance >= levelCriteria[model].combinedAlphaPerformance || item.combinedSelectedAlphaPerformance >= levelCriteria[model].combinedSelectedAlphaPerformance || item.combinedPowerPoolAlphaPerformance >= levelCriteria[model].combinedPowerPoolAlphaPerformance);
         }
         result['gold'][model + 'Rank'] = itemData.filter(item => item.totalRank < userData.totalRank).length + 1;
 
