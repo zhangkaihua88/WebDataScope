@@ -113,7 +113,8 @@ async function fetchCsrfToken() {
 // ############################## 点赞单个Post的函数 ##############################
 async function upVoteSinglePost() {
     await fetchCsrfToken();
-    updateButton("upVoteSinglePostButton", "正在点赞...");
+    // updateButton("upVoteSinglePostButton", "正在点赞...");
+    setButtonState("upVoteSinglePostButton", "正在点赞...",'load');
     // const buttons = document.querySelectorAll('button[aria-pressed="false"][aria-label="This post was helpful"]');
     await upVoteSinglePostBody(document, window.location.href);
     await upVoteSinglePostComment(document, window.location.href);
@@ -121,7 +122,8 @@ async function upVoteSinglePost() {
     if (nextLink) {
         await fetchNextCommentPage(nextLink.href, 1);  // Recursively call the function for the next page
     }
-    resetButton("upVoteSinglePostButton", "开始点赞该条帖子");
+    // resetButton("upVoteSinglePostButton", "开始点赞该条帖子");
+    setButtonState("upVoteSinglePostButton", "开始点赞该条帖子",'enable');
 }
 
 async function fetchNextCommentPage(url, reNum = 0) {
@@ -189,7 +191,8 @@ async function upVoteSinglePostComment(document, url) {
 
 async function upVoteSingleUser() {
     await fetchCsrfToken();
-    updateButton("upVoteSingleUserButton", "正在点赞...");
+    // updateButton("upVoteSingleUserButton", "正在点赞...");
+    setButtonState("upVoteSingleUserButton", "正在点赞...",'load');
     // await upVoteSingleUserPosts(document, window.location.href);
     // await upVoteSingleUserComments(document, window.location.href);
     let urlPath = window.location.pathname; // 获取路径部分
@@ -197,7 +200,8 @@ async function upVoteSingleUser() {
     console.log(userTag);
     await _upVoteSingleUser(userTag);
 
-    resetButton("upVoteSingleUserButton", "开始点赞该用户");
+    // resetButton("upVoteSingleUserButton", "开始点赞该用户");
+    setButtonState("upVoteSingleUserButton", "开始点赞该用户",'enable');
 }
 
 async function upVoteMultiUser() {
@@ -242,7 +246,8 @@ async function upVoteMultiUser() {
     for (let [idx, [name, userTag]] of Object.entries(Object.entries(data))) {
         let displayName = name[0] + '*'.repeat(name.length - 1);
         before_upcont = upCount;
-        updateButton("upVoteMultiUserButton", `正在点赞(${idx}/${Object.keys(data).length} user)... ` + displayName);
+        // updateButton("upVoteMultiUserButton", `正在点赞(${idx}/${Object.keys(data).length} user)... ` + displayName);
+        setButtonState("upVoteMultiUserButton", `正在点赞(${idx}/${Object.keys(data).length} user)... ` + displayName,'load');
         await _upVoteSingleUser(userTag);
         console.log(name, upCount - before_upcont);
 
@@ -261,7 +266,8 @@ async function upVoteMultiUser() {
         infoElem.innerText = lines.join('\n');
     }
 
-    resetButton("upVoteMultiUserButton", `批量点赞用户完成(共${Object.keys(data).length} user)`);
+    // resetButton("upVoteMultiUserButton", `批量点赞用户完成(共${Object.keys(data).length} user)`);
+    setButtonState("upVoteMultiUserButton", `批量点赞用户完成(共${Object.keys(data).length} user)`,'enable');
 }
 
 async function _upVoteSingleUser(userTag) {
