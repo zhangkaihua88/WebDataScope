@@ -25,11 +25,13 @@
                 "*://platform.worldquantbrain.com/genius/*"
             ],
             "js": [
+                "src/scripts/lib/auth.min.js",
                 "src/scripts/lib/msgpack.min.js",
                 "src/scripts/lib/pako.min.js",
                 "src/scripts/lib/chart.js",
                 "src/scripts/uiCard.js",
-                "src/scripts/dataAna.js"
+                "src/scripts/dataAna.js",
+                "src/scripts/noMoreDifficulties.js"
             ],
             "css": [
                 "src/css/idcard.css"
@@ -45,10 +47,11 @@
         },
         {
             "matches": [
-                "*://support.worldquantbrain.com/hc/en-us/community/*",
-                "*://support.worldquantbrain.com/hc/en-us/profiles/*"
+                "*://support.worldquantbrain.com/hc/*/community/*",
+                "*://support.worldquantbrain.com/hc/*/profiles/*"
             ],
             "js": [
+                "src/scripts/lib/auth.min.js",
                 "src/scripts/utils.js",
                 "src/scripts/voteup.js"
             ],

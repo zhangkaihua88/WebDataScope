@@ -10,7 +10,7 @@ let quarterStartTime = getStartTime();
 
 async function getLikedIds() {
     return new Promise((resolve) => {
-        chrome.storage.local.get(['WQPLikedIds'], function({ WQPLikedIds }) {
+        chrome.storage.local.get(['WQPLikedIds'], function ({ WQPLikedIds }) {
             resolve(WQPLikedIds || []);
         });
     });
@@ -45,6 +45,9 @@ function logCount() {
 }
 
 async function _upVote(url) {
+    // 获取 CSRF Token
+    let authToken = await getAuth();
+    let data;
     try {
         let WQPLikedIds = await getLikedIds();
         if (WQPLikedIds.includes(url)) {
@@ -52,24 +55,28 @@ async function _upVote(url) {
             upCountFromCache += 1; // 增加缓存的点赞数量
             upCount += 1;
             logCount();
-            return ;
+            return;
         }
         await saveLikedId(url);  // 保存已点赞的ID
 
-        const response = await fetch(url + "/vote", {
-            "headers": {
-                "accept": "application/json, text/javascript, */*; q=0.01",
-                "content-type": "application/x-www-form-urlencoded; charset=UTF-8",
-                "x-csrf-token": csrfToken,
-                "x-requested-with": "XMLHttpRequest"
-            },
-            "referrerPolicy": "strict-origin-when-cross-origin",
-            "body": "value=up",
-            "method": "POST",
-            "mode": "cors",
-            "credentials": "include"
-        });
-        const data = await response.json();
+        if (authToken) {
+            const response = await fetch(url + "/vote", {
+                "headers": {
+                    "accept": "application/json, text/javascript, */*; q=0.01",
+                    "content-type": "application/x-www-form-urlencoded; charset=UTF-8",
+                    "x-csrf-token": csrfToken,
+                    "x-requested-with": "XMLHttpRequest"
+                },
+                "referrerPolicy": "strict-origin-when-cross-origin",
+                "body": "value=up",
+                "method": "POST",
+                "mode": "cors",
+                "credentials": "include"
+            });
+            data = await response.json();
+        } else {
+            data = { 'value': 'up' }
+        }
         if (data["value"] === "up") {
             upCount += 1;
             console.log("点赞成功:", url);
@@ -240,6 +247,16 @@ async function upVoteMultiUser() {
     infoElem.parentNode.insertBefore(infoDiv, infoElem);
 
     for (let [idx, [name, userTag]] of Object.entries(Object.entries(data))) {
+        let nameData = await getDataFromUrl(`https://support.worldquantbrain.com/hc/api/internal/communities/mentions.json?query=${name}`);
+        if (nameData && nameData.length > 0) {
+            if (String(nameData[0].id) === String(userTag)) {
+                console.log(`用户 ${name} 的 userTag 已经是 ${userTag}，无需修改。`);
+            } else {
+                console.log(`用户 ${name} 的 userTag 已经是 ${userTag}，将其修改为 ${nameData[0].id}。`);
+                userTag = String(nameData[0].id);  // 更新 userTag
+            }
+        }
+
         let displayName = name[0] + '*'.repeat(name.length - 1);
         before_upcont = upCount;
         updateButton("upVoteMultiUserButton", `正在点赞(${idx}/${Object.keys(data).length} user)... ` + displayName);
@@ -403,7 +420,7 @@ function createStartMenu() {
 function clearLikedIds() {
     if (confirm('确定要清空所有点赞记录吗？此操作不可恢复。')) {
         if (confirm('请再次确认，是否真的要清空所有点赞记录？')) {
-            chrome.storage.local.remove('WQPLikedIds', function() {
+            chrome.storage.local.remove('WQPLikedIds', function () {
                 alert('点赞记录已清空！');
                 upCount = 0;
                 logCount();

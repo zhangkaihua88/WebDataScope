@@ -147,7 +147,7 @@ function injectionDistributionScript(tabId) {
         });
         chrome.scripting.executeScript({
             target: { tabId: tabId },
-            files: ['src/scripts/lib/chart.js', "src/scripts/utils.js", 'src/scripts/distribution.js'],
+            files: ["src/scripts/lib/auth.min.js", 'src/scripts/lib/chart.js', "src/scripts/utils.js", 'src/scripts/distribution.js'],
         });
     } catch (error) {
         console.error('Script injection failed: ', error);
@@ -210,6 +210,7 @@ function injectionGeniusScript(tabId) {
                 chrome.scripting.executeScript({
                     target: { tabId: tabId },
                     files: [
+                        "src/scripts/lib/auth.min.js",
                         "src/scripts/lib/jquery-3.7.0.min.js",
                         "src/scripts/lib/jquery.dataTables.min.js",
                         "src/scripts/lib/dataTables.columnControl.min.js",
