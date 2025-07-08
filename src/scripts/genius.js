@@ -651,7 +651,7 @@ async function insertRankListInfo() {
             }
 
             var baseFields = [
-                'Signals', 'Pyramids', 'Combined Alpha Performance', 'Combined Selected Alpha Performance',
+                'Signals', 'Pyramids', 'Combined Alpha Performance', 'Combined Selected Alpha Performance', 'Combined Power Pool Alpha Performance'
             ];
             var sixFields = [
                 'Operators used', 'Operator Avg', 'Fields used', 'Field Avg', 'Community Activity', 'Max Simulation Streak'
