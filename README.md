@@ -23,6 +23,8 @@ WebDataScope是一个正在打造的Chrome/Edge插件。它可以让你在平台
 - V0.9.3(20250614)
   - add: Genius预估排名信息
   - add: Genius排名分析可以修改六维查看排名信息
+  - style: genius页面点赞按钮样式优化;
+  - fix: genius页面insertOpsTable函数导致的页面绑定事件丢失bug
 - V0.9.2(20250610)
   - fix: Genius排名分析中获取的时间未转化为美东时间的错误
   - fix: 修复某已知bug
