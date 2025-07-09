@@ -11,8 +11,8 @@ const OptUrl = 'https://api.worldquantbrain.com/operators';
 // genius level criteria
 const levelCriteria = {
     "expert": { "alphaCount": 20, "pyramidCount": 10, "combinedAlphaPerformance": 0.5, "combinedSelectedAlphaPerformance": 0.5, "combinedPowerPoolAlphaPerformance": 0.5 },
-    "master": { "alphaCount": 120, "pyramidCount": 20, "combinedAlphaPerformance": 1, "combinedSelectedAlphaPerformance": 1, "combinedPowerPoolAlphaPerformance": 1  },
-    "grandmaster": { "alphaCount": 220, "pyramidCount": 50, "combinedAlphaPerformance": 2, "combinedSelectedAlphaPerformance": 2, "combinedPowerPoolAlphaPerformance": 2  }
+    "master": { "alphaCount": 120, "pyramidCount": 20, "combinedAlphaPerformance": 1, "combinedSelectedAlphaPerformance": 1, "combinedPowerPoolAlphaPerformance": 1 },
+    "grandmaster": { "alphaCount": 220, "pyramidCount": 50, "combinedAlphaPerformance": 2, "combinedSelectedAlphaPerformance": 2, "combinedPowerPoolAlphaPerformance": 2 }
 }
 
 const CONCURRENCY = 10; // 同时进行的请求数
@@ -24,7 +24,7 @@ const targetSelectorButton = '#root > div > div.genius__container > div > div > 
 async function fetchAllAlphas() {
     // 抓取本季度所有的alpha
 
-    updateButton('WQPOPSFetchButton', `开始抓取`);
+    setButtonState('WQPOPSFetchButton', `开始抓取...`,'load');
 
     const currentDate = new Date();
     const year = currentDate.getUTCFullYear();
@@ -74,9 +74,9 @@ async function fetchAllAlphas() {
             break;
         }
         offset += limit; // Increase offset for the next page
-        updateButton('WQPOPSFetchButton', `正在抓取 ${allResults.length} / ${totalCount}`); // Update button text
+        setButtonState('WQPOPSFetchButton', `正在抓取 ${allResults.length} / ${totalCount}`, 'load');// Update button text
     }
-    updateButton('WQPOPSFetchButton', `正在分析`);
+    setButtonState('WQPOPSFetchButton', '正在分析...', 'load');
 
 
     // Check if the length matches the total count
@@ -150,7 +150,7 @@ async function opsAna() {
         console.log(dataToSave);
     });
     insertOpsTable();
-    resetButton('WQPOPSFetchButton', `运算符分析完成${data.length}`);
+    setButtonState('WQPOPSFetchButton', `运算符分析完成${data.length}`, 'enable');
 }
 
 
@@ -169,73 +169,23 @@ function insertOpsTable() {
             console.log(savedTimestamp);
 
             // 创建表格结构
-            let tableHTML = `
-            <div class="research-paradigm__header">
-                <h2 class="genius__subtitle">Operator Analysis</h2>
-                <small class="genius__hint genius__hint--dark">
-                    <span>美东时间: ${formatSavedTimestamp(savedTimestamp)[0]}</span>
-                    <span>北京时间: ${formatSavedTimestamp(savedTimestamp)[1]}</span>
-                </small>
-            </div>
-
-            <article class="card">
-            <div class="card_wrapper">
-            <div class="card__content" style="padding-bottom: 26px;">
-                <h3>在你可用的运算符中，共有${nonZeroCount}种运算符被使用，${zeroCount}种运算符未被使用。</h3>
-                <p>'-'有两种含义分别是substract和revers, 此处统一为substract</p>
-                
-                
-                <div class="operator-table">
-                    <table id="operatorTable" class="sortable WQScope_table">
-                        <thead>
-                            <tr>
-                                <th data-sort="category">Category</th>
-                                <th data-sort="definition">Definition</th>
-                                <th data-sort="count">Count</th>
-                                <th data-sort="scope">Scope</th>
-                                <th data-sort="level">Level</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-            `;
-
-            // 插入数据行
-            savedArray.forEach((item, index) => {
-                const rowClass = index % 2 === 0 ? '' : 'class="odd-row"';
-                tableHTML += `
-                <tr ${rowClass}>
-                    <td>${item.category}</td>
-                    <td>${item.definition}</td>
-                    <td>${item.count}</td>
-                    <td>${item.scope}</td>
-                    <td>${item.level}</td>
-                </tr>
-                `;
-            });
-
-            // 关闭表格标签
-            tableHTML += `
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-            </div>
-            </article>
-            `;
+            let tableHTML = generateOperatorTable(savedTimestamp, nonZeroCount, zeroCount, savedArray);
 
             // 查找目标插入位置
             const mainContent = document.querySelector('.genius__main-content');
-            if (mainContent) {
-                // 检查是否已经存在表格，如果存在则删除旧表格
-                const existingTable = mainContent.querySelector("#operatorTable");
-                if (existingTable) {
-                    existingTable.remove();
+
+                if (mainContent) {
+                    // 删除旧的表格容器（假设整体容器有唯一类名或ID）
+                    const oldWrapper = mainContent.querySelector('#operatorTable');
+                    if (oldWrapper) {
+                        oldWrapper.remove();
+                    }
+
+                    // 插入到 mainContent 的末尾
+                    mainContent.insertAdjacentHTML('beforeend', tableHTML);
+                } else {
+                    console.error('未找到 mainContent 元素');
                 }
-                // 插入新的表格
-                mainContent.innerHTML += tableHTML;
-            } else {
-                console.error('未找到mainContent元素');
-            }
 
             // 排序功能
             const table = document.getElementById("operatorTable");
@@ -269,6 +219,56 @@ function insertOpsTable() {
         }
     });
 }
+// 工具函數,提供inertOpsTable使用
+function generateOperatorTable(savedTimestamp, nonZeroCount, zeroCount, savedArray) {
+    const [usTime, cnTime] = formatSavedTimestamp(savedTimestamp);
+
+    const rowsHTML = savedArray.map((item, index) => `
+                        <tr class="${index % 2 ? 'odd-row' : ''}">
+                            <td>${item.category}</td>
+                            <td>${item.definition}</td>
+                            <td>${item.count}</td>
+                            <td>${item.scope}</td>
+                            <td>${item.level}</td>
+                        </tr>
+                    `).join('');
+
+    return `
+                    <div class="research-paradigm__header">
+                        <h2 class="genius__subtitle">Operator Analysis</h2>
+                        <small class="genius__hint genius__hint--dark">
+                            <span>美东时间: ${usTime}</span>
+                            <span>北京时间: ${cnTime}</span>
+                        </small>
+                    </div>
+                    
+                    <article class="card">
+                        <div class="card_wrapper">
+                            <div class="card__content" style="padding-bottom: 26px;">
+                                <h3>在你可用的运算符中，共有${nonZeroCount}种运算符被使用，${zeroCount}种运算符未被使用。</h3>
+                                <p>'-'有两种含义分别是substract和revers, 此处统一为substrac
+                                <div class="operator-table">
+                                    <table id="operatorTable" class="sortable WQScope_table">
+                                        <thead>
+                                            <tr>
+                                                <th data-sort="category">Category</th>
+                                                <th data-sort="definition">Definition</th>
+                                                <th data-sort="count">Count</th>
+                                                <th data-sort="scope">Scope</th>
+                                                <th data-sort="level">Level</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            ${rowsHTML}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </article>
+                `;
+}
+
 
 
 // ############################## 排名分析 ##############################
@@ -292,7 +292,7 @@ function determineUserLevel(userData, geniusCombineTag) {
             // 如果 geniusCombineTag 为 true，需要同时满足 combinedAlphaPerformance 和 combinedSelectedAlphaPerformance
             isPerformanceConditionMet = (
                 userData.combinedAlphaPerformance >= criteria.combinedAlphaPerformance ||
-                userData.combinedSelectedAlphaPerformance >= criteria.combinedSelectedAlphaPerformance||
+                userData.combinedSelectedAlphaPerformance >= criteria.combinedSelectedAlphaPerformance ||
                 userData.combinedPowerPoolAlphaPerformance >= criteria.combinedPowerPoolAlphaPerformance
             );
         }
@@ -1054,7 +1054,7 @@ function getSeason() {
 async function fetchAllUsers() {
     // 抓取所有用户的排名信息
 
-    updateButton('WQPRankFetchButton', `开始抓取`);
+    setButtonState('WQPRankFetchButton', '开始抓取...', 'load');
     // const currentDate = new Date();
 
     // Convert to Eastern Time (ET)
@@ -1084,7 +1084,7 @@ async function fetchAllUsers() {
 
     // 初始化进度
     let fetchedCount = data.length;
-    updateButton('WQPRankFetchButton', `正在抓取 ${fetchedCount} / ${totalCount}`);
+    setButtonState('WQPRankFetchButton', `正在抓取 ${fetchedCount} / ${totalCount}`, 'load');
 
     // 计算剩余请求
     const remainingPages = Math.ceil(totalCount / limit) - 1;
@@ -1101,7 +1101,7 @@ async function fetchAllUsers() {
         const batchRequests = batchUrls.map(url =>
             getDataFromUrl(url).then(page => {
                 fetchedCount += page.results.length;
-                updateButton('WQPRankFetchButton', `正在抓取 ${fetchedCount} / ${totalCount}`);
+                setButtonState('WQPRankFetchButton', `正在抓取 ${fetchedCount} / ${totalCount}`, 'load');
                 return page;
             })
         );
@@ -1145,7 +1145,7 @@ async function rankAna() {
         console.log('数据已保存');
         console.log(dataToSave);
     });
-    resetButton('WQPRankFetchButton', `排名分析完成`);
+    setButtonState('WQPRankFetchButton', `排名分析完成`, 'disable');
     insertMyRankInfo();
 }
 

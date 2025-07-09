@@ -14,6 +14,34 @@ function resetButton(buttonId, buttonText) {
     startButton.removeAttribute("disabled");
 }
 
+function setButtonState(buttonId, buttonText, mode = 'disable') {
+    const button = document.getElementById(buttonId);
+
+    if (!button) {
+        console.warn(`Button with ID '${buttonId}' not found.`);
+        return;
+    }
+
+    if (mode === 'load') {
+        button.innerText = '⏳ ' + (buttonText || 'Loading...');
+        button.style.cursor = 'wait';
+        button.setAttribute('disabled', true);
+        button.style.opacity = '0.6';
+    } else if (mode === 'disable') {
+        button.innerText = buttonText;
+        button.style.cursor = 'default';
+        button.setAttribute('disabled', true);
+        button.style.opacity = '1';
+    } else if (mode === 'enable') {
+        button.innerText = buttonText;
+        button.removeAttribute('disabled');
+        button.style.cursor = 'pointer';
+        button.style.opacity = '1';
+    } else {
+        console.warn(`Invalid mode: ${mode}`);
+    }
+}
+
 
 async function getDataFromUrl(url) {
     const response = await fetch(url, {
@@ -72,7 +100,7 @@ function findSingleOps(text) {
     let count = [];
     singleOps.sort((a, b) => b.length - a.length);  // Sort by operator length in descending order
     singleOps.forEach(op => {
-        let regex = new RegExp(`${escapeRegExp(op)}`, 'g'); 
+        let regex = new RegExp(`${escapeRegExp(op)}`, 'g');
         let matches = [...text.matchAll(regex)];
         count = count.concat(Array(matches.length).fill(op));  // Add matched operator to the count
         text = text.replace(regex, ' ');  // Replace matched operators with spaces
@@ -97,17 +125,17 @@ function findOps(regular, operators) {
 
 
 function rankDense(arr, ascending = true) {
-  // 1. 拷贝并排序唯一值
-  const sortedUnique = Array.from(new Set(arr)).sort((a, b) => ascending ? a - b : b - a);
+    // 1. 拷贝并排序唯一值
+    const sortedUnique = Array.from(new Set(arr)).sort((a, b) => ascending ? a - b : b - a);
 
-  // 2. 创建值到 rank 的映射
-  const rankMap = new Map();
-  sortedUnique.forEach((val, index) => {
-    rankMap.set(val, index + 1); // dense rank 从 1 开始
-  });
+    // 2. 创建值到 rank 的映射
+    const rankMap = new Map();
+    sortedUnique.forEach((val, index) => {
+        rankMap.set(val, index + 1); // dense rank 从 1 开始
+    });
 
-  // 3. 映射原数组为 rank 数组
-  return arr.map(val => rankMap.get(val));
+    // 3. 映射原数组为 rank 数组
+    return arr.map(val => rankMap.get(val));
 }
 
 function formatSavedTimestamp(dateString) {
