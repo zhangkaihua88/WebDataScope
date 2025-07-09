@@ -24,7 +24,6 @@ const targetSelectorButton = '#root > div > div.genius__container > div > div > 
 async function fetchAllAlphas() {
     // 抓取本季度所有的alpha
 
-    // updateButton('WQPOPSFetchButton', `开始抓取`);
     setButtonState('WQPOPSFetchButton', `开始抓取...`,'load');
 
     const currentDate = new Date();
@@ -1055,7 +1054,6 @@ function getSeason() {
 async function fetchAllUsers() {
     // 抓取所有用户的排名信息
 
-    // updateButton('WQPRankFetchButton', `开始抓取`);
     setButtonState('WQPRankFetchButton', '开始抓取...', 'load');
     // const currentDate = new Date();
 
@@ -1086,7 +1084,6 @@ async function fetchAllUsers() {
 
     // 初始化进度
     let fetchedCount = data.length;
-    // updateButton('WQPRankFetchButton', `正在抓取 ${fetchedCount} / ${totalCount}`);
     setButtonState('WQPRankFetchButton', `正在抓取 ${fetchedCount} / ${totalCount}`, 'load');
 
     // 计算剩余请求
@@ -1104,7 +1101,6 @@ async function fetchAllUsers() {
         const batchRequests = batchUrls.map(url =>
             getDataFromUrl(url).then(page => {
                 fetchedCount += page.results.length;
-                // updateButton('WQPRankFetchButton', `正在抓取 ${fetchedCount} / ${totalCount}`);
                 setButtonState('WQPRankFetchButton', `正在抓取 ${fetchedCount} / ${totalCount}`, 'load');
                 return page;
             })
@@ -1149,7 +1145,6 @@ async function rankAna() {
         console.log('数据已保存');
         console.log(dataToSave);
     });
-    // resetButton('WQPRankFetchButton', `排名分析完成`);
     setButtonState('WQPRankFetchButton', `排名分析完成`, 'disable');
     insertMyRankInfo();
 }
