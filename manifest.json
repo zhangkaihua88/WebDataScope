@@ -39,14 +39,6 @@
         },
         {
             "matches": [
-                "*://support.worldquantbrain.com/hc/en-us/search*"
-            ],
-            "js": [
-                "src/scripts/search.js"
-            ]
-        },
-        {
-            "matches": [
                 "*://support.worldquantbrain.com/hc/*/community/*",
                 "*://support.worldquantbrain.com/hc/*/profiles/*"
             ],

@@ -20,6 +20,9 @@ WebDataScope是一个正在打造的Chrome/Edge插件。它可以让你在平台
 - [ ] 计算Self Corr
 
 # 更新日志
+- V0.9.x()
+  - fix: 修复某些已知bug
+  - del: 论坛中文搜索功能
 - V0.9.3(20250614)
   - add: Genius预估排名信息
   - add: Genius排名分析可以修改六维查看排名信息

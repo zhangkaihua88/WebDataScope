@@ -42,6 +42,13 @@ function setButtonState(buttonId, buttonText, mode = 'disable') {
     }
 }
 
+function format(formatString, replacements) {
+  let result = formatString;
+  for (const [key, value] of Object.entries(replacements)) {
+    result = result.replace(new RegExp(`\\{${key}\\}`, 'g'), value);
+  }
+  return result;
+}
 
 async function getDataFromUrl(url) {
     const response = await fetch(url, {
@@ -57,6 +64,45 @@ async function getDataFromUrl(url) {
     }
     const data = await response.json(); // Parse JSON data
     return data
+}
+
+async function getDataFromUrlWithOffsetParallel(formatUrl, limit, buttonName){
+    const CONCURRENCY = 10; // 同时进行的请求数
+
+    const initialUrl = format(formatUrl, { limit: limit, offset: 0 });
+    const initialData = await getDataFromUrl(initialUrl);
+    const totalCount = initialData.count;
+    let data = initialData.results;
+    let fetchedCount = data.length;
+    setButtonState(buttonName, `正在抓取 ${fetchedCount} / ${totalCount}`, 'load');
+
+    // 计算剩余请求
+    const remainingPages = Math.ceil(totalCount / limit) - 1;
+    const offsets = Array.from({ length: remainingPages }, (_, i) => (i + 1) * limit);
+
+    const urls = offsets.map(offset => format(formatUrl, { limit: limit, offset: offset }));
+
+    // 分批请求函数
+    const fetchBatch = async (batchUrls) => {
+        const batchRequests = batchUrls.map(url =>
+            getDataFromUrl(url).then(page => {
+                fetchedCount += page.results.length;
+                setButtonState(buttonName, `正在抓取 ${fetchedCount} / ${totalCount}`, 'load');
+                return page;
+            })
+        );
+        return await Promise.all(batchRequests);
+    };
+
+    // 执行分批请求
+    for (let i = 0; i < urls.length; i += CONCURRENCY) {
+        const batchUrls = urls.slice(i, i + CONCURRENCY);
+        const batchData = await fetchBatch(batchUrls);
+        batchData.forEach(page => data = data.concat(page.results));
+    }
+
+    console.log(`Fetched ${data.length} results, expected ${totalCount}`);
+    return data;
 }
 
 

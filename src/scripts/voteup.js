@@ -296,8 +296,7 @@ async function upVoteSingleUserPosts(url) {
     let parser = new DOMParser();
     let newDoc = parser.parseFromString(html, 'text/html');
     console.log(newDoc);
-
-
+    
     let postList = newDoc.querySelectorAll('.profile-contribution');
     for (let item of postList) {
         let href = item.querySelector('.profile-contribution-title>a').href;

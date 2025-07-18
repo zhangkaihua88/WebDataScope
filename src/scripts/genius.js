@@ -1,6 +1,4 @@
 // genius.js: genius相关功能的 JS 文件
-// 1. Operator Analysis
-// 2. Rank Analysis 
 console.log('genius.js loaded');
 
 
@@ -11,13 +9,14 @@ const OptUrl = 'https://api.worldquantbrain.com/operators';
 // genius level criteria
 const levelCriteria = {
     "expert": { "alphaCount": 20, "pyramidCount": 10, "combinedAlphaPerformance": 0.5, "combinedSelectedAlphaPerformance": 0.5, "combinedPowerPoolAlphaPerformance": 0.5 },
-    "master": { "alphaCount": 120, "pyramidCount": 20, "combinedAlphaPerformance": 1, "combinedSelectedAlphaPerformance": 1, "combinedPowerPoolAlphaPerformance": 1 },
-    "grandmaster": { "alphaCount": 220, "pyramidCount": 50, "combinedAlphaPerformance": 2, "combinedSelectedAlphaPerformance": 2, "combinedPowerPoolAlphaPerformance": 2 }
+    "master": { "alphaCount": 120, "pyramidCount": 30, "combinedAlphaPerformance": 1, "combinedSelectedAlphaPerformance": 1, "combinedPowerPoolAlphaPerformance": 1 },
+    "grandmaster": { "alphaCount": 220, "pyramidCount": 60, "combinedAlphaPerformance": 2, "combinedSelectedAlphaPerformance": 2, "combinedPowerPoolAlphaPerformance": 2 }
 }
 
-const CONCURRENCY = 10; // 同时进行的请求数
+
 
 const targetSelectorButton = '#root > div > div.genius__container > div > div > div.genius__header';
+
 
 // ############################## 运算符分析 ##############################
 
@@ -30,23 +29,6 @@ async function fetchAllAlphas() {
     const year = currentDate.getUTCFullYear();
     const quarter = Math.floor((currentDate.getMonth() + 3) / 3);
     const quarters = [
-        // https://api.worldquantbrain.com/users/self/alphas?limit=30&offset=0&status!=UNSUBMITTED%1FIS-FAIL&dateSubmitted%3E
-        // 2025-02-01T05:00:00.000Z
-        // &dateSubmitted%3C
-        // 2025-02-28T05:00:00.000Z
-        // &order=-dateCreated&hidden=false
-
-        // https://api.worldquantbrain.com/users/self/alphas?limit=30&offset=0&status!=UNSUBMITTED%1FIS-FAIL&
-        // dateSubmitted%3E
-        // 2025-01-01T05:00:00.000Z
-        // &dateSubmitted%3C
-        // 2025-03-31T04:00:00.000Z
-        // &order=-dateCreated&hidden=false
-
-        // https://api.worldquantbrain.com/users/self/alphas?limit=30&offset=0&status!=UNSUBMITTED%1FIS-FAIL&dateSubmitted%3E2024-04-01T04:00:00.000Z&dateSubmitted%3C2024-06-30T04:00:00.000Z&order=-dateCreated&hidden=false
-        // https://api.worldquantbrain.com/users/self/alphas?limit=30&offset=0&status!=UNSUBMITTED%1FIS-FAIL&dateSubmitted%3E2024-07-01T04:00:00.000Z&dateSubmitted%3C2024-09-30T04:00:00.000Z&order=-dateCreated&hidden=false
-        // https://api.worldquantbrain.com/users/self/alphas?limit=30&offset=0&status!=UNSUBMITTED%1FIS-FAIL&dateSubmitted%3E2024-10-01T04:00:00.000Z&dateSubmitted%3C2024-12-31T05:00:00.000Z&order=-dateCreated&hidden=false
-
         { start: `${year}-01-01T05:00:00.000Z`, end: `${year}-04-01T04:00:00.000Z` },  // 第一季度
         { start: `${year}-04-01T04:00:00.000Z`, end: `${year}-07-01T04:00:00.000Z` },  // 第二季度
         { start: `${year}-07-01T04:00:00.000Z`, end: `${year}-10-01T04:00:00.000Z` },  // 第三季度
@@ -55,40 +37,10 @@ async function fetchAllAlphas() {
     const { start, end } = quarters[quarter - 1];
     const dateRange = `dateSubmitted%3E${start}&dateSubmitted%3C${end}`;
 
-    let allResults = [];
-    let offset = 0; // Initial offset
     const limit = 30; // Data limit per page
-    const statusFilter = "status!=UNSUBMITTED%1FIS-FAIL";
-    const order = "order=-dateCreated";
-    const hiddenFilter = "hidden=false";
-    let totalCount = 0; // To store total count
-
-    while (true) {
-        const AlphaUrl = `https://api.worldquantbrain.com/users/self/alphas?limit=${limit}&offset=${offset}&${statusFilter}&${dateRange}&${order}&${hiddenFilter}`;
-        data = await getDataFromUrl(AlphaUrl);
-        allResults = allResults.concat(data.results); // Merge results
-        if (totalCount === 0) {
-            totalCount = data.count;
-        }
-        if (allResults.length >= totalCount) {
-            break;
-        }
-        offset += limit; // Increase offset for the next page
-        setButtonState('WQPOPSFetchButton', `正在抓取 ${allResults.length} / ${totalCount}`, 'load');// Update button text
-    }
-    setButtonState('WQPOPSFetchButton', '正在分析...', 'load');
-
-
-    // Check if the length matches the total count
-    const count = allResults.length;
-    console.log(`Fetched ${count} results, expected ${totalCount}`);
-
-    if (count === totalCount) {
-        console.log("All results fetched successfully!");
-    } else {
-        console.log("There seems to be a mismatch in the count!");
-    }
-    return allResults;
+    const formatUrl = `https://api.worldquantbrain.com/users/self/alphas?limit={limit}&offset={offset}&status!=UNSUBMITTED%1FIS-FAIL&${dateRange}&order=-dateCreated&hidden=false`
+    let data = await getDataFromUrlWithOffsetParallel(formatUrl, limit, 'WQPOPSFetchButton')
+    return data;
 }
 
 async function opsAna() {
@@ -510,7 +462,17 @@ async function insertRankListInfo() {
             { title: 'Combined Selected Alpha Performance', data: 'combinedSelectedAlphaPerformance', visible: false }, // 综合选择的Alpha表现
             { title: 'Combined Power Pool Alpha Performance', data: 'combinedPowerPoolAlphaPerformance', visible: false }, // 综合Power Pool的Alpha表现
 
-
+            // consultant 信息
+            { title: 'RA Count', data: 'submissionsCount', visible: false },
+            { title: 'RA Fields Used', data: 'dataFieldsUsed', visible: false },
+            { title: 'RA Prod Corr', data: 'meanProdCorrelation', visible: false },
+            { title: 'RA Self Corr', data: 'meanSelfCorrelation', visible: false },
+            { title: 'SA Count', data: 'superAlphaSubmissionsCount', visible: false },
+            { title: 'SA Prod Corr', data: 'superAlphaMeanProdCorrelation', visible: false },
+            { title: 'SA Self Corr', data: 'superAlphaMeanSelfCorrelation', visible: false },
+            { title: 'University', data: 'university', visible: false },
+            { title: 'Value Factor', data: 'valueFactor', visible: false },
+            { title: 'Weight Factor', data: 'weightFactor', visible: false },
 
             // 六维
             { title: 'Operators used', data: 'operatorCount', visible: false },
@@ -656,11 +618,20 @@ async function insertRankListInfo() {
             var sixFields = [
                 'Operators used', 'Operator Avg', 'Fields used', 'Field Avg', 'Community Activity', 'Max Simulation Streak'
             ];
+            var consultantFields = [
+                'RA Count', 'RA Prod Corr', 'RA Self Corr', 'SA Count', 'SA Prod Corr', 'SA Self Corr', 'University', 'Value Factor', 'Weight Factor', 
+                // 'RA Fields Used',
+            ]
             let html = '';
             let base = getFields(baseFields);
             let six = getFields(sixFields);
+            let consultantInfo = getFields(consultantFields);
             if (base.length) {
-                html += '<div style="margin-bottom:8px;"><b>基础信息</b></div>';
+                html += '<div style="margin:12px 0 8px 0;"><b>Consultant 基本信息</b></div>';
+                html += '<div style="display: flex; flex-direction: column;">' + toRows(consultantInfo, 3) + '</div>';
+            }
+            if (base.length) {
+                html += '<div style="margin:12px 0 8px 0;"><b>基础信息</b></div>';
                 html += '<div style="display: flex; flex-direction: column;">' + toRows(base, 2) + '</div>';
             }
             if (six.length) {
@@ -1051,91 +1022,53 @@ function getSeason() {
     text = text.replace('Q4', '10-01');
     return text;
 }
+
 async function fetchAllUsers() {
     // 抓取所有用户的排名信息
 
     setButtonState('WQPRankFetchButton', '开始抓取...', 'load');
-    // const currentDate = new Date();
 
-    // Convert to Eastern Time (ET)
-    // const options = { timeZone: 'America/New_York' };
-    // const easternDate = new Date(currentDate.toLocaleString('en-US', options));
-
-    // Get year and quarter in Eastern Time
-    // const year = easternDate.getFullYear();
-    // const quarter = Math.floor((easternDate.getMonth() + 3) / 3);
-
-    // const quarters = [
-    //     `${year}-01-01`, // 第一季度
-    //     `${year}-04-01`, // 第二季度
-    //     `${year}-07-01`, // 第三季度
-    //     `${year}-10-01`  // 第四季度
-    // ];
-    // const season = quarters[quarter - 1];
     const season = getSeason();
     console.log(season, "season")
 
     const limit = 100;
-    // 获取初始数据
-    const initialUrl = `https://api.worldquantbrain.com/consultant/boards/genius?limit=${limit}&offset=0&date=${season}&aggregate=user`;
-    const initialData = await getDataFromUrl(initialUrl);
-    const totalCount = initialData.count;
-    let data = initialData.results;
+    const formatUrl = `https://api.worldquantbrain.com/consultant/boards/genius?limit={limit}&offset={offset}&date=${season}&aggregate=user`;
+    let data = await getDataFromUrlWithOffsetParallel(formatUrl, limit, 'WQPRankFetchButton')
+    return data;
+}
 
-    // 初始化进度
-    let fetchedCount = data.length;
-    setButtonState('WQPRankFetchButton', `正在抓取 ${fetchedCount} / ${totalCount}`, 'load');
-
-    // 计算剩余请求
-    const remainingPages = Math.ceil(totalCount / limit) - 1;
-    const offsets = Array.from({ length: remainingPages }, (_, i) => (i + 1) * limit);
-    const urls = offsets.map(offset =>
-        `https://api.worldquantbrain.com/consultant/boards/genius?limit=${limit}&offset=${offset}&date=${season}&aggregate=user`
-    );
-
-    // 并发控制配置
-
-
-    // 分批请求函数
-    const fetchBatch = async (batchUrls) => {
-        const batchRequests = batchUrls.map(url =>
-            getDataFromUrl(url).then(page => {
-                fetchedCount += page.results.length;
-                setButtonState('WQPRankFetchButton', `正在抓取 ${fetchedCount} / ${totalCount}`, 'load');
-                return page;
-            })
-        );
-        return await Promise.all(batchRequests);
-    };
-
-    // 执行分批请求
-    for (let i = 0; i < urls.length; i += CONCURRENCY) {
-        const batchUrls = urls.slice(i, i + CONCURRENCY);
-        const batchData = await fetchBatch(batchUrls);
-        batchData.forEach(page => data = data.concat(page.results));
-    }
-
-    // // 保持原有的排名计算逻辑
-    // data.forEach(item => item['totalRank'] = 0);
-    // for (const col of ["operatorCount", "fieldCount", "communityActivity", "completedReferrals", "maxSimulationStreak"]) {
-    //     let sorted = data.map(item => item[col]).sort((a, b) => b - a);
-    //     data.forEach(item => item[col + 'Rank'] = sorted.indexOf(item[col]) + 1);
-    //     data.forEach(item => item['totalRank'] += item[col + 'Rank']);
-    // }
-    // for (const col of ["operatorAvg", "fieldAvg"]) {
-    //     let sorted = data.map(item => item[col]).sort((a, b) => a - b);
-    //     data.forEach(item => item[col + 'Rank'] = sorted.indexOf(item[col]) + 1);
-    //     data.forEach(item => item['totalRank'] += item[col + 'Rank']);
-    // }
-
-    console.log(`Fetched ${data.length} results, expected ${totalCount}`);
+async function fetchConsultantLB(){
+    setButtonState('WQPRankFetchButton', '开始深度抓取...', 'load');
+    const limit = 100;
+    const formatUrl = 'https://api.worldquantbrain.com/consultant/boards/leader?limit={limit}&offset={offset}&&aggregate=user';
+    let data = await getDataFromUrlWithOffsetParallel(formatUrl, limit, 'WQPRankFetchButton');
     return data;
 }
 
 async function rankAna() {
     // 分析所有用户的排名信息, button 分析排名的调用函数
+    let data = await fetchAllUsers();
+    let dataConsultantLB = await fetchConsultantLB();
 
-    data = await fetchAllUsers();
+    // 创建一个映射表，用于快速查找 dataConsultantLB 中的对象
+    const consultantMap = new Map();
+    
+    // 遍历 dataConsultantLB，将每个对象的 user 作为键存入映射表
+    for (const item of dataConsultantLB) {
+        if (item.user !== undefined) {
+        consultantMap.set(item.user, item);
+        }
+    }
+    
+    // 遍历 data 数组，查找匹配的 user 并合并属性
+    for (const item of data) {
+        if (item.user !== undefined && consultantMap.has(item.user)) {
+        const consultantItem = consultantMap.get(item.user);
+        // 合并属性，保留 data 中的原有属性，添加或覆盖来自 dataConsultantLB 的属性
+        Object.assign(item, consultantItem);
+        }
+    }
+
     let currentTime = new Date().toISOString();
     let dataToSave = {
         array: data,
@@ -1151,7 +1084,10 @@ async function rankAna() {
 
 
 
-
+async function setup(){
+    authToken = await getAuth();
+    setButtonState('WQPAuth', `配置完成${authToken}`, 'disable');
+}
 
 
 // ############################## 插入按钮 ##############################
@@ -1200,6 +1136,7 @@ function insertButton() {
         buttonContainer.style.gap = '10px'; // Space between buttons
 
         // Append buttons to the container
+        buttonContainer.appendChild(ButtonGen('配置插件', 'WQPAuth', setup));
         buttonContainer.appendChild(ButtonGen('运算符分析', 'WQPOPSFetchButton', opsAna));
         buttonContainer.appendChild(ButtonGen('显示运算符分析', 'WQPOPSShowButton', insertOpsTable));
         buttonContainer.appendChild(ButtonGen('排名分析', 'WQPRankFetchButton', rankAna));
