@@ -39,8 +39,8 @@
         },
         {
             "matches": [
-                "*://support.worldquantbrain.com/hc/*/community/*",
-                "*://support.worldquantbrain.com/hc/*/profiles/*"
+                "*://support.worldquantbrain.com/*",
+                "*://support.worldquantbrain.com/*"
             ],
             "js": [
                 "src/scripts/utils.js",

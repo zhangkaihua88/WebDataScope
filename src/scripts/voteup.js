@@ -134,7 +134,29 @@ async function fetchRetry(url, options = {}) {
     while (attempt < tries) {
         try {
             const response = await fetch(url, init);
-            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            // 特殊处理 429：按 Retry-After 或默认 10s 等待后重试
+            if (response.status === 429) {
+                attempt += 1;
+                if (attempt >= tries) {
+                    const err = new Error('HTTP 429 Too Many Requests');
+                    err.status = 429;
+                    throw err;
+                }
+                let waitMs = 10000; // 默认 10s
+                try {
+                    const ra = response.headers.get('Retry-After');
+                    const sec = ra ? parseInt(ra, 10) : NaN;
+                    if (Number.isFinite(sec) && sec > 0) waitMs = sec * 1000;
+                } catch (_) { }
+                console.warn(`fetchRetry 遇到 429，等待 ${waitMs}ms 后重试:`, url);
+                await new Promise(r => setTimeout(r, waitMs));
+                continue; // 重新进入循环
+            }
+            if (!response.ok) {
+                const err = new Error(`HTTP ${response.status}`);
+                err.status = response.status;
+                throw err;
+            }
             const html = await response.text();
             const parser = new DOMParser();
             return parser.parseFromString(html, 'text/html');
@@ -142,6 +164,7 @@ async function fetchRetry(url, options = {}) {
             lastError = err;
             attempt += 1;
             if (attempt >= tries) break;
+            // 除了 429 外，其它错误使用指数退避
             let delay = retryDelay * Math.pow(factor, attempt - 1);
             if (jitter) delay = delay * (0.8 + Math.random() * 0.4);
             await new Promise(r => setTimeout(r, Math.round(delay)));
@@ -401,10 +424,7 @@ async function upVoteSingleUserComments(url) {
 // ############################## 抓取所有文档 ##############################
 async function getCommunity() {
     await fetchCsrfToken();
-    let response = await fetch("https://support.worldquantbrain.com/hc/en-us/community/topics");
-    let html = await response.text();  // Await for the response text
-    let parser = new DOMParser();
-    let newDoc = parser.parseFromString(html, 'text/html');
+    let newDoc = fetchRetry("https://support.worldquantbrain.com/hc/en-us/community/topics");
     // 获取 #main-content 下的 ul 元素
     const mainUl = newDoc.querySelector('#main-content> ul');
     // 如果找到该元素
@@ -823,7 +843,7 @@ async function crawlCommunityFullAll(opts = {}) {
         if (!commId) continue;
 
         const header = `(${idx + 1}/${totalCommunities}) 社区: ${c.title} (ID=${commId})`;
-        let commState = state.byCommunity[commId] || {topics: {} };
+        let commState = state.byCommunity[commId] || { topics: {} };
         // 合并 getCommunity 返回的元信息到社区状态对象中
         commState = {
             ...commState,
@@ -841,8 +861,8 @@ async function crawlCommunityFullAll(opts = {}) {
         setCommunityProgress(0, expected);
         setOverallProgress(idx, totalCommunities);
 
-    let pageUrl = c.url;
-    while (pageUrl) {
+        let pageUrl = c.url;
+        while (pageUrl) {
             try {
                 const { topics, nextUrl } = await getTopics(pageUrl);
                 // 3.1 并行刷新本页需要刷新的正文，并同时抓取第一页评论
@@ -1159,7 +1179,7 @@ async function crawlRecentActivitiesIncremental(opts = {}) {
         try {
             const newCount = commentsCount(commentsObj);
             onProgress(`增量已保存: 社区 ${bucketId || '-'} 帖 ${topicId} 评论 ${existedCount} -> ${newCount}`);
-        } catch (_) {}
+        } catch (_) { }
         return { topicId, bucketId, updated: true };
     });
 
@@ -1173,6 +1193,305 @@ async function crawlRecentActivitiesIncremental(opts = {}) {
 }
 
 
+async function getCategories() {
+    let newDoc = await fetchRetry("https://support.worldquantbrain.com/hc/en-us");
+    // 获取ul元素
+    const ulElement = newDoc.querySelector("ul.blocks-list");
+
+    // 获取所有li子元素
+    const liElements = ulElement.querySelectorAll("li.blocks-item");
+
+    // 存储提取的信息
+    const result = [];
+
+    // 遍历每个li元素
+    liElements.forEach(li => {
+        // 提取id
+        const id = li.id;
+
+        // 获取a标签
+        const aTag = li.querySelector("a.blocks-item-link");
+
+        // 提取href并转换为完整URL
+        const relativeUrl = aTag.getAttribute("href");
+        const fullUrl = new URL(relativeUrl, window.location.origin).href;
+
+        // 提取标题
+        const title = aTag.querySelector("span.blocks-item-title").textContent;
+
+        // 添加到结果数组
+        result.push({
+            id: id,
+            url: fullUrl,
+            title: title
+        });
+    });
+    console.log("提取的分类信息:", result);
+    return result;
+}
+
+async function getSection(url, newDoc = null) {
+    // 如果没传入newDoc，则通过url获取
+    if (!newDoc) {
+        newDoc = await fetchRetry(url);
+    }
+    // 获取所有h2元素
+    const h2Elements = newDoc.querySelectorAll("h2.section-tree-title");
+
+    // 存储提取的信息
+    const results = [];
+
+    // 遍历每个h2元素
+    h2Elements.forEach(h2 => {
+        // 获取a标签
+        const aTag = h2.querySelector("a");
+
+        if (aTag) {
+            let id = null;
+            // 提取完整URL
+            const relativeUrl = aTag.getAttribute("href");
+            const absoluteUrl = new URL(relativeUrl, window.location.origin).href;
+
+
+            if (absoluteUrl) {
+                const m = new URL(absoluteUrl).pathname.match(/\/sections\/(\d+)/);
+                if (m) id = m[1];
+            }
+            // 提取标题
+            const title = aTag.textContent;
+
+            // 添加到结果数组
+            results.push({
+                url: absoluteUrl,
+                id: id,
+                title: title
+            });
+        }
+    });
+    console.log("提取的子分类信息:", results);
+    return results;
+}
+
+async function getArticle(url) {
+    let newDoc = await fetchRetry(url)
+    // 获取所有文章列表项
+    const articleItems = newDoc.querySelectorAll("ul.article-list li.article-list-item");
+
+    // 存储提取的信息
+    const articleInfoList = [];
+    articleItems.forEach(item => {
+        // 获取链接元素
+        const link = item.querySelector("a.article-list-link");
+
+        if (link) {
+            let id = null;
+            // 提取相对URL并转换为完整URL
+            const relativeUrl = link.getAttribute("href");
+            const absoluteUrl = new URL(relativeUrl, window.location.origin).href;
+
+            if (absoluteUrl) {
+                const m = new URL(absoluteUrl).pathname.match(/\/articles\/(\d+)/);
+                if (m) id = m[1];
+            }
+
+            // 提取标题
+            const title = link.textContent.trim();
+
+            // 添加到结果数组
+            articleInfoList.push({
+                url: absoluteUrl,
+                id: id,
+                title: title
+            });
+        }
+    });
+
+    if (articleInfoList.length === 0)  {
+        console.log("当前分类无文章:", url);
+        let section_data = await getSection(url, newDoc)
+        console.log("尝试获取子分类:", section_data);
+        if (Array.isArray(section_data) && section_data.length > 0) {
+            for (const s of section_data) {
+                if (!s || !s.url) continue;
+                console.log('下钻子分类:', s.title || '', s.url);
+                let sub_articles = []
+                try {
+                    sub_articles = await getArticle(s.url);
+                } catch (e) {
+                    console.warn('获取文章失败(忽略并继续子分类):', s.url, e);
+                    sub_articles = [];
+                }
+                if (Array.isArray(sub_articles) && sub_articles.length > 0) {
+                    for (const a of sub_articles) {
+                        if (!a || !a.url) continue;
+                        articleInfoList.push(a);
+                    }
+                }
+            }
+        }
+        
+    }
+
+    // 打印提取的信息
+    console.log(articleInfoList);
+    return articleInfoList;
+
+}
+
+// 文章详情抓取（进入文章页解析 title/author/datetime/content）
+async function getArticleDetails(url) {
+    try {
+        const newDoc = await fetchRetry(url);
+        const title = (newDoc.querySelector("h1.article-title")?.textContent || "").trim();
+        const author = (newDoc.querySelector('div.article-meta > a')?.textContent || "").trim();
+        const datetime = newDoc.querySelector('li.meta-data > time')?.getAttribute('datetime') || null;
+        const contentEl = newDoc.querySelector('div.article-content');
+        const articleContent = contentEl ? contentEl.outerHTML : null;
+        let id = null;
+        try {
+            const m = new URL(url).pathname.match(/\/articles\/(\d+)/);
+            if (m) id = m[1];
+        } catch (_) { }
+        return { id, url, title, author, datetime, articleContent };
+    } catch (e) {
+        console.error('getArticleDetails 失败:', url, e);
+        return { id: null, url, title: '', author: '', datetime: null, articleContent: null };
+    }
+}
+
+
+
+
+async function crawlCategoryFullAll() {
+    // 1) 读取并初始化本地状态容器
+    const prevState = await getFromStorage('WQPCommunityState');
+    const state = prevState && typeof prevState === 'object' ? prevState : {};
+    // 本次运行不使用之前的 byCategory，始终重置
+    state.byCategory = {};
+    const setToStorage = (obj) => new Promise(resolve => chrome.storage.local.set(obj, resolve));
+    // 立即持久化一次清空后的结构，避免旧数据残留
+    await setToStorage({ WQPCommunityState: state });
+
+    // 2) 获取分类入口
+    const categories = await getCategories();
+    if (!Array.isArray(categories) || categories.length === 0) {
+        updateProgress('未获取到任何分类');
+        return;
+    }
+
+    setOverallProgress(0, categories.length);
+    updateProgress(`开始抓取分类/文章，共 ${categories.length} 个分类`);
+
+    // 3) 逐分类抓取 -> 逐 Section 抓取 -> 逐 Article 详情
+    for (let idx = 0; idx < categories.length; idx++) {
+        const c = categories[idx];
+        const catId = String(c.id || '');
+        if (!catId) continue;
+
+        const header = `(${idx + 1}/${categories.length}) 分类: ${c.title}`;
+        console.log(`开始抓取分类: ${c.title} ${c.url}`);
+        updateProgress(`${header} | 初始化...`);
+
+        // 分类节点（累积/合并）
+        let catState = state.byCategory[catId] || { sections: {} };
+        catState.id = catId;
+        catState.url = c.url;
+        catState.title = c.title;
+        if (!catState.sections || typeof catState.sections !== 'object') catState.sections = {};
+
+        // 获取该分类下的所有 Section
+        let sections = [];
+        try {
+            sections = await getSection(c.url);
+        } catch (e) {
+            console.error('获取子分类失败:', c.url, e);
+            sections = [];
+        }
+
+        // 若该分类页面无可见子分类，但可能直接挂文章，则使用一个虚拟 root section 覆盖
+        if (!Array.isArray(sections) || sections.length === 0) {
+            sections = [{ id: 'root', url: c.url, title: `${c.title} (root)` }];
+        }
+
+
+        // 逐 section 并发处理，每个 section 内逐文章并发抓详情
+        const sectionTasks = sections.map((s, sIdx) => async () => {
+            const secId = String(s.id || `url:${s.url}`);
+            if (!secId) return;
+
+            updateProgress(`${header} | 抓取子分类: ${s.title}`);
+
+            // 初始化/合并 section 容器
+            let secState = catState.sections[secId] || { articles: {} };
+            secState.id = secId;
+            secState.url = s.url;
+            secState.title = s.title;
+            if (!secState.articles || typeof secState.articles !== 'object') secState.articles = {};
+            catState.sections[secId] = secState;
+            state.byCategory[catId] = catState;
+
+            // 获取该 section 下的文章列表（函数内部已处理继续下钻子 section 的情况）
+            let articles = [];
+            try {
+                articles = await getArticle(s.url);
+            } catch (e) {
+                console.error('获取文章列表失败:', s.url, e);
+                articles = [];
+            }
+
+            const articleTasks = articles.map((a, aIdx) => async () => {
+                const aUrl = a && a.url ? a.url : '';
+                if (!aUrl) return;
+                let detail = null;
+                try {
+                    detail = await getArticleDetails(aUrl);
+                } catch (e) {
+                    console.error('获取文章详情失败:', aUrl, e);
+                    detail = null;
+                }
+
+                const artId = String((detail && detail.id) || a.id || aUrl);
+                // 直接写入共享 state，避免并发下对局部副本的覆盖
+                if (!state.byCategory[catId]) state.byCategory[catId] = catState;
+                if (!state.byCategory[catId].sections[secId]) state.byCategory[catId].sections[secId] = { id: secId, url: s.url, title: s.title, articles: {} };
+                state.byCategory[catId].sections[secId].articles[artId] = {
+                    id: artId,
+                    url: aUrl,
+                    title: (detail && detail.title) || a.title || '',
+                    author: (detail && detail.author) || '',
+                    datetime: (detail && detail.datetime) || null,
+                    articleContent: (detail && detail.articleContent) || null,
+                    lastCrawledAt: new Date().toISOString()
+                };
+                updateProgress(`${header} | ${s.title} 已抓取文章 (${aIdx + 1}/${articles.length})`);
+            });
+
+            // 并发抓取文章详情
+            if (articleTasks.length > 0) {
+                await runWithConcurrency(articleTasks, Math.min(2, articleTasks.length));
+            }
+
+            // section 完成后再落一次盘
+            catState.sections[secId] = state.byCategory[catId].sections[secId];
+            state.byCategory[catId] = catState;
+            await setToStorage({ WQPCommunityState: state });
+            updateProgress(`${header} | 子分类完成: ${s.title}`);
+        });
+
+        if (sectionTasks.length > 0) {
+            await runWithConcurrency(sectionTasks, Math.min(2, sectionTasks.length));
+        }
+
+        // 分类完成，更新时间戳与总体进度
+        state.byCategory[catId] = catState;
+        state.byCategoryTime = new Date().toISOString();
+        await setToStorage({ WQPCommunityState: state });
+        setOverallProgress(idx + 1, categories.length);
+        updateProgress(`${header} | 完成`);
+    }
+
+    updateProgress('分类/文章抓取完成');
+}
 
 
 
@@ -1266,6 +1585,23 @@ function createStartMenu() {
         }
     }, false);
     baseButtons.append(crawlIncBtn);
+
+    // 抓取分类/文章按钮
+    let crawlCategoryBtn = document.createElement("button");
+    crawlCategoryBtn.setAttribute("id", "crawlCategoryButton");
+    crawlCategoryBtn.innerText = "抓取分类/文章";
+    crawlCategoryBtn.className = "egg_study_btn egg_menu";
+    crawlCategoryBtn.addEventListener("click", async () => {
+        try {
+            setButtonState("crawlCategoryButton", "分类抓取中...", 'load');
+            updateProgress('开始抓取分类/文章...');
+            await crawlCategoryFullAll();
+            updateProgress('分类/文章抓取完成');
+        } finally {
+            setButtonState("crawlCategoryButton", "抓取分类/文章", 'enable');
+        }
+    }, false);
+    baseButtons.append(crawlCategoryBtn);
 
 
     // 进度条容器（总体）
