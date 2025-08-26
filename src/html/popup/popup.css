@@ -97,3 +97,16 @@ button:disabled {
 #status.error {
     color: red;
 }
+
+/* 导出按钮并排 */
+.btn-row {
+    display: flex;
+    gap: 8px;
+    width: 100%;
+}
+
+.btn-row > button {
+    flex: 1 1 0;
+    width: auto;
+    margin-top: 0;
+}

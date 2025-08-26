@@ -6,6 +6,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>WorldQuant Scope 配置</title>
     <link rel="stylesheet" href="popup.css">
+    <script src="../../scripts/lib/pako.min.js"></script>
+    <script src="../../scripts/lib/msgpack.min.js"></script>
 </head>
 
 <body>
@@ -34,6 +36,16 @@
             </div>
             <button type="submit" id="saveBtn" disabled>保存设置</button>
         </form>
+
+        <h2 style="margin-top:16px;text-align:left;">社区数据</h2>
+        <div class="input-group" style="display:flex;gap:8px;flex-wrap:wrap;">
+            <div class="btn-row" style="width:100%">
+                <button id="exportCommunityBtn" type="button">导出(JSON)</button>
+                <button id="exportCommunityCompressedBtn" type="button" style="background-color:#198754;">导出(压缩)</button>
+            </div>
+            <button id="importCommunityBtn" type="button" style="background-color:#6c757d;">导入</button>
+            <input id="importCommunityFile" type="file" accept="application/json,.json,.wqcs" style="display:none;" />
+        </div>
         <p id="status" aria-live="polite"></p>
     </div>
     <script src="popup.js"></script>

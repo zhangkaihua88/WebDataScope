@@ -74,6 +74,7 @@
         "storage",
         "activeTab",
         "alarms",
-        "notifications"
+        "notifications",
+        "unlimitedStorage"
     ]
 }
