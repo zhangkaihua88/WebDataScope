@@ -151,6 +151,35 @@ async function fetchRetry(url, options = {}) {
     throw lastError;
 }
 
+// JSON 请求带重试（用于 recent_activities API）
+async function fetchJsonRetry(url, options = {}) {
+    const {
+        tries = 3,
+        retryDelay = 500,
+        factor = 2,
+        jitter = true,
+        init
+    } = options;
+    let attempt = 0;
+    let lastError;
+    while (attempt < tries) {
+        try {
+            const res = await fetch(url, init);
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            return await res.json();
+        } catch (err) {
+            lastError = err;
+            attempt += 1;
+            if (attempt >= tries) break;
+            let delay = retryDelay * Math.pow(factor, attempt - 1);
+            if (jitter) delay = delay * (0.8 + Math.random() * 0.4);
+            await new Promise(r => setTimeout(r, Math.round(delay)));
+        }
+    }
+    console.error('fetchJsonRetry 失败:', url, lastError);
+    throw lastError;
+}
+
 // ############################## 点赞单个Post的函数 ##############################
 async function upVoteSinglePost() {
     await fetchCsrfToken();
@@ -956,6 +985,193 @@ async function crawlCommunityFullAll(opts = {}) {
     onProgress('全部完成：增量抓取（帖子+评论）完成');
 }
 
+// 基于“最近活动”API的增量更新：
+// - 从 page=1 开始迭代 recent_activities.json
+// - 直到 activity.timestamp < (state.byCommunityTime - 2h) 即停止
+// - 批量并发抓取涉及的帖子：如无正文则补抓第一页正文；评论仅增量抓取新增页
+async function crawlRecentActivitiesIncremental(opts = {}) {
+    const BASE = 'https://support.worldquantbrain.com';
+    const perPage = Number(opts.perPage || 50);
+    const startPage = Number(opts.startPage || 1);
+    const onProgress = typeof opts.onProgress === 'function' ? opts.onProgress : (msg) => updateProgress(msg);
+
+    // 读取旧状态
+    const setToStorage = (obj) => new Promise(resolve => chrome.storage.local.set(obj, resolve));
+    const prevState = await getFromStorage('WQPCommunityState');
+    const state = prevState && typeof prevState === 'object' && prevState.byCommunity
+        ? prevState
+        : { byCommunity: {} };
+
+    const prevTime = state.byCommunityTime ? new Date(state.byCommunityTime) : null;
+    const cutoff = prevTime ? new Date(prevTime.getTime() - 2 * 3600 * 1000) : new Date(Date.now() - 2 * 3600 * 1000);
+
+    onProgress('开始最近活动增量更新...');
+
+    // 收集需要更新的帖子，去重按 topicId
+    const topicsMap = new Map(); // topicId -> { postUrl, title, commentCount, commId }
+
+    let page = startPage;
+    let stop = false;
+    while (!stop) {
+        const apiUrl = `${BASE}/hc/api/internal/communities/public/recent_activities.json?locale=en-us&page=${page}&per_page=${perPage}`;
+        let json;
+        try {
+            json = await fetchJsonRetry(apiUrl, { init: { credentials: 'include' } });
+        } catch (e) {
+            console.error('获取最近活动失败:', apiUrl, e);
+            break;
+        }
+
+        const activities = Array.isArray(json?.activities) ? json.activities : [];
+        if (activities.length === 0) break;
+
+        for (const act of activities) {
+            // 时间判断
+            const ts = act?.timestamp ? new Date(act.timestamp) : null;
+            if (ts && ts < cutoff) {
+                stop = true;
+                break;
+            }
+
+            // 只处理帖子相关活动（URL 中包含 /community/posts/）
+            const relUrl = act?.url || '';
+            if (!relUrl || !/\/community\/posts\//.test(relUrl)) continue;
+            const abs = new URL(relUrl, BASE).href;
+            const m = relUrl.match(/\/posts\/(\d+)/);
+            const topicId = m ? m[1] : null;
+            if (!topicId) continue;
+
+            // 提取社区ID
+            let commId = '';
+            try {
+                const bc = Array.isArray(act?.breadcrumbs) ? act.breadcrumbs : [];
+                if (bc.length > 0 && bc[0].url) {
+                    const mm = bc[0].url.match(/\/topics\/(\d+)/);
+                    if (mm) commId = String(mm[1]);
+                }
+            } catch (_) { }
+
+            const title = act?.title || '';
+            const commentCount = Number(act?.comment_count || 0);
+
+            const existed = topicsMap.get(topicId) || { postUrl: abs, title, commentCount: 0, commId };
+            existed.postUrl = abs;
+            existed.title = existed.title || title;
+            existed.commId = existed.commId || commId;
+            existed.commentCount = Math.max(Number(existed.commentCount || 0), commentCount);
+            topicsMap.set(topicId, existed);
+            console.log(topicsMap)
+        }
+
+        // 翻页
+        if (stop) break;
+        const nextUrl = json?.next_page || '';
+        if (!nextUrl) break;
+        page += 1;
+    }
+
+    if (topicsMap.size === 0) {
+        onProgress('最近活动无需要更新的帖子');
+        return;
+    }
+
+    // 并发处理每个帖子：正文+增量评论
+    const topicEntries = Array.from(topicsMap.entries());
+    onProgress(`需要增量更新帖子数：${topicEntries.length}`);
+
+    // 分批执行以控制总体并发
+    const tasks = topicEntries.map(([topicId, info]) => async () => {
+        const commId = info.commId ? String(info.commId) : '';
+        // 若无法解析社区ID，也允许落在一个通用键下
+        const bucketId = commId || 'unknown';
+        let commState = state.byCommunity[bucketId] || { topics: {} };
+        // 最基本的元字段
+        commState.id = bucketId;
+        commState.topics = commState.topics || {};
+
+        const existed = commState.topics[topicId];
+
+        // 1) 抓正文 + 第1页评论（仅当正文缺失时）
+        let postContent = existed?.postContent || null;
+        let firstPageComments = [];
+        if (!postContent) {
+            try {
+                const r = await refreshPostBodyAndFirstPage(info.postUrl);
+                postContent = r.postContent || postContent;
+                firstPageComments = Array.isArray(r.firstPageComments) ? r.firstPageComments : [];
+            } catch (e) {
+                console.error('刷新正文失败:', info.postUrl, e);
+            }
+        }
+
+        // 2) 计算需要增量抓取的评论页
+        let commentsObj = toCommentsMap(existed?.comments);
+        // 先合并第一页评论（如有）
+        if (firstPageComments.length > 0) {
+            commentsObj = mergeComments(commentsObj, firstPageComments);
+        }
+
+        const existedCount = commentsCount(commentsObj);
+        const totalCount = Math.max(Number(info.commentCount || 0), existedCount);
+        let pageJobs = [];
+        if (totalCount > existedCount) {
+            let startPage = Math.max(1, Math.floor(existedCount / COMMUNITY_PER_PAGE) + 1);
+            // 若已抓到第一页，则从第2页开始补
+            if (firstPageComments.length > 0) startPage = Math.max(2, startPage);
+            const endPage = Math.max(1, Math.ceil(totalCount / COMMUNITY_PER_PAGE));
+            for (let p = startPage; p <= endPage; p++) {
+                const u = new URL(info.postUrl);
+                u.searchParams.set('page', String(p));
+                u.hash = 'comments';
+                pageJobs.push(u.href);
+            }
+        }
+
+        // 抓取增量页
+        if (pageJobs.length > 0) {
+            const pageTasks = pageJobs.map(href => async () => {
+                try {
+                    const data = await _getPost(href);
+                    return Array.isArray(data?.allCommentsData) ? data.allCommentsData : [];
+                } catch (e) {
+                    console.error('增量评论页抓取失败:', href, e);
+                    return [];
+                }
+            });
+            const pageResults = await runWithConcurrency(pageTasks, Math.min(COMMUNITY_CONCURRENCY, pageTasks.length));
+            for (const list of pageResults) {
+                commentsObj = mergeComments(commentsObj, Array.isArray(list) ? list : []);
+            }
+        }
+
+        // 落盘
+        commState.topics[topicId] = {
+            ...(existed || {}),
+            id: topicId,
+            url: info.postUrl,
+            title: info.title || existed?.title || '',
+            commentNum: totalCount,
+            postContent,
+            comments: commentsObj,
+            lastCrawledAt: new Date().toISOString()
+        };
+        state.byCommunity[bucketId] = commState;
+        try {
+            const newCount = commentsCount(commentsObj);
+            onProgress(`增量已保存: 社区 ${bucketId || '-'} 帖 ${topicId} 评论 ${existedCount} -> ${newCount}`);
+        } catch (_) {}
+        return { topicId, bucketId, updated: true };
+    });
+
+    const results = await runWithConcurrency(tasks, COMMUNITY_CONCURRENCY);
+    const updatedCount = results.filter(r => r && r.updated).length;
+
+    // 更新时间戳并保存
+    state.byCommunityTime = new Date().toISOString();
+    await setToStorage({ WQPCommunityState: state });
+    onProgress(`最近活动增量更新完成：更新 ${updatedCount}/${topicEntries.length} 帖`);
+}
+
 
 
 
@@ -1034,6 +1250,22 @@ function createStartMenu() {
         }
     }, false);
     baseButtons.append(crawlFullAllBtn);
+
+    // 最近活动增量更新按钮
+    let crawlIncBtn = document.createElement("button");
+    crawlIncBtn.setAttribute("id", "crawlRecentIncButton");
+    crawlIncBtn.innerText = "最近活动增量更新";
+    crawlIncBtn.className = "egg_study_btn egg_menu";
+    crawlIncBtn.addEventListener("click", async () => {
+        try {
+            setButtonState("crawlRecentIncButton", "增量更新处理中...", 'load');
+            updateProgress('开始最近活动增量更新...');
+            await crawlRecentActivitiesIncremental({ perPage: 5, startPage: 1, onProgress: (msg) => updateProgress(msg) });
+        } finally {
+            setButtonState("crawlRecentIncButton", "最近活动增量更新", 'enable');
+        }
+    }, false);
+    baseButtons.append(crawlIncBtn);
 
 
     // 进度条容器（总体）
