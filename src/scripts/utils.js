@@ -128,7 +128,7 @@ function waitForElement(selector, nonselector) {
 
 
 
-async function getAuth(){n=5||0;return new Promise((r,j)=>{chrome.storage.local.get('WQPSummary',async({WQPSummary:a})=>{let d=a;try{if(!a){d=await getDataFromUrl("https://api.worldquantbrain.com/users/self/consultant/summary"),chrome.storage.local.set({WQPSummary:d},()=>{})}}catch(e){if(n<3)return getAuth(n+1).then(r).catch(j);return j(e)}r(["CN","HK"].includes(d?.leaderboard?.country))})})}
+async function getAuth(){n=5||0;return new Promise((r,j)=>{browser.storage.local.get('WQPSummary').then(async({WQPSummary:a})=>{let d=a;try{if(!a){d=await getDataFromUrl("https://api.worldquantbrain.com/users/self/consultant/summary");await browser.storage.local.set({WQPSummary:d})}}catch(e){if(n<3)return getAuth(n+1).then(r).catch(j);return j(e)}r(["CN","HK"].includes(d?.leaderboard?.country))})})}
 
 
 function removeComments(code) {

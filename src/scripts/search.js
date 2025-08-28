@@ -49,7 +49,7 @@
 //         button.innerText = '加载中...';
 //         button.disabled = true; // 禁用按钮，防止多次点击
 //         // 获取存储的 API 地址
-//         chrome.storage.local.get(['WQPSettings'], ({ WQPSettings }) => {
+//         browser.storage.local.get(['WQPSettings'], ({ WQPSettings }) => {
 //             const WQPApiAddress = WQPSettings.apiAddress;
 //             if (WQPApiAddress) {
 //                 // 拼接请求 URL
