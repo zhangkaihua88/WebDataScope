@@ -446,14 +446,14 @@ async function getCommunity() {
             // 提取论坛的id（从 /topics/<id>-slug 中解析）
             const extractTopicId = (fullUrl, baseUrl) => {
                 try {
-                    const u = new URL(fullUrl || href, baseUrl || response.url);
+                    const u = new URL(fullUrl || href, baseUrl || baseUrl);
                     const m = u.pathname.match(/\/topics\/(\d+)/);
                     return m ? m[1] : '';
                 } catch (e) {
                     return '';
                 }
             };
-            const id = extractTopicId(url, response.url);
+            const id = extractTopicId(url, baseUrl);
 
             // 提取帖子数量和关注者数量
             const metaItems = link.querySelectorAll('.meta-group .meta-data');
