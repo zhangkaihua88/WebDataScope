@@ -424,10 +424,8 @@ async function upVoteSingleUserComments(url) {
 // ############################## 抓取所有文档 ##############################
 async function getCommunity() {
     await fetchCsrfToken();
-    let response = await fetch("https://support.worldquantbrain.com/hc/en-us/community/topics");
-    let html = await response.text();  // Await for the response text
-    let parser = new DOMParser();
-    let newDoc = parser.parseFromString(html, 'text/html');
+    const baseUrl = "https://support.worldquantbrain.com/hc/en-us/community/topics";
+    let newDoc = await fetchRetry(baseUrl);
     // 获取 #main-content 下的 ul 元素
     const mainUl = newDoc.querySelector('#main-content> ul');
     // 如果找到该元素
@@ -443,7 +441,8 @@ async function getCommunity() {
             const title = titleElem ? titleElem.textContent.trim() : '';
             // 提取 URL
             const href = link.getAttribute('href') || '';
-            const url = href ? new URL(href, response.url).href : '';
+            // fetchRetry 已经没有 response 对象，直接用页面的绝对路径作为 base
+            const url = href ? new URL(href, baseUrl).href : '';
             // 提取论坛的id（从 /topics/<id>-slug 中解析）
             const extractTopicId = (fullUrl, baseUrl) => {
                 try {
