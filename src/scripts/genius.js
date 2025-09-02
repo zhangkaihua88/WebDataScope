@@ -226,7 +226,7 @@ function generateOperatorTable(savedTimestamp, nonZeroCount, zeroCount, savedArr
 // ############################## 排名分析 ##############################
 
 
-function determineUserLevel(userData, geniusCombineTag) {
+function determineUserLevel(userData, geniusCombineTag, ignoreCombine = false) {
     // 根据用户数据判断用户级别
 
     for (const level of ["grandmaster", "master", "expert"]) {
@@ -238,15 +238,17 @@ function determineUserLevel(userData, geniusCombineTag) {
             userData.pyramidCount >= criteria.pyramidCount
         );
 
-        // 根据 geniusCombineTag 决定是否检查 combinedAlphaPerformance 或 combinedSelectedAlphaPerformance
+        // 根据 geniusCombineTag 和 ignoreCombine 决定是否检查 combinedAlphaPerformance
         let isPerformanceConditionMet = true;
-        if (geniusCombineTag) {
-            // 如果 geniusCombineTag 为 true，需要同时满足 combinedAlphaPerformance 和 combinedSelectedAlphaPerformance
-            isPerformanceConditionMet = (
-                userData.combinedAlphaPerformance >= criteria.combinedAlphaPerformance ||
-                userData.combinedSelectedAlphaPerformance >= criteria.combinedSelectedAlphaPerformance ||
-                userData.combinedPowerPoolAlphaPerformance >= criteria.combinedPowerPoolAlphaPerformance
-            );
+        if (!ignoreCombine) { // Only check combine metrics if not ignoring
+            if (geniusCombineTag) {
+                // 如果 geniusCombineTag 为 true，需要同时满足 combinedAlphaPerformance 和 combinedSelectedAlphaPerformance
+                isPerformanceConditionMet = (
+                    userData.combinedAlphaPerformance >= criteria.combinedAlphaPerformance ||
+                    userData.combinedSelectedAlphaPerformance >= criteria.combinedSelectedAlphaPerformance ||
+                    userData.combinedPowerPoolAlphaPerformance >= criteria.combinedPowerPoolAlphaPerformance
+                );
+            }
         }
 
         // 如果所有条件都满足，则返回当前级别
@@ -257,7 +259,7 @@ function determineUserLevel(userData, geniusCombineTag) {
     return 'gold';
 }
 
-async function getAllRank() {
+async function getAllRank(ignoreCombine = false) {
     // 根据用户ID获取单个用户的排名信息
 
     return new Promise((resolve, reject) => {
@@ -271,7 +273,6 @@ async function getAllRank() {
             const savedTimestamp = WQPRankData?.timestamp || 'N/A';
             let itemData;
 
-            // data.forEach(item => item['achievedLevel'] = determineUserLevel(item, WQPSettings.geniusCombineTag));
             data.forEach(item => item['finalLevel'] = 'gold');
             data = data.filter(item => item.alphaCount > 0);
 
@@ -280,8 +281,10 @@ async function getAllRank() {
                     itemData = data.map((item, index) => ({ ...item, originalIndex: index }));
                 } else {
                     itemData = data.map((item, index) => ({ ...item, originalIndex: index })).filter(item => item.alphaCount >= levelCriteria[model].alphaCount && item.pyramidCount >= levelCriteria[model].pyramidCount);
-                    if (WQPSettings.geniusCombineTag) {
-                        itemData = itemData.filter(item => item.combinedAlphaPerformance >= levelCriteria[model].combinedAlphaPerformance || item.combinedSelectedAlphaPerformance >= levelCriteria[model].combinedSelectedAlphaPerformance || item.combinedPowerPoolAlphaPerformance >= levelCriteria[model].combinedPowerPoolAlphaPerformance);
+                    if (!ignoreCombine) { // Only filter by combine metrics if not ignoring
+                        if (WQPSettings.geniusCombineTag) {
+                            itemData = itemData.filter(item => item.combinedAlphaPerformance >= levelCriteria[model].combinedAlphaPerformance || item.combinedSelectedAlphaPerformance >= levelCriteria[model].combinedSelectedAlphaPerformance || item.combinedPowerPoolAlphaPerformance >= levelCriteria[model].combinedPowerPoolAlphaPerformance);
+                        }
                     }
                 }
                 itemData.forEach(item => item['TotalRank'] = 0);
@@ -304,58 +307,40 @@ async function getAllRank() {
                 });
             }
 
+            const filteredBaseCountData = data.filter(item => item.alphaCount >= WQPSettings.geniusAlphaCount);
+            baseCount = filteredBaseCountData.length;
+
+            let expertCandidates = filteredBaseCountData.filter(item => determineUserLevel(item, WQPSettings.geniusCombineTag, ignoreCombine) === 'expert' || determineUserLevel(item, WQPSettings.geniusCombineTag, ignoreCombine) === 'master' || determineUserLevel(item, WQPSettings.geniusCombineTag, ignoreCombine) === 'grandmaster');
+            let masterCandidates = filteredBaseCountData.filter(item => determineUserLevel(item, WQPSettings.geniusCombineTag, ignoreCombine) === 'master' || determineUserLevel(item, WQPSettings.geniusCombineTag, ignoreCombine) === 'grandmaster');
+            let grandmasterCandidates = filteredBaseCountData.filter(item => determineUserLevel(item, WQPSettings.geniusCombineTag, ignoreCombine) === 'grandmaster');
 
 
-            baseCount = data.filter(item => item.alphaCount >= WQPSettings.geniusAlphaCount).length;
-            grandmasterCount = Math.round(baseCount * 0.02);
-            masterCount = Math.round(baseCount * 0.08);
             expertCount = Math.round(baseCount * 0.2);
+            masterCount = Math.round(baseCount * 0.08);
+            grandmasterCount = Math.round(baseCount * 0.02);
 
+            // Sort candidates by their respective total ranks and assign final level
+            expertCandidates.sort((a, b) => a.expertTotalRank - b.expertTotalRank);
+            masterCandidates.sort((a, b) => a.masterTotalRank - b.masterTotalRank);
+            grandmasterCandidates.sort((a, b) => a.grandmasterTotalRank - b.grandmasterTotalRank);
 
-            console.log('baseCount:', baseCount);
-            console.log('expertCount:', expertCount);
-            console.log('masterCount:', masterCount);
-            console.log('grandmasterCount:', grandmasterCount);
+            // Assign final levels based on counts and sorted candidates
+            expertCandidates.slice(0, expertCount).forEach(item => { item.finalLevel = 'expert'; });
+            masterCandidates.slice(0, masterCount).forEach(item => { item.finalLevel = 'master'; });
+            grandmasterCandidates.slice(0, grandmasterCount).forEach(item => { item.finalLevel = 'grandmaster'; });
 
-
-
-
-
-            // 计算每个用户的最终级别
-            // 根据totalRank进行排序，前面的用户级别为最高级别
-            data.sort((a, b) => {
-                const rankA = isNaN(a.expertTotalRank) ? Number.MAX_SAFE_INTEGER : a.expertTotalRank;
-                const rankB = isNaN(b.expertTotalRank) ? Number.MAX_SAFE_INTEGER : b.expertTotalRank;
-                return rankA - rankB;
-            });
-            data.forEach((item, index) => {
-                if (index < expertCount + masterCount + grandmasterCount && ['expert', 'master', 'grandmaster'].includes(item.achievedLevel)) {
-                    item.finalLevel = 'expert';
+            // Ensure unique levels for each user based on highest achieved level
+            data.forEach(user => {
+                if (grandmasterCandidates.includes(user) && user.finalLevel === 'grandmaster') {
+                    user.finalLevel = 'grandmaster';
+                } else if (masterCandidates.includes(user) && user.finalLevel === 'master') {
+                    user.finalLevel = 'master';
+                } else if (expertCandidates.includes(user) && user.finalLevel === 'expert') {
+                    user.finalLevel = 'expert';
+                } else {
+                    user.finalLevel = 'gold'; // Default to gold if no higher level achieved
                 }
             });
-            // data.sort((a, b) => a.masterTotalRank - b.masterTotalRank);
-            data.sort((a, b) => {
-                const rankA = isNaN(a.masterTotalRank) ? Number.MAX_SAFE_INTEGER : a.masterTotalRank;
-                const rankB = isNaN(b.masterTotalRank) ? Number.MAX_SAFE_INTEGER : b.masterTotalRank;
-                return rankA - rankB;
-            });
-            data.forEach((item, index) => {
-                if (index < masterCount + grandmasterCount && ['master', 'grandmaster'].includes(item.achievedLevel)) {
-                    item.finalLevel = 'master';
-                }
-            });
-            // data.sort((a, b) => a.grandmasterTotalRank - b.grandmasterTotalRank);
-            data.sort((a, b) => {
-                const rankA = isNaN(a.grandmasterTotalRank) ? Number.MAX_SAFE_INTEGER : a.grandmasterTotalRank;
-                const rankB = isNaN(b.grandmasterTotalRank) ? Number.MAX_SAFE_INTEGER : b.grandmasterTotalRank;
-                return rankA - rankB;
-            });
-            data.forEach((item, index) => {
-                if (index < grandmasterCount && item.achievedLevel == 'grandmaster') {
-                    item.finalLevel = 'grandmaster';
-                }
-            });
-
 
 
             data.forEach((item, index) => {
@@ -714,7 +699,7 @@ async function insertRankListInfo() {
     }
 }
 
-async function getSingleRankByUserId(userId) {
+async function getSingleRankByUserId(userId, ignoreCombine = false) {
     // 根据用户ID获取单个用户的排名信息
     return new Promise((resolve, reject) => {
         chrome.storage.local.get(['WQPRankData', 'WQPSettings'], function ({ WQPRankData, WQPSettings }) {
@@ -726,25 +711,24 @@ async function getSingleRankByUserId(userId) {
             const data = WQPRankData?.array || [];
             const savedTimestamp = WQPRankData?.timestamp || 'N/A';
 
-            calculateRanks(data, userId, WQPSettings)
+            calculateRanks(data, userId, WQPSettings, ignoreCombine)
                 .then(result => resolve({ result, savedTimestamp }))
                 .catch(reject);
         });
     });
 }
 
-async function calculateRanks(data, userId, WQPSettings) {
+async function calculateRanks(data, userId, WQPSettings, ignoreCombine = false) {
     const userData = data.find(item => item.user === userId);
 
     if (!userData) {
-        reject(`User with ID ${userId} not found.`);
-        return;
+        return Promise.reject(`User with ID ${userId} not found.`);
     }
 
     const result = {};
     result['userData'] = userData;
     result['info'] = {
-        "currentLevel": determineUserLevel(userData, WQPSettings.geniusCombineTag),
+        "currentLevel": determineUserLevel(userData, WQPSettings.geniusCombineTag, ignoreCombine),
         "baseAlphaCount": WQPSettings.geniusAlphaCount,
     };
     // filter以item.name Rank结尾的
@@ -755,8 +739,10 @@ async function calculateRanks(data, userId, WQPSettings) {
 
     for (const model of ["expert", "master", "grandmaster"]) {
         let itemData = data.filter(item => item.alphaCount >= levelCriteria[model].alphaCount && item.pyramidCount >= levelCriteria[model].pyramidCount);
-        if (WQPSettings.geniusCombineTag) {
-            itemData = itemData.filter(item => item.combinedAlphaPerformance >= levelCriteria[model].combinedAlphaPerformance || item.combinedSelectedAlphaPerformance >= levelCriteria[model].combinedSelectedAlphaPerformance || item.combinedPowerPoolAlphaPerformance >= levelCriteria[model].combinedPowerPoolAlphaPerformance);
+        if (!ignoreCombine) { // Only filter by combine metrics if not ignoring
+            if (WQPSettings.geniusCombineTag) {
+                itemData = itemData.filter(item => item.combinedAlphaPerformance >= levelCriteria[model].combinedAlphaPerformance || item.combinedSelectedAlphaPerformance >= levelCriteria[model].combinedSelectedAlphaPerformance || item.combinedPowerPoolAlphaPerformance >= levelCriteria[model].combinedPowerPoolAlphaPerformance);
+            }
         }
         result['gold'][model + 'Rank'] = itemData.filter(item => item.totalRank < userData.totalRank).length + 1;
 
@@ -788,7 +774,7 @@ async function calculateRanks(data, userId, WQPSettings) {
     return result;
 }
 
-function rankInfo2Html(result) {
+function rankInfo2Html(result, ignoreCombineChecked = false) {
     const userData = result['userData'];
 
     // 将排名信息转换为HTML格式
@@ -809,6 +795,11 @@ function rankInfo2Html(result) {
     <p>
     该用户目前满足的级别: <strong>${result.info.currentLevel}</strong>
     </p>
+
+    <div style="margin-bottom: 10px;">
+        <input type="checkbox" id="ignoreCombineCheckbox" ${ignoreCombineChecked ? 'checked' : ''}>
+        <label for="ignoreCombineCheckbox">不按 combine 过滤</label>
+    </div>
 
     <button id="editRankButton" style="margin-bottom: 10px; padding: 5px 10px; background-color: #4CAF50; color: white; border: none; border-radius: 4px; cursor: pointer;">编辑六维指标</button>
     <div id="editRankForm" style="display: none; margin-bottom: 20px; padding: 15px; border: 1px solid #ddd; border-radius: 4px;">
@@ -889,6 +880,141 @@ function rankInfo2Html(result) {
     `
 }
 
+async function insertMyRankInfo() {
+    // 插入我的排名信息, button 插入我的排名信息的调用函数
+
+    let userId = await getDataFromUrl('https://api.worldquantbrain.com/users/self/consultant/summary');
+    userId = userId.leaderboard.user;
+    const { result, savedTimestamp } = await getSingleRankByUserId(userId);
+    // console.log('Data:', result);
+    let tableHTML = `
+        <div id='rankCard'>
+        <div class="research-paradigm__header">
+            <h2 class="genius__subtitle">Genius Rank Analysis</h2>
+            <small class="genius__hint genius__hint--dark">
+                <span>美东时间: ${formatSavedTimestamp(savedTimestamp)[0]}</span>
+                <span>北京时间: ${formatSavedTimestamp(savedTimestamp)[1]}</span>
+            </small>
+        </div>
+
+        <article class="card" style="flex-direction: column-reverse;">
+        <div class="card_wrapper">
+        <div class="card__content" style="padding-bottom: 26px;max-width: 100%">
+        <h3 style="font-size: 1.5rem; font-weight: bold; margin-bottom: 10px;">我的排名信息</h3>
+        <small class="genius__hint genius__hint--dark">
+            <span>美东时间: ${formatSavedTimestamp(savedTimestamp)[0]}</span>
+            <span>北京时间: ${formatSavedTimestamp(savedTimestamp)[1]}</span>
+        </small>
+        ${rankInfo2Html(result)}
+        </div>
+        </div>
+        </div>
+        </article>
+        </div>
+        `;
+    let mainContent = document.querySelector(targetSelectorButton);
+    mainContent = mainContent.parentElement;
+    if (mainContent) {
+        // 检查是否已经存在表格，如果存在则删除旧表格
+        const existingTable = mainContent.querySelector("#rankCard");
+        if (existingTable) {
+            existingTable.remove();
+        }
+        // 插入新的表格
+        const progressContainer = mainContent.querySelector('#WQButtonContainer');
+        progressContainer.insertAdjacentHTML('afterend', tableHTML);
+        // mainContent.innerHTML = tableHTML + mainContent.innerHTML;
+        // 绑定事件监听器
+        bindRankEditEvents(userId, savedTimestamp);
+    } else {
+        console.error('未找到mainContent元素');
+    }
+}
+
+
+function bindRankEditEvents(userId, savedTimestamp) {
+    const editButton = document.getElementById('editRankButton');
+    const editForm = document.getElementById('editRankForm');
+    const updateButton = document.getElementById('updateRankButton');
+    const ignoreCombineCheckbox = document.getElementById('ignoreCombineCheckbox');
+
+    if (editButton && editForm && updateButton && ignoreCombineCheckbox) {
+        editButton.addEventListener('click', () => {
+            editForm.style.display = editForm.style.display === 'none' ? 'block' : 'none';
+        });
+
+        updateButton.addEventListener('click', async () => {
+            const newData = {
+                operatorCount: parseInt(document.getElementById('operatorCount').value) || 0,
+                operatorAvg: parseFloat(document.getElementById('operatorAvg').value) || 0,
+                fieldCount: parseInt(document.getElementById('fieldCount').value) || 0,
+                fieldAvg: parseFloat(document.getElementById('fieldAvg').value) || 0,
+                communityActivity: parseFloat(document.getElementById('communityActivity').value) || 0,
+                // completedReferrals: parseInt(document.getElementById('completedReferrals').value) || 0,
+                maxSimulationStreak: parseInt(document.getElementById('maxSimulationStreak').value) || 0
+            };
+            console.debug('newData', newData);
+
+            // 更新数据并重新计算排名
+            const updatedResult = await updateUserRankings(userId, newData, ignoreCombineCheckbox.checked);
+
+            // 更新显示
+            const rankCard = document.getElementById('rankCard');
+            if (rankCard) {
+                rankCard.querySelector('.card__content').innerHTML = `
+                    <h3 style="font-size: 1.5rem; font-weight: bold; margin-bottom: 10px;">我的排名信息</h3>
+                    <small class="genius__hint genius__hint--dark">
+                        <span>美东时间: ${formatSavedTimestamp(savedTimestamp)[0]}</span>
+                        <span>北京时间: ${formatSavedTimestamp(savedTimestamp)[1]}</span>
+                    </small>
+                    ${rankInfo2Html(updatedResult, ignoreCombineCheckbox.checked)}
+                `;
+                // 重新绑定事件监听器
+                bindRankEditEvents(userId, savedTimestamp);
+            }
+        });
+
+        ignoreCombineCheckbox.addEventListener('change', async () => {
+            const { result, savedTimestamp } = await getSingleRankByUserId(userId, ignoreCombineCheckbox.checked);
+            const rankCard = document.getElementById('rankCard');
+            if (rankCard) {
+                rankCard.querySelector('.card__content').innerHTML = `
+                    <h3 style="font-size: 1.5rem; font-weight: bold; margin-bottom: 10px;">我的排名信息</h3>
+                    <small class="genius__hint genius__hint--dark">
+                        <span>美东时间: ${formatSavedTimestamp(savedTimestamp)[0]}</span>
+                        <span>北京时间: ${formatSavedTimestamp(savedTimestamp)[1]}</span>
+                    </small>
+                    ${rankInfo2Html(result, ignoreCombineCheckbox.checked)}
+                `;
+                bindRankEditEvents(userId, savedTimestamp);
+            }
+        });
+    }
+}
+
+async function updateUserRankings(userId, newData, ignoreCombine = false) {
+    // 获取所有用户数据
+    const { WQPRankData, WQPSettings } = await new Promise(resolve => {
+        chrome.storage.local.get(['WQPRankData', 'WQPSettings'], resolve);
+    });
+
+    if (!WQPRankData || !WQPRankData.array) {
+        throw new Error('No rank data available');
+    }
+
+    // 找到当前用户的数据
+    const userData = WQPRankData.array.find(item => item.user === userId);
+    if (!userData) {
+        throw new Error('User data not found');
+    }
+
+    // 更新用户数据
+    Object.assign(userData, newData);
+
+    // 使用通用的排名计算函数
+    return await calculateRanks(WQPRankData.array, userId, WQPSettings, ignoreCombine);
+}
+
 
 
 
@@ -948,8 +1074,9 @@ function bindRankEditEvents(userId, savedTimestamp) {
     const editButton = document.getElementById('editRankButton');
     const editForm = document.getElementById('editRankForm');
     const updateButton = document.getElementById('updateRankButton');
+    const ignoreCombineCheckbox = document.getElementById('ignoreCombineCheckbox');
 
-    if (editButton && editForm && updateButton) {
+    if (editButton && editForm && updateButton && ignoreCombineCheckbox) {
         editButton.addEventListener('click', () => {
             editForm.style.display = editForm.style.display === 'none' ? 'block' : 'none';
         });
@@ -967,7 +1094,7 @@ function bindRankEditEvents(userId, savedTimestamp) {
             console.debug('newData', newData);
 
             // 更新数据并重新计算排名
-            const updatedResult = await updateUserRankings(userId, newData);
+            const updatedResult = await updateUserRankings(userId, newData, ignoreCombineCheckbox.checked);
 
             // 更新显示
             const rankCard = document.getElementById('rankCard');
@@ -978,16 +1105,32 @@ function bindRankEditEvents(userId, savedTimestamp) {
                         <span>美东时间: ${formatSavedTimestamp(savedTimestamp)[0]}</span>
                         <span>北京时间: ${formatSavedTimestamp(savedTimestamp)[1]}</span>
                     </small>
-                    ${rankInfo2Html(updatedResult)}
+                    ${rankInfo2Html(updatedResult, ignoreCombineCheckbox.checked)}
                 `;
                 // 重新绑定事件监听器
+                bindRankEditEvents(userId, savedTimestamp);
+            }
+        });
+
+        ignoreCombineCheckbox.addEventListener('change', async () => {
+            const { result, savedTimestamp } = await getSingleRankByUserId(userId, ignoreCombineCheckbox.checked);
+            const rankCard = document.getElementById('rankCard');
+            if (rankCard) {
+                rankCard.querySelector('.card__content').innerHTML = `
+                    <h3 style="font-size: 1.5rem; font-weight: bold; margin-bottom: 10px;">我的排名信息</h3>
+                    <small class="genius__hint genius__hint--dark">
+                        <span>美东时间: ${formatSavedTimestamp(savedTimestamp)[0]}</span>
+                        <span>北京时间: ${formatSavedTimestamp(savedTimestamp)[1]}</span>
+                    </small>
+                    ${rankInfo2Html(result, ignoreCombineCheckbox.checked)}
+                `;
                 bindRankEditEvents(userId, savedTimestamp);
             }
         });
     }
 }
 
-async function updateUserRankings(userId, newData) {
+async function updateUserRankings(userId, newData, ignoreCombine = false) {
     // 获取所有用户数据
     const { WQPRankData, WQPSettings } = await new Promise(resolve => {
         chrome.storage.local.get(['WQPRankData', 'WQPSettings'], resolve);
@@ -1007,7 +1150,7 @@ async function updateUserRankings(userId, newData) {
     Object.assign(userData, newData);
 
     // 使用通用的排名计算函数
-    return await calculateRanks(WQPRankData.array, userId, WQPSettings);
+    return await calculateRanks(WQPRankData.array, userId, WQPSettings, ignoreCombine);
 }
 
 function getSeason() {
@@ -1225,4 +1368,3 @@ function watchForElementAndInsertButton() {
 watchForElementAndInsertButton();
 document.addEventListener("mouseover", showGeniusCard);
 document.addEventListener("mousemove", (ev) => card.updateCursor(ev.pageX, ev.pageY));
-
