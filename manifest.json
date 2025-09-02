@@ -19,7 +19,9 @@
     "content_scripts": [
         {
             "matches": [
-                "*://platform.worldquantbrain.com/*"
+                "*://platform.worldquantbrain.com/*",
+                "*://platform.worldquantbrain.com/alpha/*",
+                "*://platform.worldquantbrain.com/alphas/unsubmitted"
             ],
             "exclude_matches": [
                 "*://platform.worldquantbrain.com/genius/*"
@@ -31,7 +33,8 @@
                 "src/scripts/utils.js",
                 "src/scripts/uiCard.js",
                 "src/scripts/dataAna.js",
-                "src/scripts/noMoreDifficulties.js"
+                "src/scripts/noMoreDifficulties.js",
+                "src/scripts/alphaDetailsPopup.js"
             ],
             "css": [
                 "src/css/idcard.css"
