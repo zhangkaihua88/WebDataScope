@@ -1,6 +1,10 @@
 // Description: 弹出窗口的 JS 文件
 console.log('popup.js loaded');
 
+// 检查依赖库是否加载
+console.log('msgpack available:', typeof msgpack !== 'undefined');
+console.log('pako available:', typeof pako !== 'undefined');
+
 // 获取 HTML 元素
 const dbAddressInput = document.getElementById('dbAddress');
 const hiddenFeatureCheckbox = document.getElementById('hiddenFeature');
@@ -18,7 +22,7 @@ const importCommunityFile = document.getElementById('importCommunityFile');
 // 加载用户设置
 function loadSettings() {
     statusText.textContent = '加载中...';
-    chrome.storage.local.get('WQPSettings', ({ WQPSettings }) => {
+    browser.storage.local.get('WQPSettings').then(({ WQPSettings }) => {
         dbAddressInput.value = WQPSettings.apiAddress || '';
         hiddenFeatureCheckbox.checked = WQPSettings.hiddenFeatureEnabled || false;
         dataAnalysisCheckbox.checked = WQPSettings.dataAnalysisEnabled || false;
@@ -27,6 +31,8 @@ function loadSettings() {
         
         saveBtn.disabled = !dbAddressInput.value.trim();
         statusText.textContent = '';
+    }).catch(error => {
+        showStatusMessage('加载设置失败！', false);
     });
 }
 
@@ -47,17 +53,15 @@ function saveSettings(event) {
         saveBtn.disabled = false;
         return;
     }
-    chrome.storage.local.set({ WQPSettings }, () => {
-        if (chrome.runtime.lastError) {
-            showStatusMessage('保存失败，请重试！', false);
+    browser.storage.local.set({ WQPSettings }).then(() => {
+        showStatusMessage('设置已保存！', true);
+        setTimeout(() => {
+            statusText.textContent = '';
             saveBtn.disabled = false;
-        } else {
-            showStatusMessage('设置已保存！', true);
-            setTimeout(() => {
-                statusText.textContent = '';
-                saveBtn.disabled = false;
-            }, 2000);
-        }
+        }, 2000);
+    }).catch(error => {
+        showStatusMessage('保存失败，请重试！', false);
+        saveBtn.disabled = false;
     });
 }
 
@@ -111,7 +115,7 @@ function formatNow() {
 
 function handleExportCommunity() {
     statusText.textContent = '导出中...';
-    chrome.storage.local.get('WQPCommunityState', ({ WQPCommunityState }) => {
+    browser.storage.local.get('WQPCommunityState').then(({ WQPCommunityState }) => {
         try {
             if (!WQPCommunityState) {
                 showStatusMessage('没有可导出的社区数据。', false);
@@ -124,12 +128,25 @@ function handleExportCommunity() {
             console.error(e);
             showStatusMessage('导出失败。', false);
         }
+    }).catch(error => {
+        showStatusMessage('获取数据失败。', false);
     });
 }
 
 function handleExportCommunityCompressed() {
     statusText.textContent = '导出(压缩)中...';
-    chrome.storage.local.get('WQPCommunityState', ({ WQPCommunityState }) => {
+    
+    // 检查依赖库
+    if (typeof msgpack === 'undefined') {
+        showStatusMessage('msgpack库未加载，无法压缩导出。', false);
+        return;
+    }
+    if (typeof pako === 'undefined') {
+        showStatusMessage('pako库未加载，无法压缩导出。', false);
+        return;
+    }
+    
+    browser.storage.local.get('WQPCommunityState').then(({ WQPCommunityState }) => {
         try {
             if (!WQPCommunityState) {
                 showStatusMessage('没有可导出的社区数据。', false);
@@ -141,9 +158,12 @@ function handleExportCommunityCompressed() {
             downloadBytes(`WQPCommunityState_${formatNow()}.wqcs`, deflated, 'application/octet-stream');
             showStatusMessage('压缩导出完成。', true);
         } catch (e) {
-            console.error(e);
-            showStatusMessage('压缩导出失败。', false);
+            console.error('压缩导出错误:', e);
+            showStatusMessage(`压缩导出失败: ${e.message}`, false);
         }
+    }).catch(error => {
+        console.error('获取数据错误:', error);
+        showStatusMessage('获取数据失败。', false);
     });
 }
 
@@ -157,6 +177,19 @@ function handleImportFileChange(evt) {
     if (!file) return;
     statusText.textContent = '导入中...';
     const isCompressed = /\.wqcs$/i.test(file.name);
+    
+    // 如果是压缩文件，检查依赖库
+    if (isCompressed) {
+        if (typeof msgpack === 'undefined') {
+            showStatusMessage('msgpack库未加载，无法导入压缩文件。', false);
+            return;
+        }
+        if (typeof pako === 'undefined') {
+            showStatusMessage('pako库未加载，无法导入压缩文件。', false);
+            return;
+        }
+    }
+    
     const reader = new FileReader();
     if (isCompressed) {
         reader.onload = () => {
@@ -164,16 +197,14 @@ function handleImportFileChange(evt) {
                 const arr = new Uint8Array(reader.result);
                 const inflated = pako.inflate(arr);
                 const obj = msgpack.decode(inflated);
-                chrome.storage.local.set({ WQPCommunityState: obj }, () => {
-                    if (chrome.runtime.lastError) {
-                        showStatusMessage('写入存储失败。', false);
-                    } else {
-                        showStatusMessage('导入成功。', true);
-                    }
+                browser.storage.local.set({ WQPCommunityState: obj }).then(() => {
+                    showStatusMessage('导入成功。', true);
+                }).catch(error => {
+                    showStatusMessage('写入存储失败。', false);
                 });
             } catch (e) {
-                console.error(e);
-                showStatusMessage('导入失败：压缩内容无法解析。', false);
+                console.error('导入压缩文件错误:', e);
+                showStatusMessage(`导入失败：${e.message}`, false);
             }
         };
         reader.onerror = () => showStatusMessage('读取文件失败。', false);
@@ -182,12 +213,10 @@ function handleImportFileChange(evt) {
         reader.onload = () => {
             try {
                 const obj = JSON.parse(reader.result);
-                chrome.storage.local.set({ WQPCommunityState: obj }, () => {
-                    if (chrome.runtime.lastError) {
-                        showStatusMessage('写入存储失败。', false);
-                    } else {
-                        showStatusMessage('导入成功。', true);
-                    }
+                browser.storage.local.set({ WQPCommunityState: obj }).then(() => {
+                    showStatusMessage('导入成功。', true);
+                }).catch(error => {
+                    showStatusMessage('写入存储失败。', false);
                 });
             } catch (e) {
                 console.error(e);

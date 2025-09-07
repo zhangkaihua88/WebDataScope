@@ -74,7 +74,7 @@ async function fetchDataDetails(fileName, dataFieldData) {
 
     // 获取数据集列表
     if (!cacheData['dataSetList']) {
-        const response = await fetch(chrome.runtime.getURL(`data/dataSetList.json`));
+        const response = await fetch(browser.runtime.getURL(`data/dataSetList.json`));
         cacheData['dataSetList'] = await response.json();
     }
     const dataSetList = cacheData['dataSetList'];
@@ -102,7 +102,7 @@ async function fetchDataDetails(fileName, dataFieldData) {
     }
 
     // 从文件中获取数据
-    let url = chrome.runtime.getURL(`data/${fileName}.bin`);
+    let url = browser.runtime.getURL(`data/${fileName}.bin`);
     try {
         const response = await fetch(url);
         const arrayBuffer = await response.arrayBuffer();
@@ -293,8 +293,9 @@ async function updateCardInfo(dataId, data, updateDataCallback) {
 
 async function showDataCard(event) {
     // 显示数据卡片
-    chrome.storage.local.get('WQPSettings', async ({ WQPSettings }) => {
-        if (WQPSettings.dataAnalysisEnabled) {
+    try {
+        const { WQPSettings } = await browser.storage.local.get('WQPSettings');
+        if (WQPSettings && WQPSettings.dataAnalysisEnabled) {
             const { dataFieldHtml, dataFieldUrl } = getDataFieldId(event.target);
             if (dataFieldUrl) {
                 const data = getDataFieldData(dataFieldHtml, dataFieldUrl);
@@ -319,7 +320,10 @@ async function showDataCard(event) {
         }
         card.disable();
         return;
-    });
+    } catch (error) {
+        console.error('Error in showDataCard:', error);
+        card.disable();
+    }
 
 }
 

@@ -12,17 +12,14 @@ const COMMUNITY_CONCURRENCY = 10;  // 正文抓取并发上限
 // ############################## 通用函数 ##############################
 
 async function getLikedIds() {
-    return new Promise((resolve) => {
-        chrome.storage.local.get(['WQPLikedIds'], function ({ WQPLikedIds }) {
-            resolve(WQPLikedIds || []);
-        });
-    });
+    const { WQPLikedIds } = await browser.storage.local.get(['WQPLikedIds']);
+    return WQPLikedIds || [];
 }
 async function saveLikedId(id) {
     let WQPLikedIds = await getLikedIds();
     if (!WQPLikedIds.includes(id)) {
         WQPLikedIds.push(id);
-        await chrome.storage.local.set({ WQPLikedIds });
+        await browser.storage.local.set({ WQPLikedIds });
     }
 }
 
@@ -715,10 +712,9 @@ function setCommunityProgress(current, total) {
 
 
 // 读取本地存储的工具函数
-function getFromStorage(key) {
-    return new Promise((resolve) => {
-        chrome.storage.local.get([key], (res) => resolve(res[key]));
-    });
+async function getFromStorage(key) {
+    const result = await browser.storage.local.get([key]);
+    return result[key];
 }
 
 // 按页抓取评论（用于增量抓取，从 startPage 到 endPage）
@@ -829,7 +825,7 @@ async function crawlCommunityFullAll(opts = {}) {
     }
 
     // 2) 读取旧状态，若无则初始化
-    const setToStorage = (obj) => new Promise(resolve => chrome.storage.local.set(obj, resolve));
+    const setToStorage = async (obj) => await browser.storage.local.set(obj);
     const prevState = await getFromStorage('WQPCommunityState');
     const state = prevState && typeof prevState === 'object' && prevState.byCommunity
         ? prevState
@@ -1018,7 +1014,7 @@ async function crawlRecentActivitiesIncremental(opts = {}) {
     const onProgress = typeof opts.onProgress === 'function' ? opts.onProgress : (msg) => updateProgress(msg);
 
     // 读取旧状态
-    const setToStorage = (obj) => new Promise(resolve => chrome.storage.local.set(obj, resolve));
+    const setToStorage = async (obj) => await browser.storage.local.set(obj);
     const prevState = await getFromStorage('WQPCommunityState');
     const state = prevState && typeof prevState === 'object' && prevState.byCommunity
         ? prevState
@@ -1370,7 +1366,7 @@ async function crawlCategoryFullAll() {
     const state = prevState && typeof prevState === 'object' ? prevState : {};
     // 本次运行不使用之前的 byCategory，始终重置
     state.byCategory = {};
-    const setToStorage = (obj) => new Promise(resolve => chrome.storage.local.set(obj, resolve));
+    const setToStorage = async (obj) => await browser.storage.local.set(obj);
     // 立即持久化一次清空后的结构，避免旧数据残留
     await setToStorage({ WQPCommunityState: state });
 
@@ -1551,7 +1547,9 @@ function createStartMenu() {
     clearButton.setAttribute("id", "clearLikedIdsButton");
     clearButton.innerText = "清空点赞记录";
     clearButton.className = "egg_study_btn egg_menu";
-    clearButton.addEventListener("click", clearLikedIds, false);
+    clearButton.addEventListener("click", async () => {
+        await clearLikedIds();
+    }, false);
     baseButtons.append(clearButton);
 
     // 全量抓取（帖子+评论）按钮（不做增量，直接完整抓取）
@@ -1656,31 +1654,29 @@ function createStartMenu() {
 }
 
 // 清空点赞记录函数
-function clearLikedIds() {
+async function clearLikedIds() {
     if (confirm('确定要清空所有点赞记录吗？此操作不可恢复。')) {
         if (confirm('请再次确认，是否真的要清空所有点赞记录？')) {
-            chrome.storage.local.remove('WQPLikedIds', function () {
-                alert('点赞记录已清空！');
-                upCount = 0;
-                logCount();
-            });
+            await browser.storage.local.remove('WQPLikedIds');
+            alert('点赞记录已清空！');
+            upCount = 0;
+            logCount();
         }
     }
 }
 
 // Use MutationObserver to watch for DOM changes
-function voteUpMain() {
+async function voteUpMain() {
     // observer.disconnect();
-    chrome.storage.local.get('WQPSettings', ({ WQPSettings }) => {
-        if (WQPSettings.hiddenFeatureEnabled) {
-            // 如果为 true，则执行特定代码
-            console.log('隐藏功能已启用');
-            createStartMenu();
-        }
-    });
+    const { WQPSettings } = await browser.storage.local.get('WQPSettings');
+    if (WQPSettings && WQPSettings.hiddenFeatureEnabled) {
+        // 如果为 true，则执行特定代码
+        console.log('隐藏功能已启用');
+        createStartMenu();
+    }
 
 }
-voteUpMain()
+voteUpMain().catch(err => console.error('voteUpMain failed:', err))
 // const observer = new MutationObserver(() => {
 //     if (document.querySelector("#user-nav > a:nth-child(2)")) {
 //         voteUpMain()

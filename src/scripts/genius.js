@@ -97,19 +97,23 @@ async function opsAna() {
         array: operators,
         timestamp: currentTime
     };
-    chrome.storage.local.set({ WQPOPSAna: dataToSave }, function () {
+    try {
+        await browser.storage.local.set({ WQPOPSAna: dataToSave });
         console.log('数据已保存');
         console.log(dataToSave);
-    });
+    } catch (error) {
+        console.error('保存数据失败:', error);
+    }
     insertOpsTable();
     setButtonState('WQPOPSFetchButton', `运算符分析完成${data.length}`, 'enable');
 }
 
 
-function insertOpsTable() {
+async function insertOpsTable() {
     // 插入运算符分析的表格, button 插入表格的调用函数
 
-    chrome.storage.local.get('WQPOPSAna', function (result) {
+    try {
+        const result = await browser.storage.local.get('WQPOPSAna');
         if (result.WQPOPSAna) {
             console.log('读取的数据:', result.WQPOPSAna);
             let savedArray = result.WQPOPSAna.array;
@@ -169,7 +173,9 @@ function insertOpsTable() {
         } else {
             console.log('没有找到保存的数据');
         }
-    });
+    } catch (error) {
+        console.error('读取数据失败:', error);
+    }
 }
 // 工具函數,提供inertOpsTable使用
 function generateOperatorTable(savedTimestamp, nonZeroCount, zeroCount, savedArray) {
@@ -260,12 +266,8 @@ function determineUserLevel(userData, geniusCombineTag) {
 async function getAllRank() {
     // 根据用户ID获取单个用户的排名信息
 
-    return new Promise((resolve, reject) => {
-        chrome.storage.local.get(['WQPRankData', 'WQPSettings'], function ({ WQPRankData, WQPSettings }) {
-            if (chrome.runtime.lastError) {
-                reject(chrome.runtime.lastError);
-                return;
-            }
+    try {
+        const { WQPRankData, WQPSettings } = await browser.storage.local.get(['WQPRankData', 'WQPSettings']);
 
             let data = WQPRankData?.array || [];
             const savedTimestamp = WQPRankData?.timestamp || 'N/A';
@@ -385,9 +387,10 @@ async function getAllRank() {
 
 
 
-            resolve({ data, savedTimestamp });
-        });
-    });
+        return { data, savedTimestamp };
+    } catch (error) {
+        throw error;
+    }
 }
 
 
@@ -716,21 +719,17 @@ async function insertRankListInfo() {
 
 async function getSingleRankByUserId(userId) {
     // 根据用户ID获取单个用户的排名信息
-    return new Promise((resolve, reject) => {
-        chrome.storage.local.get(['WQPRankData', 'WQPSettings'], function ({ WQPRankData, WQPSettings }) {
-            if (chrome.runtime.lastError) {
-                reject(chrome.runtime.lastError);
-                return;
-            }
+    try {
+        const { WQPRankData, WQPSettings } = await browser.storage.local.get(['WQPRankData', 'WQPSettings']);
 
             const data = WQPRankData?.array || [];
             const savedTimestamp = WQPRankData?.timestamp || 'N/A';
 
-            calculateRanks(data, userId, WQPSettings)
-                .then(result => resolve({ result, savedTimestamp }))
-                .catch(reject);
-        });
-    });
+        const result = await calculateRanks(data, userId, WQPSettings);
+        return { result, savedTimestamp };
+    } catch (error) {
+        throw error;
+    }
 }
 
 async function calculateRanks(data, userId, WQPSettings) {
@@ -989,9 +988,7 @@ function bindRankEditEvents(userId, savedTimestamp) {
 
 async function updateUserRankings(userId, newData) {
     // 获取所有用户数据
-    const { WQPRankData, WQPSettings } = await new Promise(resolve => {
-        chrome.storage.local.get(['WQPRankData', 'WQPSettings'], resolve);
-    });
+    const { WQPRankData, WQPSettings } = await browser.storage.local.get(['WQPRankData', 'WQPSettings']);
 
     if (!WQPRankData || !WQPRankData.array) {
         throw new Error('No rank data available');
@@ -1074,10 +1071,13 @@ async function rankAna() {
         array: data,
         timestamp: currentTime
     };
-    chrome.storage.local.set({ WQPRankData: dataToSave }, function () {
+    try {
+        await browser.storage.local.set({ WQPRankData: dataToSave });
         console.log('数据已保存');
         console.log(dataToSave);
-    });
+    } catch (error) {
+        console.error('保存数据失败:', error);
+    }
     setButtonState('WQPRankFetchButton', `排名分析完成`, 'disable');
     insertMyRankInfo();
 }
