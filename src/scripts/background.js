@@ -29,6 +29,7 @@ chrome.runtime.onInstalled.addListener(async () => {
                 dataAnalysisEnabled: true,
                 geniusAlphaCount: 40,
                 geniusCombineTag: true,
+                apiMonitorEnabled: true,
             };
 
             // 将默认设置保存到 Chrome 存储中

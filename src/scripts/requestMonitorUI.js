@@ -4,6 +4,17 @@
   if (window.__WQS_REQ_UI__) return;
   window.__WQS_REQ_UI__ = true;
 
+  // 读取设置，控制是否显示面板
+  try {
+    chrome.storage?.local?.get('WQPSettings', ({ WQPSettings }) => {
+      if (WQPSettings && WQPSettings.apiMonitorEnabled === true) {
+        start();
+      }
+    });
+  } catch (_) { /* ignore */ }
+
+  function start() {
+
   const MAX_ITEMS = 100;
   const container = document.createElement('div');
   container.id = 'wqs-request-monitor';
@@ -228,4 +239,5 @@
       } catch (_) { /* ignore */ }
     }
   });
+  }
 })();
