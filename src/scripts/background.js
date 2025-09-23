@@ -8,6 +8,15 @@ const REPO_NAME = "WebDataScope";
 const CHECK_INTERVAL = 24 * 60 * 60 * 1000; // 24小时检查一次
 
 
+// 内存中仅会话级别缓存，不做长期持久化
+let recentApiRequests = [];
+const MAX_RECENT = 200;
+// 在此处直接维护需要排除的前缀列表
+const EXCLUDED_PREFIXES = [
+    'https://api.worldquantbrain.com/errors/api/2/envelope/'
+
+];
+
 
 // 初始化设置
 chrome.runtime.onInstalled.addListener(async () => {
@@ -61,6 +70,84 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
 
 
 // ############################## 以下为辅助函数 #################################
+
+
+// 监听 api.worldquantbrain.com 的网络请求并广播到页面用于展示
+try {
+    chrome.webRequest.onBeforeRequest.addListener(
+        (details) => {
+            const url = details.url || '';
+            if (!url.includes('api.worldquantbrain.com')) return;
+            if (isExcluded(url)) return;
+            let body = '';
+            if ((details.method || '').toUpperCase() === 'POST' && details.requestBody) {
+                body = extractRequestBody(details.requestBody);
+            }
+            const rec = {
+                id: details.requestId,
+                time: Date.now(),
+                type: 'before',
+                method: details.method,
+                url,
+                body,
+                tabId: details.tabId,
+            };
+            recentApiRequests.push(rec);
+            if (recentApiRequests.length > MAX_RECENT) recentApiRequests.shift();
+            broadcastRequest(rec);
+        },
+        { urls: ["https://api.worldquantbrain.com/*"] },
+        ["requestBody"]
+    );
+
+    chrome.webRequest.onCompleted.addListener(
+        (details) => {
+            const url = details.url || '';
+            if (!url.includes('api.worldquantbrain.com')) return;
+            if (isExcluded(url)) return;
+            const rec = {
+                id: details.requestId,
+                time: Date.now(),
+                type: 'completed',
+                method: details.method,
+                url,
+                statusCode: details.statusCode,
+                tabId: details.tabId,
+            };
+            recentApiRequests.push(rec);
+            if (recentApiRequests.length > MAX_RECENT) recentApiRequests.shift();
+            broadcastRequest(rec);
+        },
+        { urls: ["https://api.worldquantbrain.com/*"] }
+    );
+} catch (e) {
+    console.warn('webRequest listeners failed to register', e);
+}
+
+// 内容脚本可主动请求最近 N 条记录
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+    if (msg && msg.type === 'REQ_MONITOR_GET_RECENT') {
+        // 仅返回最近 100 条，且过滤 tabId 匹配或为 -1 的(无法关联标签的)记录
+        const tabId = sender?.tab?.id;
+        const list = recentApiRequests
+            .filter(r => r.tabId === tabId || r.tabId === -1)
+            .slice(-100);
+        sendResponse({ ok: true, data: list });
+        return true;
+    } else if (msg && msg.type === 'REQ_MONITOR_GET_EXCLUDED') {
+        sendResponse({ ok: true, data: EXCLUDED_PREFIXES });
+        return true;
+    }
+});
+
+function broadcastRequest(rec) {
+    // 仅向 platform.worldquantbrain.com 的标签分发
+    chrome.tabs.query({ url: '*://platform.worldquantbrain.com/*' }, (tabs) => {
+        for (const t of tabs) {
+            chrome.tabs.sendMessage(t.id, { type: 'REQ_MONITOR_NEW', data: rec });
+        }
+    });
+}
 
 
 // 版本比较函数
@@ -210,6 +297,7 @@ function injectionGeniusScript(tabId) {
                 chrome.scripting.executeScript({
                     target: { tabId: tabId },
                     files: [
+                        "src/scripts/requestMonitorUI.js",
                         "src/scripts/lib/jquery-3.7.0.min.js",
                         "src/scripts/lib/jquery.dataTables.min.js",
                         "src/scripts/lib/dataTables.columnControl.min.js",
@@ -231,10 +319,52 @@ function injectionGeniusScript(tabId) {
                     args: [],
                     func: (...args) => watchForElementAndInsertButton(...args),
                 });
+                // 同时确保请求监视器 UI 注入
+                chrome.scripting.executeScript({
+                    target: { tabId: tabId },
+                    files: ["src/scripts/requestMonitorUI.js"],
+                });
             }
         });
         console.log(tabId.url);
     } catch (error) {
         console.error('Script injection failed: ', error);
     }
+}
+
+function isExcluded(url) {
+    if (!url) return false;
+    if (!Array.isArray(EXCLUDED_PREFIXES) || EXCLUDED_PREFIXES.length === 0) return false;
+    return EXCLUDED_PREFIXES.some(p => typeof p === 'string' && url.startsWith(p));
+}
+
+const MAX_BODY_LEN = 2000;
+function extractRequestBody(requestBody) {
+    try {
+        if (!requestBody) return '';
+        if (requestBody.formData) {
+            const parts = [];
+            for (const k of Object.keys(requestBody.formData)) {
+                const vals = requestBody.formData[k];
+                if (Array.isArray(vals)) {
+                    for (const v of vals) parts.push(`${k}=${String(v)}`);
+                } else {
+                    parts.push(`${k}=${String(vals)}`);
+                }
+            }
+            return parts.join('&').slice(0, MAX_BODY_LEN);
+        }
+        if (requestBody.raw && Array.isArray(requestBody.raw) && requestBody.raw.length > 0) {
+            const chunk = requestBody.raw[0];
+            const bytes = chunk.bytes;
+            if (bytes) {
+                const u8 = new Uint8Array(bytes);
+                const txt = new TextDecoder('utf-8').decode(u8);
+                return txt.slice(0, MAX_BODY_LEN);
+            }
+        }
+    } catch (e) {
+        console.warn('extractRequestBody failed', e);
+    }
+    return '';
 }

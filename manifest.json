@@ -31,7 +31,8 @@
                 "src/scripts/utils.js",
                 "src/scripts/uiCard.js",
                 "src/scripts/dataAna.js",
-                "src/scripts/noMoreDifficulties.js"
+                "src/scripts/noMoreDifficulties.js",
+                "src/scripts/requestMonitorUI.js"
             ],
             "css": [
                 "src/css/idcard.css"
@@ -65,7 +66,8 @@
         }
     ],
     "host_permissions": [
-        "https://*/*"
+        "https://*/*",
+        "https://api.worldquantbrain.com/*"
     ],
     "permissions": [
         "scripting",
@@ -75,6 +77,7 @@
         "activeTab",
         "alarms",
         "notifications",
+        "webRequest",
         "unlimitedStorage"
     ]
 }
