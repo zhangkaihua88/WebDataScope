@@ -32,7 +32,7 @@ async function fetchAllAlphas() {
         { start: `${year}-01-01T05:00:00.000Z`, end: `${year}-04-01T04:00:00.000Z` },  // 第一季度
         { start: `${year}-04-01T04:00:00.000Z`, end: `${year}-07-01T04:00:00.000Z` },  // 第二季度
         { start: `${year}-07-01T04:00:00.000Z`, end: `${year}-10-01T04:00:00.000Z` },  // 第三季度
-        { start: `${year}-10-01T04:00:00.000Z`, end: `${year}-01-01T05:00:00.000Z` }   // 第四季度
+        { start: `${year}-10-01T04:00:00.000Z`, end: `${year+1}-01-01T05:00:00.000Z` }   // 第四季度
     ];
     const { start, end } = quarters[quarter - 1];
     const dateRange = `dateSubmitted%3E${start}&dateSubmitted%3C${end}`;
