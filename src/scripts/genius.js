@@ -1222,7 +1222,314 @@ function watchForElementAndInsertButton() {
 }
 
 
+// ############################## Combined Power Pool 进度条 ##############################
+
+function addPowerPoolProgressBar() {
+    // 为 Combined Power Pool Alpha Performance 添加进度条
+    console.log('[WQP] Checking for Combined Power Pool Alpha Performance progress bar...');
+    
+    // 等待页面加载完成
+    const checkAndAddProgressBar = () => {
+        console.log('[WQP] Starting checkAndAddProgressBar...');
+        
+        // 先检查页面上是否有任何包含 "Combined" 的文本
+        const bodyText = document.body.innerText;
+        console.log('[WQP] Searching for "Combined Power Pool" in page text...');
+        
+        // 尝试多种可能的文本格式
+        const searchTerms = [
+            'Combined Power Pool Alpha Performance',
+            'Combined Power Pool',
+            'Power Pool Alpha Performance',
+            'Power Pool'
+        ];
+        
+        let foundTerm = null;
+        for (const term of searchTerms) {
+            if (bodyText.includes(term)) {
+                foundTerm = term;
+                console.log(`[WQP] Found term: "${term}"`);
+                break;
+            }
+        }
+        
+        if (!foundTerm) {
+            console.log('[WQP] No matching text found on page. Available text sample:', bodyText.substring(0, 500));
+            return false;
+        }
+        
+        // 查找包含 "Combined Power Pool Alpha Performance" 的具体元素
+        // 优先查找 H3, 然后是 DIV
+        const selectors = [
+            'h3', 'h2', 'h4',
+            '.research-paradigm__card-header',
+            '.genius__subtitle',
+            'div.research-paradigm__section'
+        ];
+        
+        let powerPoolSection = null;
+        
+        for (const selector of selectors) {
+            const elements = Array.from(document.querySelectorAll(selector));
+            powerPoolSection = elements.find(el => 
+                searchTerms.some(term => el.textContent.includes(term))
+            );
+            if (powerPoolSection) {
+                console.log(`[WQP] Found using selector "${selector}":`, powerPoolSection);
+                break;
+            }
+        }
+        
+        if (!powerPoolSection) {
+            console.log('[WQP] Could not find specific element for Combined Power Pool');
+            return false;
+        }
+        
+        // 查找父容器 - Combined Power Pool 应该在 .research-paradigm__section 中
+        let container = powerPoolSection.closest('.research-paradigm__section');
+        if (!container) {
+            container = powerPoolSection.closest('article');
+        }
+        if (!container) {
+            container = powerPoolSection.closest('.card');
+        }
+        if (!container) {
+            container = powerPoolSection.closest('div');
+        }
+        
+        if (!container) {
+            console.log('[WQP] ERROR: Could not find container');
+            return false;
+        }
+        
+        console.log('[WQP] Found container:', container);
+        
+        // 查找数值 - 从容器文本中提取
+        let performanceValue = 0;
+        let valueElement = null;
+        
+        // 首先尝试查找显示数值的元素
+        const possibleValueElements = container.querySelectorAll('.genius__value, .research-paradigm__card-value, strong, b, h1, h2, h3, h4, span');
+        
+        for (const el of possibleValueElements) {
+            const text = el.textContent.trim();
+            // 匹配纯数字或小数
+            if (/^\d+(\.\d+)?$/.test(text)) {
+                performanceValue = parseFloat(text);
+                valueElement = el;
+                console.log(`[WQP] Found value ${performanceValue} in element:`, el.tagName, el.className);
+                break;
+            }
+        }
+        
+        if (!valueElement) {
+            // 从容器文本中提取数字
+            const containerText = container.textContent;
+            // 查找 "Combined Power Pool Alpha Performance" 后的数字
+            const match = containerText.match(/Combined Power Pool Alpha Performance[^\d]*(\d+\.?\d*)/i);
+            if (match) {
+                performanceValue = parseFloat(match[1]);
+                console.log(`[WQP] Extracted value from text: ${performanceValue}`);
+            } else {
+                console.log('[WQP] Could not find performance value, using default 0');
+            }
+        }
+        
+        console.log(`[WQP] Final performance value: ${performanceValue}`);
+        
+        // 检查是否已经有进度条 (通过 ID 检查)
+        const existingProgressBar = container.querySelector('[id^="wqp-power-pool-progress-chart-"]');
+        if (existingProgressBar) {
+            console.log('[WQP] Progress bar already exists, skipping');
+            return true;
+        }
+        
+        // 创建或查找进度条容器
+        let progressBarContainer = container.querySelector('.genius__progress-bar-container');
+        if (!progressBarContainer) {
+            progressBarContainer = document.createElement('div');
+            progressBarContainer.className = 'genius__progress-bar-container';
+            progressBarContainer.style.marginTop = '16px';
+            progressBarContainer.style.marginBottom = '16px';
+            
+            console.log('[WQP] Creating new progress bar container');
+            
+            // 直接添加到容器末尾
+            container.appendChild(progressBarContainer);
+            console.log('[WQP] Appended progress bar to container');
+        }
+        
+        // 创建进度条图表容器
+        const chartContainer = document.createElement('div');
+        chartContainer.id = 'wqp-power-pool-progress-chart-' + Date.now();
+        chartContainer.style.width = '100%';
+        chartContainer.style.height = '50px';
+        progressBarContainer.appendChild(chartContainer);
+        
+        console.log('[WQP] Chart container created:', chartContainer.id);
+        
+        // 使用 Highcharts 创建进度条
+        createPowerPoolProgressBar(chartContainer.id, performanceValue);
+        
+        console.log('[WQP] ✅ Progress bar successfully added!');
+        return true;
+    };
+    
+    // 使用 MutationObserver 监听页面变化
+    let attempts = 0;
+    const maxAttempts = 100; // 增加尝试次数
+    
+    const observer = new MutationObserver(() => {
+        attempts++;
+        console.log(`[WQP] Attempt ${attempts}/${maxAttempts}`);
+        
+        if (checkAndAddProgressBar() || attempts >= maxAttempts) {
+            observer.disconnect();
+            if (attempts >= maxAttempts) {
+                console.log('[WQP] Max attempts reached, stopping observation');
+            } else {
+                console.log(`[WQP] Progress bar added successfully after ${attempts} attempts`);
+            }
+        }
+    });
+    
+    // 立即尝试一次
+    console.log('[WQP] Attempting immediate check...');
+    if (!checkAndAddProgressBar()) {
+        // 如果失败,开始观察
+        console.log('[WQP] Initial check failed, starting observer...');
+        observer.observe(document.body, { 
+            childList: true, 
+            subtree: true,
+            characterData: true 
+        });
+        
+        // 10秒后停止观察 (延长时间)
+        setTimeout(() => {
+            observer.disconnect();
+            console.log('[WQP] Observer timeout - disconnected after 10 seconds');
+        }, 10000);
+    } else {
+        console.log('[WQP] Initial check succeeded!');
+    }
+}
+
+function createPowerPoolProgressBar(containerId, value) {
+    console.log('[WQP] Creating progress bar for:', containerId, 'with value:', value);
+    
+    const container = document.getElementById(containerId);
+    if (!container) {
+        console.error('[WQP] Container not found:', containerId);
+        return;
+    }
+    
+    const maxValue = 3;
+    
+    // 计算每个颜色段的宽度和颜色
+    // 关键:当前值落在某个区间时,该区间要分成两部分(深色+浅色)
+    const segments = [];
+    
+    // 区间 0-0.5 (深黄/浅黄)
+    if (value >= 0.5) {
+        segments.push({ width: 0.5, color: '#c59b00' }); // 完全达到,全深黄
+    } else if (value > 0) {
+        segments.push({ width: value, color: '#c59b00' }); // 部分达到,深黄
+        segments.push({ width: 0.5 - value, color: '#ffe9b3' }); // 未达到,浅黄
+    } else {
+        segments.push({ width: 0.5, color: '#ffe9b3' }); // 完全未达到,全浅黄
+    }
+    
+    // 区间 0.5-1.0 (深绿/浅绿)
+    if (value >= 1.0) {
+        segments.push({ width: 0.5, color: '#00ae00' }); // 完全达到,全深绿
+    } else if (value > 0.5) {
+        segments.push({ width: value - 0.5, color: '#00ae00' }); // 部分达到,深绿
+        segments.push({ width: 1.0 - value, color: '#d4f4d4' }); // 未达到,浅绿
+    } else {
+        segments.push({ width: 0.5, color: '#d4f4d4' }); // 完全未达到,全浅绿
+    }
+    
+    // 区间 1.0-2.0 (深蓝/浅蓝)
+    if (value >= 2.0) {
+        segments.push({ width: 1.0, color: '#0074c4' }); // 完全达到,全深蓝
+    } else if (value > 1.0) {
+        segments.push({ width: value - 1.0, color: '#0074c4' }); // 部分达到,深蓝
+        segments.push({ width: 2.0 - value, color: '#cce5f6' }); // 未达到,浅蓝
+    } else {
+        segments.push({ width: 1.0, color: '#cce5f6' }); // 完全未达到,全浅蓝
+    }
+    
+    // 区间 2.0-3.0 (深橙/浅橙)
+    if (value >= 3.0) {
+        segments.push({ width: 1.0, color: '#c34800' }); // 完全达到,全深橙
+    } else if (value > 2.0) {
+        segments.push({ width: value - 2.0, color: '#c34800' }); // 部分达到,深橙
+        segments.push({ width: 3.0 - value, color: '#ffd7a7' }); // 未达到,浅橙
+    } else {
+        segments.push({ width: 1.0, color: '#ffd7a7' }); // 完全未达到,全浅橙
+    }
+    
+    // 确定标记点的边框颜色 (根据当前所在区间)
+    let markerColor = '#c59b00'; // 默认黄色 (0-0.5)
+    if (value >= 2.0) {
+        markerColor = '#c34800'; // 深橙 (2.0-3.0)
+    } else if (value >= 1.0) {
+        markerColor = '#0074c4'; // 蓝色 (1.0-2.0)
+    } else if (value >= 0.5) {
+        markerColor = '#00ae00'; // 绿色 (0.5-1.0)
+    }
+    
+    const markerPosition = Math.min((value / maxValue) * 100, 100); // 百分比位置
+    
+    // 生成所有颜色段的 HTML
+    const segmentsHtml = segments.map(seg => 
+        `<div style="width: ${(seg.width / maxValue) * 100}%; background-color: ${seg.color}; height: 100%;"></div>`
+    ).join('');
+    
+    // 创建进度条 HTML
+    container.innerHTML = `
+        <div style="position: relative; width: 100%; height: 40px; padding-bottom: 10px; display: flex;">
+            <!-- 彩色条 -->
+            <div style="position: absolute; top: 0; left: 0; right: 0; height: 20px; display: flex; overflow: hidden;">
+                ${segmentsHtml}
+            </div>
+            
+            <!-- 标记点 -->
+            <div style="position: absolute; top: 10px; left: ${markerPosition}%; transform: translate(-50%, -50%); width: 18px; height: 18px; background: white; border: 3px solid ${markerColor}; border-radius: 50%; z-index: 10;"></div>
+            
+            <!-- 刻度标签 -->
+            <div style="position: absolute; bottom: 0; left: ${(0.5 / maxValue) * 100}%; transform: translateX(-50%); font-size: 0.75rem; color: #7b8292;">0.5</div>
+            <div style="position: absolute; bottom: 0; left: ${(1.0 / maxValue) * 100}%; transform: translateX(-50%); font-size: 0.75rem; color: #7b8292;">1</div>
+            <div style="position: absolute; bottom: 0; left: ${(2.0 / maxValue) * 100}%; transform: translateX(-50%); font-size: 0.75rem; color: #7b8292;">2</div>
+        </div>
+    `;
+    
+    console.log('[WQP] Progress bar created successfully with', segments.length, 'segments, value:', value, 'at position:', markerPosition.toFixed(1) + '%');
+}
+
 watchForElementAndInsertButton();
 document.addEventListener("mouseover", showGeniusCard);
 document.addEventListener("mousemove", (ev) => card.updateCursor(ev.pageX, ev.pageY));
+
+// 添加 Combined Power Pool 进度条 - 多次尝试以确保页面加载完成
+console.log('[WQP] Scheduling progress bar injection...');
+
+// 第一次尝试: 1秒后
+setTimeout(() => {
+    console.log('[WQP] First attempt (1s)');
+    addPowerPoolProgressBar();
+}, 1000);
+
+// 第二次尝试: 3秒后
+setTimeout(() => {
+    console.log('[WQP] Second attempt (3s)');
+    addPowerPoolProgressBar();
+}, 3000);
+
+// 第三次尝试: 5秒后
+setTimeout(() => {
+    console.log('[WQP] Third attempt (5s)');
+    addPowerPoolProgressBar();
+}, 5000);
+
 
