@@ -50,20 +50,68 @@ function format(formatString, replacements) {
   return result;
 }
 
-async function getDataFromUrl(url) {
-    const response = await fetch(url, {
-        referrer: "https://platform.worldquantbrain.com/",
-        referrerPolicy: "strict-origin-when-cross-origin",
-        body: null,
-        method: "GET",
-        mode: "cors",
-        credentials: "include"
-    });
-    if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+async function getDataFromUrl(url, options = {}) {
+    // Retry until response.ok with timeout and exponential backoff
+    const {
+        timeoutMs = 15000,            // 单次请求超时
+        initialDelayMs = 1000,        // 初始重试延迟
+        maxDelayMs = 10000,           // 最大重试延迟
+        maxRetries = Infinity,        // 默认无限重试，直到 response.ok
+        onRetry = null                // 可选回调：({ attempt, status?, error?, nextDelayMs })
+    } = options;
+
+    let attempt = 0;
+    let delayMs = initialDelayMs;
+
+    while (true) {
+        attempt += 1;
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(new DOMException('Timeout', 'AbortError')), timeoutMs);
+        try {
+            const response = await fetch(url, {
+                referrer: "https://platform.worldquantbrain.com/",
+                referrerPolicy: "strict-origin-when-cross-origin",
+                body: null,
+                method: "GET",
+                mode: "cors",
+                credentials: "include",
+                signal: controller.signal
+            });
+            clearTimeout(timeoutId);
+
+            if (response.ok) {
+                const data = await response.json();
+                return data;
+            }
+
+            // 非 2xx，准备重试
+            const nextDelay = Math.min(maxDelayMs, Math.floor(delayMs * 1.5 + Math.random() * 200));
+            if (typeof onRetry === 'function') {
+                try { onRetry({ attempt, status: response.status, nextDelayMs: nextDelay }); } catch (_) { /* noop */ }
+            }
+
+            if (attempt >= maxRetries) {
+                throw new Error(`Failed to fetch ${url} after ${attempt} attempts, last status: ${response.status}`);
+            }
+
+            await new Promise(res => setTimeout(res, delayMs));
+            delayMs = nextDelay;
+        } catch (err) {
+            clearTimeout(timeoutId);
+            // 网络错误或超时，继续重试
+            const nextDelay = Math.min(maxDelayMs, Math.floor(delayMs * 1.5 + Math.random() * 200));
+            if (typeof onRetry === 'function') {
+                try { onRetry({ attempt, error: err, nextDelayMs: nextDelay }); } catch (_) { /* noop */ }
+            }
+
+            if (attempt >= maxRetries) {
+                throw new Error(`Failed to fetch ${url} after ${attempt} attempts due to error: ${err?.message || err}`);
+            }
+
+            await new Promise(res => setTimeout(res, delayMs));
+            delayMs = nextDelay;
+        }
     }
-    const data = await response.json(); // Parse JSON data
-    return data
 }
 
 async function getDataFromUrlWithOffsetParallel(formatUrl, limit, buttonName){
