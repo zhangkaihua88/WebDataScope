@@ -87,7 +87,9 @@ async function getDataFromUrlWithOffsetParallel(formatUrl, limit, buttonName){
         const batchRequests = batchUrls.map(url =>
             getDataFromUrl(url).then(page => {
                 fetchedCount += page.results.length;
-                setButtonState(buttonName, `正在抓取 ${fetchedCount} / ${totalCount}`, 'load');
+                if (buttonName) {
+                    setButtonState(buttonName, `正在抓取 ${fetchedCount} / ${totalCount}`, 'load');
+                }
                 // Removed debugging log
                 return page;
             })
@@ -160,7 +162,7 @@ let submittedAlphasCache = {
 // 增量更新和本地缓存已提交 Alpha 的函数
 // 增量更新和本地缓存已提交 Alpha 的函数
 async function fetchSubmittedAlphas(buttonId) {
-    const CACHE_DURATION = 24 * 60 * 60 * 1000; // 缓存有效期24小时
+    const CACHE_DURATION = 1 * 60 * 60 * 1000; // 缓存有效期1小时
 
     // 从本地存储获取缓存
     const storedCache = await new Promise(resolve => {

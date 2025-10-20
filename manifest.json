@@ -19,9 +19,7 @@
     "content_scripts": [
         {
             "matches": [
-                "*://platform.worldquantbrain.com/*",
-                "*://platform.worldquantbrain.com/alpha/*",
-                "*://platform.worldquantbrain.com/alphas/unsubmitted"
+                "*://platform.worldquantbrain.com/*"
             ],
             "exclude_matches": [
                 "*://platform.worldquantbrain.com/genius/*"
@@ -33,11 +31,20 @@
                 "src/scripts/utils.js",
                 "src/scripts/uiCard.js",
                 "src/scripts/dataAna.js",
-                "src/scripts/noMoreDifficulties.js",
-                "src/scripts/alphaDetailsPopup.js"
+                "src/scripts/noMoreDifficulties.js"
             ],
             "css": [
                 "src/css/idcard.css"
+            ]
+        },
+        {
+            "matches": [
+                "*://platform.worldquantbrain.com/alpha/*",
+                "*://platform.worldquantbrain.com/alphas/unsubmitted",
+                "*://platform.worldquantbrain.com/learn/operators"
+            ],
+            "js": [
+                "src/scripts/alphaDetailsPopup.js"
             ]
         },
         {

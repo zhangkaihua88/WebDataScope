@@ -293,8 +293,12 @@ async function updateCardInfo(dataId, data, updateDataCallback) {
 
 async function showDataCard(event) {
     // 显示数据卡片
+    if (typeof chrome === 'undefined' || !chrome.storage || !chrome.storage.local) {
+        console.warn("chrome.storage.local is not available. Data analysis feature is disabled.");
+        return;
+    }
     chrome.storage.local.get('WQPSettings', async ({ WQPSettings }) => {
-        if (WQPSettings.dataAnalysisEnabled) {
+        if (WQPSettings && WQPSettings.dataAnalysisEnabled) {
             const { dataFieldHtml, dataFieldUrl } = getDataFieldId(event.target);
             if (dataFieldUrl) {
                 const data = getDataFieldData(dataFieldHtml, dataFieldUrl);

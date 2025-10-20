@@ -16,6 +16,9 @@ function dataFlagFunc(dataSetList, url) {
             try {
                 let a_element = element.querySelector(".link.link--wrap");
                 // console.log(a_element)
+                if (!a_element) { // Add null check
+                    return; // Skip this element if the link is not found
+                }
                 if (a_element.href.includes("data-fields")){
                     return;
                 }

@@ -32,7 +32,7 @@ async function fetchAllAlphas() {
         { start: `${year}-01-01T05:00:00.000Z`, end: `${year}-04-01T04:00:00.000Z` },  // 第一季度
         { start: `${year}-04-01T04:00:00.000Z`, end: `${year}-07-01T04:00:00.000Z` },  // 第二季度
         { start: `${year}-07-01T04:00:00.000Z`, end: `${year}-10-01T04:00:00.000Z` },  // 第三季度
-        { start: `${year}-10-01T04:00:00.000Z`, end: `${year+1}-01-01T05:00:00.000Z` }   // 第四季度
+        { start: `${year}-10-01T04:00:00.000Z`, end: `${year}-01-01T05:00:00.000Z` }   // 第四季度
     ];
     const { start, end } = quarters[quarter - 1];
     const dateRange = `dateSubmitted%3E${start}&dateSubmitted%3C${end}`;
@@ -224,89 +224,7 @@ function generateOperatorTable(savedTimestamp, nonZeroCount, zeroCount, savedArr
 
 
 // ############################## 排名分析 ##############################
-function calculateAverageAndMedian(arr) {
-    if (!arr || arr.length === 0) {
-        return { average: 0, median: 0, count: 0 };
-    }
-    const sortedArr = [...arr].sort((a, b) => a - b);
-    const sum = sortedArr.reduce((a, b) => a + b, 0);
-    const average = sum / sortedArr.length;
-    const mid = Math.floor(sortedArr.length / 2);
-    const median = sortedArr.length % 2 === 0 ? (sortedArr[mid - 1] + sortedArr[mid]) / 2 : sortedArr[mid];
-    return { average, median, count: arr.length };
-}
 
-async function calculateLevelRankStats(allUsersData, WQPSettings, mode, candidates) {
-    const stats = {};
-    const rankDimensions = [
-        "operatorCountRank", "fieldCountRank", "communityActivityRank",
-        "completedReferralsRank", "maxSimulationStreakRank",
-        "operatorAvgRank", "fieldAvgRank", "totalRank"
-    ];
-
-    const dataDimensions = [
-        "alphaCount", "pyramidCount", "combinedAlphaPerformance",
-        "combinedSelectedAlphaPerformance", "combinedPowerPoolAlphaPerformance",
-        "operatorCount", "fieldCount", "communityActivity",
-        "completedReferrals", "maxSimulationStreak",
-        "operatorAvg", "fieldAvg"
-    ];
-
-    const currentLevelCriteria = customLevelCriteria || levelCriteria;
-
-    for (const level of ["expert", "master", "grandmaster"]) {
-        let levelUsers;
-        if (mode === 'qualified') {
-            levelUsers = allUsersData.filter(user => {
-                const criteria = currentLevelCriteria[level];
-                const isBaseConditionMet = (
-                    user.alphaCount >= criteria.alphaCount &&
-                    user.pyramidCount >= criteria.pyramidCount
-                );
-
-                let isPerformanceConditionMet = true;
-                if (WQPSettings.geniusCombineTag) {
-                    isPerformanceConditionMet = (
-                        user.combinedAlphaPerformance >= criteria.combinedAlphaPerformance ||
-                        user.combinedSelectedAlphaPerformance >= criteria.combinedSelectedAlphaPerformance ||
-                        user.combinedPowerPoolAlphaPerformance >= criteria.combinedPowerPoolAlphaPerformance
-                    );
-                }
-                return isBaseConditionMet && isPerformanceConditionMet;
-            });
-        } else if (mode === 'limited') {
-            // This mode requires a more complex selection process to simulate backfilling
-            // and ensure each level has its target number of users, excluding those promoted higher.
-            const finalLevelUsers = {
-                grandmaster: allUsersData.filter(u => u.finalLevel === 'grandmaster'),
-                master: allUsersData.filter(u => u.finalLevel === 'master'),
-                expert: allUsersData.filter(u => u.finalLevel === 'expert')
-            };
-            levelUsers = finalLevelUsers[level] || [];
-
-        } else {
-            levelUsers = []; // Should not happen
-        }
-
-        stats[level] = { rawData: {}, ranks: {} };
-        // Calculate stats for raw data dimensions
-        for (const dim of dataDimensions) {
-            const values = levelUsers
-                .map(user => user[dim])
-                .filter(value => typeof value === 'number' && !isNaN(value));
-            stats[level].rawData[dim] = calculateAverageAndMedian(values);
-        }
-
-        // Calculate stats for rank dimensions
-        for (const dim of rankDimensions) {
-            const ranks = levelUsers
-                .map(user => user[level + dim])
-                .filter(rank => typeof rank === 'number' && !isNaN(rank));
-            stats[level].ranks[dim] = calculateAverageAndMedian(ranks);
-        }
-    }
-    return stats;
-}
 
 
 function determineUserLevel(userData, geniusCombineTag, ignoreCombine = false) {
@@ -907,19 +825,6 @@ function rankInfo2Html(result, ignoreCombineChecked = false) {
     该用户目前满足的级别: <strong>${result.info.currentLevel}</strong>
     </p>
 
-    <hr>
-    <div style="margin-bottom: 20px; padding: 15px; border: 1px solid #ddd; border-radius: 4px;">
-        <h4>本赛季表现指标</h4>
-        <ul>
-            <li>RA Count: ${userData.submissionsCount !== undefined ? userData.submissionsCount : 'N/A'}</li>
-            <li>RA Prod Corr: ${userData.meanProdCorrelation !== undefined ? userData.meanProdCorrelation.toFixed(4) : 'N/A'}</li>
-            <li>RA Self Corr: ${userData.meanSelfCorrelation !== undefined ? userData.meanSelfCorrelation.toFixed(4) : 'N/A'}</li>
-            <li>SA Count: ${userData.superAlphaSubmissionsCount !== undefined ? userData.superAlphaSubmissionsCount : 'N/A'}</li>
-            <li>SA Prod Corr: ${userData.superAlphaMeanProdCorrelation !== undefined ? userData.superAlphaMeanProdCorrelation.toFixed(4) : 'N/A'}</li>
-            <li>SA Self Corr: ${userData.superAlphaMeanSelfCorrelation !== undefined ? userData.superAlphaMeanSelfCorrelation.toFixed(4) : 'N/A'}</li>
-        </ul>
-    </div>
-
     <div style="margin-bottom: 10px;">
         <input type="checkbox" id="ignoreCombineCheckbox" ${ignoreCombineChecked ? 'checked' : ''}>
         <label for="ignoreCombineCheckbox">不按 combine 过滤</label>
@@ -1004,111 +909,46 @@ function rankInfo2Html(result, ignoreCombineChecked = false) {
     `;
 }
 
-async function insertMyRankInfo(data, savedTimestamp) {
+async function insertMyRankInfo() {
     console.log('insertMyRankInfo function called.');
-
-    // 1. Load base leaderboard data if not provided
-    if (!data || !savedTimestamp) {
-        const rankData = await new Promise(resolve => chrome.storage.local.get('WQPRankData', resolve));
-        if (!rankData.WQPRankData) {
-            console.error("No rank data found. Please run '排名分析' first.");
-            return;
-        }
-        data = rankData.WQPRankData.array;
-        savedTimestamp = rankData.WQPRankData.timestamp;
-    }
-    
-    // 2. Find self ID
-    let selfId;
-    let selfDataFromLeaderboard = data.find(item => item.isSelf);
-    if (selfDataFromLeaderboard) {
-        selfId = selfDataFromLeaderboard.user;
-    } else {
-        try {
-            const selfSummary = await getDataFromUrl('https://api.worldquantbrain.com/users/self/consultant/summary');
-            selfId = selfSummary.leaderboard.user;
-        } catch (error) {
-            console.error("Failed to fetch self summary:", error);
-            return;
-        }
-    }
-    
-    if (!selfId) {
-        console.error("Could not determine self user ID.");
-        return;
-    }
-
-    // 3. Get the detailed rank object first
-    const { result } = await getSingleRankByUserId(selfId);
-    
-    const finalUserData = result.userData;
-
-    // 4. Fetch user's alphas and calculate/attach season-specific metrics
-    try {
-        const userAlphas = await fetchAllAlphas(); // This fetches for 'self'
-        
-        const regularAlphas = userAlphas.filter(a => a.type === 'REGULAR');
-        const superAlphas = userAlphas.filter(a => a.type === 'SUPER');
-
-        // Attach calculated metrics DIRECTLY to the object that will be rendered
-        finalUserData.submissionsCount = regularAlphas.length;
-        finalUserData.meanProdCorrelation = regularAlphas.length > 0 ? regularAlphas.reduce((sum, a) => sum + (a.is?.prodCorrelation || 0), 0) / regularAlphas.length : 0;
-        finalUserData.meanSelfCorrelation = regularAlphas.length > 0 ? regularAlphas.reduce((sum, a) => sum + (a.is?.selfCorrelation || 0), 0) / regularAlphas.length : 0;
-
-        finalUserData.superAlphaSubmissionsCount = superAlphas.length;
-        finalUserData.superAlphaMeanProdCorrelation = superAlphas.length > 0 ? superAlphas.reduce((sum, a) => sum + (a.is?.prodCorrelation || 0), 0) / superAlphas.length : 0;
-        finalUserData.superAlphaMeanSelfCorrelation = superAlphas.length > 0 ? superAlphas.reduce((sum, a) => sum + (a.is?.selfCorrelation || 0), 0) / superAlphas.length : 0;
-    } catch (error) {
-        console.error("Failed to fetch or process user alphas:", error);
-        finalUserData.submissionsCount = 'Error';
-        finalUserData.meanProdCorrelation = 'Error';
-        finalUserData.meanSelfCorrelation = 'Error';
-        finalUserData.superAlphaSubmissionsCount = 'Error';
-        finalUserData.superAlphaMeanProdCorrelation = 'Error';
-        finalUserData.superAlphaMeanSelfCorrelation = 'Error';
-    }
-    
-    // 5. Generate and render HTML with the fully populated result object
-    const [usTime, cnTime] = formatSavedTimestamp(savedTimestamp);
+    let userId = await getDataFromUrl('https://api.worldquantbrain.com/users/self/consultant/summary');
+    userId = userId.leaderboard.user;
+    const { result, savedTimestamp } = await getSingleRankByUserId(userId);
     let tableHTML = `
         <div id='rankCard'>
         <div class="research-paradigm__header">
             <h2 class="genius__subtitle">Genius Rank Analysis</h2>
             <small class="genius__hint genius__hint--dark">
-                <span>美东时间: ${usTime}</span>
-                <span>北京时间: ${cnTime}</span>
+                <span>美东时间: ${formatSavedTimestamp(savedTimestamp)[0]}</span>
+                <span>北京时间: ${formatSavedTimestamp(savedTimestamp)[1]}</span>
             </small>
         </div>
 
         <article class="card" style="flex-direction: column-reverse;">
-            <div class="card_wrapper">
-                <div class="card__content" style="padding-bottom: 26px;max-width: 100%">
-                    <h3 style="font-size: 1.5rem; font-weight: bold; margin-bottom: 10px;">我的排名信息</h3>
-                    <small class="genius__hint genius__hint--dark">
-                        <span>美东时间: ${usTime}</span>
-                        <span>北京时间: ${cnTime}</span>
-                    </small>
-                    ${rankInfo2Html(result)}
-                </div>
-            </div>
+        <div class="card_wrapper">
+        <div class="card__content" style="padding-bottom: 26px;max-width: 100%">
+        <h3 style="font-size: 1.5rem; font-weight: bold; margin-bottom: 10px;">我的排名信息</h3>
+        <small class="genius__hint genius__hint--dark">
+            <span>美东时间: ${formatSavedTimestamp(savedTimestamp)[0]}</span>
+            <span>北京时间: ${formatSavedTimestamp(savedTimestamp)[1]}</span>
+        </small>
+        ${rankInfo2Html(result)}
+        </div>
+        </div>
+        </div>
         </article>
         </div>
         `;
-        
-    const mainContent = document.querySelector(targetSelectorButton)?.parentElement;
+    let mainContent = document.querySelector(targetSelectorButton);
+    mainContent = mainContent.parentElement;
     if (mainContent) {
         const existingTable = mainContent.querySelector("#rankCard");
         if (existingTable) {
             existingTable.remove();
         }
         const progressContainer = mainContent.querySelector('#WQButtonContainer');
-        if (progressContainer) {
-            progressContainer.insertAdjacentHTML('afterend', tableHTML);
-            bindRankEditEvents(selfId, savedTimestamp);
-        } else {
-            mainContent.insertAdjacentHTML('afterend', tableHTML);
-            bindRankEditEvents(selfId, savedTimestamp);
-        }
+        progressContainer.insertAdjacentHTML('afterend', tableHTML);
+        bindRankEditEvents(userId, savedTimestamp);
     } else {
         console.error('未找到mainContent元素');
     }
@@ -1285,130 +1125,63 @@ function getSeason() {
     return text;
 }
 
-// ############################## 排名分析 (重构后支持断点续传) ##############################
-
-async function fetchDataWithProgress(storageKey, formatUrl, limit, buttonId) {
-    let progress = await new Promise(resolve => chrome.storage.local.get(storageKey, result => resolve(result[storageKey])));
-
-    if (!progress || progress.status === 'completed') {
-        progress = {
-            status: 'in_progress',
-            offset: 0,
-            data: [],
-            total: null,
-        };
-    }
+async function fetchAllUsers() {
+    setButtonState('WQPRankFetchButton', '开始抓取...', 'load');
 
     const season = getSeason();
-    const url = formatUrl.replace('{season}', season);
+    console.log(season, "season")
 
-    let hasMore = true;
-
-    while (hasMore) {
-        const currentUrl = url.replace('{limit}', limit).replace('{offset}', progress.offset);
-        
-        try {
-            const response = await fetch(currentUrl, {
-                referrer: "https://platform.worldquantbrain.com/",
-                referrerPolicy: "strict-origin-when-cross-origin",
-                body: null,
-                method: "GET",
-                mode: "cors",
-                credentials: "include"
-            });
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-            const fetchedData = await response.json();
-            const results = fetchedData.results || fetchedData; // Accommodate both API formats
-
-            if (progress.total === null) {
-                progress.total = fetchedData.count !== undefined ? fetchedData.count : 0; // Assuming the API returns a total count
-            }
-
-            progress.data.push(...results);
-            progress.offset += limit;
-
-            const percentage = progress.total ? Math.min(Math.round((progress.data.length / progress.total) * 100), 100) : 0;
-            const fetchedCount = progress.data.length;
-            setButtonState(buttonId, `分析中 ${fetchedCount}/${progress.total} (${percentage}%)`, 'load');
-
-            await new Promise(resolve => chrome.storage.local.set({ [storageKey]: progress }, resolve));
-
-            if (!results.length || progress.offset >= progress.total) {
-                hasMore = false;
-                progress.status = 'completed';
-                await new Promise(resolve => chrome.storage.local.set({ [storageKey]: progress }, resolve));
-            }
-        } catch (error) {
-            console.error(`Failed to fetch data from ${currentUrl}:`, error);
-            progress.status = 'paused';
-            await new Promise(resolve => chrome.storage.local.set({ [storageKey]: progress }, resolve));
-            throw error; // Propagate error to stop the process
-        }
-    }
-    return progress.data;
+    const limit = 100;
+    const formatUrl = `https://api.worldquantbrain.com/consultant/boards/genius?limit={limit}&offset={offset}&date=${season}&aggregate=user`;
+    let data = await getDataFromUrlWithOffsetParallel(formatUrl, limit, 'WQPRankFetchButton')
+    return data;
 }
 
+async function fetchConsultantLB(){
+    setButtonState('WQPRankFetchButton', '开始深度抓取...', 'load');
+    const limit = 100;
+    const formatUrl = 'https://api.worldquantbrain.com/consultant/boards/leader?limit={limit}&offset={offset}&&aggregate=user';
+    let data = await getDataFromUrlWithOffsetParallel(formatUrl, limit, 'WQPRankFetchButton');
+    return data;
+}
 
 async function rankAna() {
-    const geniusStorageKey = 'WQPGeniusRankProgress';
-    const consultantStorageKey = 'WQPConsultantRankProgress';
+    let data = await fetchAllUsers();
+    let dataConsultantLB = await fetchConsultantLB();
 
-    try {
-        // Step 1: Fetch Genius Leaderboard data
-        const geniusFormatUrl = `https://api.worldquantbrain.com/consultant/boards/genius?limit={limit}&offset={offset}&date={season}&aggregate=user`;
-        let data = await fetchDataWithProgress(geniusStorageKey, geniusFormatUrl, 100, 'WQPRankFetchButton');
-
-        // Step 2: Fetch Consultant Leaderboard data
-        const consultantFormatUrl = `https://api.worldquantbrain.com/consultant/boards/leader?limit={limit}&offset={offset}&date={season}&aggregate=user`;
-        let dataConsultantLB = await fetchDataWithProgress(consultantStorageKey, consultantFormatUrl, 100, 'WQPRankFetchButton');
-
-        // Step 3: Merge the data
-        const consultantMap = new Map();
-        for (const item of dataConsultantLB) {
-            if (item.user !== undefined) {
-                consultantMap.set(item.user, {
-                    valueFactor: item.valueFactor,
-                    weightFactor: item.weightFactor
-                });
-            }
+    const consultantMap = new Map();
+    
+    for (const item of dataConsultantLB) {
+        if (item.user !== undefined) {
+        consultantMap.set(item.user, item);
         }
-        for (const item of data) {
-            if (item.user !== undefined && consultantMap.has(item.user)) {
-                const consultantItem = consultantMap.get(item.user);
-                Object.assign(item, consultantItem);
-            }
-        }
-
-        // Step 4: Save final combined data and clean up progress
-        let currentTime = new Date().toISOString();
-        let dataToSave = {
-            array: data,
-            timestamp: currentTime,
-            status: 'completed' // Mark as completed
-        };
-
-        chrome.storage.local.set({ WQPRankData: dataToSave }, () => {
-            console.log('最终排名数据已保存');
-            // Clean up progress storage
-            chrome.storage.local.remove([geniusStorageKey, consultantStorageKey]);
-        });
-
-        setButtonState('WQPRankFetchButton', `排名分析完成`, 'enable');
-        insertMyRankInfo(data, currentTime);
-
-    } catch (error) {
-        console.error("排名分析过程中断:", error);
-        setButtonState('WQPRankFetchButton', `分析中断, 点击继续`, 'enable');
     }
+    
+    for (const item of data) {
+        if (item.user !== undefined && consultantMap.has(item.user)) {
+        const consultantItem = consultantMap.get(item.user);
+        Object.assign(item, consultantItem);
+        }
+    }
+
+    let currentTime = new Date().toISOString();
+    let dataToSave = {
+        array: data,
+        timestamp: currentTime
+    };
+    chrome.storage.local.set({ WQPRankData: dataToSave }, function () {
+        console.log('数据已保存');
+        console.log(dataToSave);
+    });
+    setButtonState('WQPRankFetchButton', `排名分析完成`, 'disable');
+    insertMyRankInfo();
 }
 
 
 
 async function setup(){
-    await getAuth();
-    setButtonState('WQPAuth', `配置完成`, 'disable');
+    authToken = await getAuth();
+    setButtonState('WQPAuth', `配置完成${authToken}`, 'disable');
 }
 
 
@@ -1440,55 +1213,14 @@ function ButtonGen(buttonText, buttonId, buttonClickFunction) {
     return button
 }
 
-async function rankAnaClickHandler() {
-    const geniusStorageKey = 'WQPGeniusRankProgress';
-    const consultantStorageKey = 'WQPConsultantRankProgress';
-
-    let geniusProgress = await new Promise(resolve => chrome.storage.local.get(geniusStorageKey, result => resolve(result[geniusStorageKey])));
-    let consultantProgress = await new Promise(resolve => chrome.storage.local.get(consultantStorageKey, result => resolve(result[consultantStorageKey])));
-
-    // If the user seems to want to start over (e.g., previous run was complete), clear progress.
-    if (!geniusProgress && !consultantProgress) {
-        await new Promise(resolve => chrome.storage.local.remove([geniusStorageKey, consultantStorageKey, 'WQPRankData'], resolve));
-    }
-    
-    // Check if the last saved final data is marked as 'completed'
-    let finalData = await new Promise(resolve => chrome.storage.local.get('WQPRankData', result => resolve(result.WQPRankData)));
-    if (finalData && finalData.status === 'completed') {
-         await new Promise(resolve => chrome.storage.local.remove([geniusStorageKey, consultantStorageKey, 'WQPRankData'], resolve));
-    }
-
-
-    rankAna();
-}
-
-
-async function updateRankButtonState() {
-    const geniusStorageKey = 'WQPGeniusRankProgress';
-    const button = document.getElementById('WQPRankFetchButton');
-    if (!button) return;
-
-    let progress = await new Promise(resolve => chrome.storage.local.get(geniusStorageKey, result => resolve(result[geniusStorageKey])));
-
-    if (progress && (progress.status === 'in_progress' || progress.status === 'paused')) {
-        const percentage = progress.total ? Math.min(Math.round((progress.data.length / progress.total) * 100), 100) : 0;
-        const fetchedCount = progress.data.length;
-        setButtonState('WQPRankFetchButton', `继续分析 ${fetchedCount}/${progress.total} (${percentage}%)`, 'enable');
-    } else {
-         let finalData = await new Promise(resolve => chrome.storage.local.get('WQPRankData', result => resolve(result.WQPRankData)));
-         if (finalData && finalData.array && finalData.array.length > 0 && finalData.status !== 'completed'){
-            setButtonState('WQPRankFetchButton', `继续分析 (?)`, 'enable');
-         } else {
-            setButtonState('WQPRankFetchButton', `排名分析`, 'enable');
-         }
-    }
-}
-
-
 function insertButton() {
     console.log('insertButton function called.');
     const targetElement = document.querySelector(targetSelectorButton);
-    if (targetElement && !document.getElementById('WQButtonContainer')) {
+    console.log(targetElement);
+    if (targetElement) {
+        console.log('Disconnecting observer');
+
+
         const buttonContainer = document.createElement('div');
         buttonContainer.id = 'WQButtonContainer';
         buttonContainer.style.display = 'flex';
@@ -1498,15 +1230,16 @@ function insertButton() {
         buttonContainer.appendChild(ButtonGen('配置插件', 'WQPAuth', setup));
         buttonContainer.appendChild(ButtonGen('运算符分析', 'WQPOPSFetchButton', opsAna));
         buttonContainer.appendChild(ButtonGen('显示运算符分析', 'WQPOPSShowButton', insertOpsTable));
-        buttonContainer.appendChild(ButtonGen('排名分析', 'WQPRankFetchButton', rankAnaClickHandler));
+        buttonContainer.appendChild(ButtonGen('排名分析', 'WQPRankFetchButton', rankAna));
         buttonContainer.appendChild(ButtonGen('显示排名分析', 'WQPRankShowButton', insertMyRankInfo));
         buttonContainer.appendChild(ButtonGen('显示排名列表', 'WQPRankListShowButton', insertRankListInfo));
 
         targetElement.insertAdjacentElement('afterend', buttonContainer);
         
-        updateRankButtonState(); // Set initial button state
-        insertMyRankInfo(); // Attempt to display info from any existing data
+        insertMyRankInfo();
+
     }
+
 }
 
 
