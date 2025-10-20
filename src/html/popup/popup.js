@@ -7,6 +7,7 @@ const hiddenFeatureCheckbox = document.getElementById('hiddenFeature');
 const dataAnalysisCheckbox = document.getElementById('dataAnalysis');
 const geniusCombineTagCheckbox = document.getElementById('geniusCombineTag');
 const geniusAlphaCountInput = document.getElementById('geniusAlphaCount');
+const apiMonitorEnabledCheckbox = document.getElementById('apiMonitorEnabled');
 const saveBtn = document.getElementById('saveBtn');
 const statusText = document.getElementById('status');
 const settingsForm = document.getElementById('settingsForm');
@@ -24,7 +25,8 @@ function loadSettings() {
         dataAnalysisCheckbox.checked = WQPSettings.dataAnalysisEnabled || false;
         geniusCombineTagCheckbox.checked = WQPSettings.geniusCombineTag || false;
         geniusAlphaCountInput.value = WQPSettings.geniusAlphaCount || 40;
-        
+        apiMonitorEnabledCheckbox.checked = WQPSettings.apiMonitorEnabled || false;
+
         saveBtn.disabled = !dbAddressInput.value.trim();
         statusText.textContent = '';
     });
@@ -39,7 +41,8 @@ function saveSettings(event) {
         hiddenFeatureEnabled: hiddenFeatureCheckbox.checked,
         dataAnalysisEnabled: dataAnalysisCheckbox.checked,
         geniusCombineTag: geniusCombineTagCheckbox.checked,
-        geniusAlphaCount: parseInt(geniusAlphaCountInput.value) || 40
+        geniusAlphaCount: parseInt(geniusAlphaCountInput.value) || 40,
+        apiMonitorEnabled: apiMonitorEnabledCheckbox.checked
     };
 
     if (!WQPSettings.apiAddress) {

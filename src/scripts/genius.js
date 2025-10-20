@@ -50,7 +50,7 @@ async function opsAna() {
     let operators = await getDataFromUrl(OptUrl);
     operators = operators.filter(item => item.scope.includes('REGULAR'));
 
-    regulars = data.map(item => item.type === 'REGULAR' ? item.regular.code : '');
+    let regulars = data.map(item => item.type === 'REGULAR' ? item.regular.code : '');
     // regulars = data.map(item => item.type === 'REGULAR' ? item.regular.code : item.combo.code);
     console.log(regulars);
     let use_ops = regulars.map(item => findOps(item, operators)).flat();
@@ -393,16 +393,16 @@ async function getAllRank(ignoreCombine = false) {
             }
 
             const filteredBaseCountData = data.filter(item => item.alphaCount >= WQPSettings.geniusAlphaCount);
-            baseCount = filteredBaseCountData.length;
+            let baseCount = filteredBaseCountData.length;
 
             let expertCandidates = filteredBaseCountData.filter(item => determineUserLevel(item, WQPSettings.geniusCombineTag, ignoreCombine) === 'expert' || determineUserLevel(item, WQPSettings.geniusCombineTag, ignoreCombine) === 'master' || determineUserLevel(item, WQPSettings.geniusCombineTag, ignoreCombine) === 'grandmaster');
             let masterCandidates = filteredBaseCountData.filter(item => determineUserLevel(item, WQPSettings.geniusCombineTag, ignoreCombine) === 'master' || determineUserLevel(item, WQPSettings.geniusCombineTag, ignoreCombine) === 'grandmaster');
             let grandmasterCandidates = filteredBaseCountData.filter(item => determineUserLevel(item, WQPSettings.geniusCombineTag, ignoreCombine) === 'grandmaster');
 
 
-            expertCount = Math.round(baseCount * 0.2);
-            masterCount = Math.round(baseCount * 0.08);
-            grandmasterCount = Math.round(baseCount * 0.02);
+            let expertCount = Math.round(baseCount * 0.2);
+            let masterCount = Math.round(baseCount * 0.08);
+            let grandmasterCount = Math.round(baseCount * 0.02);
 
             // Sort candidates by their respective total ranks and assign final level
             expertCandidates.sort((a, b) => a.expertTotalRank - b.expertTotalRank);
@@ -513,7 +513,7 @@ async function insertRankListInfo() {
         data.forEach((item, idx) => {
             item.index = idx + 1;
         });
-        grandmasterCount = data.filter(item => item.finalLevel === 'grandmaster').length;
+        let grandmasterCount = data.filter(item => item.finalLevel === 'grandmaster').length;
 
         let columns = [
             { title: '排名', data: 'index', type: 'num', render: function (data, type) { return `<span style="cursor:pointer;margin-right: 8px;">&#9654;</span>` + data; }, className: 'details-control', },
@@ -1537,8 +1537,8 @@ async function showGeniusCard(event) {
             card.updateDataId(userId);
             card.updateCursor(event.clientX, event.clientY);
             card.updateTargetHtml(userHtml);
-            cardTitle = `${userId} 排名信息`;
-            cardContent = rankInfo2Html(result);
+            let cardTitle = `${userId} 排名信息`;
+            let cardContent = rankInfo2Html(result);
             card.updateData(cardTitle, cardContent);
         }
         return;
@@ -1564,6 +1564,284 @@ function watchForElementAndInsertButton() {
 }
 
 
-watchForElementAndInsertButton();
-document.addEventListener("mouseover", showGeniusCard);
-document.addEventListener("mousemove", (ev) => card.updateCursor(ev.pageX, ev.pageY));
+// ############################## Combined Power Pool 进度条 ##############################
+
+
+// 添加 Combined Power Pool 进度条 - 多次尝试以确保页面加载完成
+console.log('[WQP] Scheduling progress bar injection...');
+
+// 第一次尝试: 1秒后
+setTimeout(() => {
+    console.log('[WQP] First attempt (1s)');
+    addPowerPoolProgressBar();
+}, 1000);
+
+// 第二次尝试: 3秒后
+setTimeout(() => {
+    console.log('[WQP] Second attempt (3s)');
+    addPowerPoolProgressBar();
+}, 3000);
+
+// 第三次尝试: 5秒后
+setTimeout(() => {
+    console.log('[WQP] Third attempt (5s)');
+    addPowerPoolProgressBar();
+}, 5000);
+
+function addPowerPoolProgressBar() {
+    // 为 Combined Power Pool Alpha Performance 添加进度条
+    console.log('[WQP] Checking for Combined Power Pool Alpha Performance progress bar...');
+    
+    // 等待页面加载完成
+    const checkAndAddProgressBar = () => {
+        console.log('[WQP] Starting checkAndAddProgressBar...');
+        
+        // 先检查页面上是否有任何包含 "Combined" 的文本
+        const bodyText = document.body.innerText;
+        console.log('[WQP] Searching for "Combined Power Pool" in page text...');
+        
+        // 尝试多种可能的文本格式
+        const searchTerms = [
+            'Combined Power Pool Alpha Performance',
+            'Combined Power Pool',
+            'Power Pool Alpha Performance',
+            'Power Pool'
+        ];
+        
+        let foundTerm = null;
+        for (const term of searchTerms) {
+            if (bodyText.includes(term)) {
+                foundTerm = term;
+                console.log(`[WQP] Found term: "${term}"`);
+                break;
+            }
+        }
+        
+        if (!foundTerm) {
+            console.log('[WQP] No matching text found on page. Available text sample:', bodyText.substring(0, 500));
+            return false;
+        }
+        
+        // 查找包含 "Combined Power Pool Alpha Performance" 的具体元素
+        // 优先查找 H3, 然后是 DIV
+        const selectors = [
+            'h3', 'h2', 'h4',
+            '.research-paradigm__card-header',
+            '.genius__subtitle',
+            'div.research-paradigm__section'
+        ];
+        
+        let powerPoolSection = null;
+        
+        for (const selector of selectors) {
+            const elements = Array.from(document.querySelectorAll(selector));
+            powerPoolSection = elements.find(el => 
+                searchTerms.some(term => el.textContent.includes(term))
+            );
+            if (powerPoolSection) {
+                console.log(`[WQP] Found using selector "${selector}":`, powerPoolSection);
+                break;
+            }
+        }
+        
+        if (!powerPoolSection) {
+            console.log('[WQP] Could not find specific element for Combined Power Pool');
+            return false;
+        }
+        
+        // 查找父容器 - Combined Power Pool 应该在 .research-paradigm__section 中
+        let container = powerPoolSection.closest('.research-paradigm__section');
+        if (!container) {
+            container = powerPoolSection.closest('article');
+        }
+        if (!container) {
+            container = powerPoolSection.closest('.card');
+        }
+        if (!container) {
+            container = powerPoolSection.closest('div');
+        }
+        
+        if (!container) {
+            console.log('[WQP] ERROR: Could not find container');
+            return false;
+        }
+        
+        console.log('[WQP] Found container:', container);
+        
+        // 查找数值 - 从容器文本中提取
+        let performanceValue = 0;
+        let valueElement = null;
+        
+        // 首先尝试查找显示数值的元素
+        const possibleValueElements = container.querySelectorAll('.genius__value, .research-paradigm__card-value, strong, b, h1, h2, h3, h4, span');
+        
+        for (const el of possibleValueElements) {
+            const text = el.textContent.trim();
+            // 匹配纯数字或小数
+            if (/^\d+(\.\d+)?$/.test(text)) {
+                performanceValue = parseFloat(text);
+                valueElement = el;
+                console.log(`[WQP] Found value ${performanceValue} in element:`, el.tagName, el.className);
+                break;
+            }
+        }
+        
+        if (!valueElement) {
+            // 从容器文本中提取数字
+            const containerText = container.textContent;
+            // 查找 "Combined Power Pool Alpha Performance" 后的数字
+            const match = containerText.match(/Combined Power Pool Alpha Performance[^\d]*(\d+\.?\d*)/i);
+            if (match) {
+                performanceValue = parseFloat(match[1]);
+                console.log(`[WQP] Extracted value from text: ${performanceValue}`);
+            } else {
+                console.log('[WQP] Could not find performance value, using default 0');
+            }
+        }
+        
+        console.log(`[WQP] Final performance value: ${performanceValue}`);
+        
+        // 检查是否已经有进度条 (通过 ID 检查)
+        const existingProgressBar = container.querySelector('[id^="wqp-power-pool-progress-chart-"]');
+        if (existingProgressBar) {
+            console.log('[WQP] Progress bar already exists, skipping');
+            return true;
+        }
+        
+        // 创建或查找进度条容器
+        let progressBarContainer = container.querySelector('.genius__progress-bar-container');
+        if (!progressBarContainer) {
+            progressBarContainer = document.createElement('div');
+            progressBarContainer.className = 'genius__progress-bar-container';
+            progressBarContainer.style.marginTop = '16px';
+            progressBarContainer.style.marginBottom = '16px';
+            
+            console.log('[WQP] Creating new progress bar container');
+            
+            // 直接添加到容器末尾
+            container.appendChild(progressBarContainer);
+            console.log('[WQP] Appended progress bar to container');
+        }
+        
+        // 创建进度条图表容器
+        const chartContainer = document.createElement('div');
+        chartContainer.id = 'wqp-power-pool-progress-chart-' + Date.now();
+        chartContainer.style.width = '100%';
+        chartContainer.style.height = '50px';
+        progressBarContainer.appendChild(chartContainer);
+        
+        console.log('[WQP] Chart container created:', chartContainer.id);
+        
+        // 使用 Highcharts 创建进度条
+        createPowerPoolProgressBar(chartContainer.id, performanceValue);
+        
+        console.log('[WQP] ✅ Progress bar successfully added!');
+        return true;
+    };
+    
+    // 使用 MutationObserver 监听页面变化
+    let attempts = 0;
+    const maxAttempts = 100; // 增加尝试次数
+    
+    const observer = new MutationObserver(() => {
+        attempts++;
+        console.log(`[WQP] Attempt ${attempts}/${maxAttempts}`);
+        
+        if (checkAndAddProgressBar() || attempts >= maxAttempts) {
+            observer.disconnect();
+            if (attempts >= maxAttempts) {
+                console.log('[WQP] Max attempts reached, stopping observation');
+            } else {
+                console.log(`[WQP] Progress bar added successfully after ${attempts} attempts`);
+            }
+        }
+    });
+    
+    // 立即尝试一次
+    console.log('[WQP] Attempting immediate check...');
+    if (!checkAndAddProgressBar()) {
+        // 如果失败,开始观察
+        console.log('[WQP] Initial check failed, starting observer...');
+        observer.observe(document.body, { 
+            childList: true, 
+            subtree: true,
+            characterData: true 
+        });
+        
+        // 10秒后停止观察 (延长时间)
+        setTimeout(() => {
+            observer.disconnect();
+            console.log('[WQP] Observer timeout - disconnected after 10 seconds');
+        }, 10000);
+    } else {
+        console.log('[WQP] Initial check succeeded!');
+    }
+}
+
+function createPowerPoolProgressBar(containerId, value) {
+    // 使用 Highcharts 创建一个水平的条形图作为进度条
+    Highcharts.chart(containerId, {
+        chart: {
+            type: 'bar',
+            backgroundColor: 'transparent',
+            margin: [0, 0, 0, 0],
+            spacing: [0, 0, 0, 0]
+        },
+        title: {
+            text: null
+        },
+        credits: {
+            enabled: false
+        },
+        xAxis: {
+            visible: false,
+            categories: ['']
+        },
+        yAxis: {
+            visible: false,
+            min: 0,
+            max: 2, // Genius 要求为 2
+            title: {
+                text: null
+            }
+        },
+        legend: {
+            enabled: false
+        },
+        plotOptions: {
+            series: {
+                stacking: 'normal',
+                borderWidth: 0,
+                pointPadding: 0,
+                groupPadding: 0,
+                animation: false
+            }
+        },
+        tooltip: {
+            enabled: true,
+            headerFormat: '',
+            pointFormat: '<b>{point.y:.2f} / 2</b>'
+        },
+        series: [{
+            name: 'Progress',
+            data: [Math.min(value, 2)], // 确保值不超过最大值
+            color: 'var(--brand-blue-50, #007bff)',
+            dataLabels: {
+                enabled: true,
+                align: 'center',
+                format: '{point.y:.2f} / 2',
+                style: {
+                    color: 'white',
+                    textOutline: 'none'
+                }
+            }
+        }, {
+            name: 'Remaining',
+            data: [Math.max(0, 2 - value)],
+            color: 'var(--fill-gray-100, #f0f0f0)',
+            dataLabels: {
+                enabled: false
+            }
+        }]
+    });
+}

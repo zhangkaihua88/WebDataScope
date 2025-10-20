@@ -109,10 +109,10 @@ async function fetchDataDetails(fileName, dataFieldData) {
         const inflatedData = pako.inflate(arrayBuffer);
         const decodedData = msgpack.decode(new Uint8Array(inflatedData));
         cacheData[fileName] = decodedData;
-        return decodedData, perfectMatch, universe;
+        return [decodedData, perfectMatch, universe];
     } catch (error) {
         // console.log("error", error);
-        return;
+        return [null, false, null];
     }
 }
 
@@ -143,20 +143,28 @@ function anaDis(rawData) {
 }
 
 async function updateCardInfo(dataId, data, updateDataCallback) {
-    // 更新卡片信息
-
-    const fileName = data.dataSet + "_" + data.region + "_" + data.universe + "_Delay" + data.delay;
+    const fileName = `${data.dataSet}_${data.region}_${data.universe}_Delay${data.delay}`;
     const dataField = data.dataField;
 
     const [matchData, perfectMatch, matchUniverse] = await fetchDataDetails(fileName, data);
+
+    if (!matchData || !matchData[dataField]) {
+        console.error("无法加载或解析数据:", fileName, dataField);
+        // Optionally, update the card with an error message.
+        return;
+    }
+
     let itemData = matchData[dataField];
+
     try {
-        tmp = itemData['yearly_distribution'];
-        tmp = tmp.replace(/\(/g, '{').replace(/\)/g, '}');
-        tmp = tmp.replace(/({\d+(\.\d+)?, \d+(\.\d+)?})/g, '"$1"');
-        itemData['yearly_distribution'] = JSON.parse(tmp)
-    } catch (error) {
-    } finally {
+        // 安全地解析 yearly_distribution
+        if (typeof itemData['yearly_distribution'] === 'string') {
+            let tmp = itemData['yearly_distribution']
+                .replace(/\(/g, '{').replace(/\)/g, '}')
+                .replace(/({\d+(\.\d+)?, \d+(\.\d+)?})/g, '"$1"');
+            itemData['yearly_distribution'] = JSON.parse(tmp);
+        }
+
         const container = document.createElement('div');
         container.classList.add('canvas-container');
         container.innerHTML = `
@@ -172,7 +180,6 @@ async function updateCardInfo(dataId, data, updateDataCallback) {
                     <li><span id='skew'></span></li>
                     <li><span id='kurt'></span></li>
                 </ul>
-
             </div>
             <div class="canvasDataInfo"><canvas id="WQAnaDataHist"></canvas></div>
             <div class="canvas"><canvas id="WQAnaDataHist0"></canvas></div>
@@ -185,109 +192,71 @@ async function updateCardInfo(dataId, data, updateDataCallback) {
             <div class="canvas"><canvas id="WQAnaDataHist7"></canvas></div>
             <div class="canvas"><canvas id="WQAnaDataHist8"></canvas></div>
             <div class="canvas"><canvas id="WQAnaDataHist9"></canvas></div>
-            `;
-        const cardTitle = `${dataField} 分析报告` + (perfectMatch ? '' : `(from ${matchUniverse})`);
-        const cardContent = container.outerHTML;
-        updateDataCallback(cardTitle, cardContent);
+        `;
+        const cardTitle = `${dataField} 分析报告 ${perfectMatch ? '' : `(from ${matchUniverse})`}`;
+        updateDataCallback(cardTitle, container.outerHTML);
 
-
-
+        // 更新文本信息
         document.getElementById("frequency").innerHTML = `更新频率: ${itemData['frequency']}`;
         document.getElementById("coverage").innerHTML = `覆盖数: ${(itemData['Coverage'].reduce(sum) / itemData['Coverage'].length).toFixed(0)}`;
         document.getElementById("coverageRatio").innerHTML = `覆盖率: ${(itemData['CoverageRatio'].reduce(sum) / itemData['CoverageRatio'].length).toFixed(2)}`;
-        document.getElementById("posRatio").innerHTML = `正值占比: ${(itemData['IndicativePositiveRatio'].reduce(sum) / itemData['IndicativePositiveRatio'].length).toFixed(2)}`;
+        document.getElementById("posRatio").innerHTML = `正值占比: ${(itemData['IndicativePositiveRatio'].reduce(sum) / itemData['IndicativPositiveRatio'].length).toFixed(2)}`;
         document.getElementById("negRatio").innerHTML = `负值占比: ${(itemData['IndicativeNegativeRatio'].reduce(sum) / itemData['IndicativeNegativeRatio'].length).toFixed(2)}`;
         document.getElementById("abs01Ratio").innerHTML = `abs在[0,1]的占比: ${(itemData['absValueBetween1and0ratio'].reduce(sum) / itemData['absValueBetween1and0ratio'].length).toFixed(2)}`;
         document.getElementById("intStat").innerHTML = `是否为整数: ${itemData['IntegerStatus']}`;
         document.getElementById("skew").innerHTML = `偏度: ${itemData['skenewss']}`;
         document.getElementById("kurt").innerHTML = `峰度: ${itemData['kurtosis']}`;
 
-        const ctx = document.getElementById(`WQAnaDataHist`).getContext('2d');
-
-        const myHistogram = new Chart(ctx, {
+        // 创建覆盖率/占比的折线图
+        new Chart(document.getElementById('WQAnaDataHist').getContext('2d'), {
             type: 'line',
             data: {
-                labels: [2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019, 2020, 2021], // 生成X轴的标签
-                datasets: [{
-                    label: '覆盖率',
-                    data: itemData['CoverageRatio'], // 使用计算出的频率数据
-                    fill: false,
-                    // borderColor: 'rgba(75, 192, 192, 1)',
-                    borderWidth: 1,
-                    tension: 0.1
-                }, {
-                    label: '正值占比',
-                    data: itemData['IndicativePositiveRatio'], // 使用计算出的频率数据
-                    fill: false,
-                    // borderColor: 'rgba(75, 192, 192, 1)',
-                    borderWidth: 1,
-                    tension: 0.1
-                }, {
-                    label: '负值占比',
-                    data: itemData['IndicativeNegativeRatio'], // 使用计算出的频率数据
-                    fill: false,
-                    // borderColor: 'rgba(75, 192, 192, 1)',
-                    borderWidth: 1,
-                    tension: 0.1
-                }, {
-                    label: 'abs在[0,1]的占比',
-                    data: itemData['absValueBetween1and0ratio'], // 使用计算出的频率数据
-                    fill: false,
-                    // borderColor: 'rgba(75, 192, 192, 1)',
-                    borderWidth: 1,
-                    tension: 0.1
-                },
+                labels: Array.from({ length: itemData['CoverageRatio'].length }, (_, i) => 2012 + i),
+                datasets: [
+                    { label: '覆盖率', data: itemData['CoverageRatio'], tension: 0.1, borderWidth: 1 },
+                    { label: '正值占比', data: itemData['IndicativePositiveRatio'], tension: 0.1, borderWidth: 1 },
+                    { label: '负值占比', data: itemData['IndicativeNegativeRatio'], tension: 0.1, borderWidth: 1 },
+                    { label: 'abs在[0,1]的占比', data: itemData['absValueBetween1and0ratio'], tension: 0.1, borderWidth: 1 }
                 ]
             },
             options: {
                 maintainAspectRatio: false,
                 responsive: true,
                 animations: false,
-                scales: {
-                    y: {
-                        min: 0, // 设置 Y 轴的最小值
-                        max: 1, // 设置 Y 轴的最大值
-                        beginAtZero: true // 确保 Y 轴从 0 开始
-                    },
-                },
-            },
+                scales: { y: { min: 0, max: 1, beginAtZero: true } }
+            }
         });
 
-        for (var i = 0; i < itemData['yearly_distribution'].length; i++) {
-
-            let result = anaDis(itemData['yearly_distribution'][i]);
-            let bins = result[0];
-            let bins_data = result[1];
-            const ctx = document.getElementById(`WQAnaDataHist${i}`).getContext('2d');
-            const myHistogram = new Chart(ctx, {
-                type: 'bar',
-                data: {
-                    labels: bins, // 生成X轴的标签
-                    datasets: [{
-                        label: 'Frequency',
-                        data: bins_data, // 使用计算出的频率数据
-                        backgroundColor: 'rgba(75, 192, 192, 0.2)',
-                        borderColor: 'rgba(75, 192, 192, 1)',
-                        borderWidth: 1
-                    }]
-                },
-                options: {
-                    maintainAspectRatio: false,
-                    responsive: true,
-                    animations: false,
-                    scales: {
-                        y: {
-                            beginAtZero: true
-                        },
+        // 为每年的分布创建柱状图
+        if (Array.isArray(itemData['yearly_distribution'])) {
+            itemData['yearly_distribution'].forEach((yearlyDist, i) => {
+                const [bins, bins_data] = anaDis(yearlyDist);
+                new Chart(document.getElementById(`WQAnaDataHist${i}`).getContext('2d'), {
+                    type: 'bar',
+                    data: {
+                        labels: bins,
+                        datasets: [{
+                            label: 'Frequency',
+                            data: bins_data,
+                            backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                            borderColor: 'rgba(75, 192, 192, 1)',
+                            borderWidth: 1
+                        }]
                     },
-                    plugins: {
-                        legend: {
-                            display: false // 通过这里隐藏图例
-                        }
-                    },
-                },
+                    options: {
+                        maintainAspectRatio: false,
+                        responsive: true,
+                        animations: false,
+                        scales: { y: { beginAtZero: true } },
+                        plugins: { legend: { display: false } }
+                    }
+                });
             });
         }
+
+    } catch (error) {
+        console.error("Error updating card info:", error);
+        // Optionally, update the card with a user-friendly error message.
     }
 }
 

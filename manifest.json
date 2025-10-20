@@ -2,7 +2,7 @@
     "manifest_version": 3,
     "name": "WorldQuant Scope",
     "description": "WorldQuant Scope is a browser extension that provides a set of tools to help you navigate the WorldQuant platform.",
-    "version": "0.9.3000",
+    "version": "0.9.7",
     "author": "zhangkaihua@buaa.edu.cn",
     "icons": {
         "128": "img/logo.png"
@@ -31,7 +31,8 @@
                 "src/scripts/utils.js",
                 "src/scripts/uiCard.js",
                 "src/scripts/dataAna.js",
-                "src/scripts/noMoreDifficulties.js"
+                "src/scripts/noMoreDifficulties.js",
+                "src/scripts/requestMonitorUI.js"
             ],
             "css": [
                 "src/css/idcard.css"
@@ -59,6 +60,29 @@
             "css": [
                 "src/css/menu.css"
             ]
+        },
+        {
+            "matches": [
+                "*://platform.worldquantbrain.com/genius/*"
+            ],
+            "js": [
+                "src/scripts/lib/jquery-3.7.0.min.js",
+                "src/scripts/lib/dataTables.js",
+                "src/scripts/lib/dataTables.responsive.min.js",
+                "src/scripts/lib/dataTables.buttons.min.js",
+                "src/scripts/lib/buttons.colVis.min.js",
+                "src/scripts/lib/columnControl.dataTables.min.js",
+                "src/scripts/utils.js",
+                "src/scripts/uiCard.js",
+                "src/scripts/genius.js"
+            ],
+            "css": [
+                "src/css/genius.css",
+                "src/css/dataTables.dataTables.css",
+                "src/css/responsive.dataTables.min.css",
+                "src/css/buttons.dataTables.min.css",
+                "src/css/columnControl.dataTables.min.css"
+            ]
         }
     ],
     "web_accessible_resources": [
@@ -75,7 +99,8 @@
         }
     ],
     "host_permissions": [
-        "https://*/*"
+        "https://*/*",
+        "https://api.worldquantbrain.com/*"
     ],
     "permissions": [
         "scripting",
@@ -85,6 +110,7 @@
         "activeTab",
         "alarms",
         "notifications",
+        "webRequest",
         "unlimitedStorage"
     ]
 }
