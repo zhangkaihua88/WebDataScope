@@ -1,8 +1,13 @@
 // background.js: 后台脚本，用于监听浏览器事件，如标签页更新、插件安装等，以及与content scripts和popup交互
 console.log('Background script is running.');
+// 以副作用方式加载 pako（UMD 构建会挂到 globalThis.pako），适配 MV3 Service Worker
+import './lib/pako.min.js';
+import './lib/msgpack.min.js';
 
 const dataSetListUrl = chrome.runtime.getURL(`data/dataSetList.json`);
+const dataIsOsUrl = chrome.runtime.getURL(`data/oth/osis_data.bin`);
 let dataSetList = null; // 定义全局变量
+let dataIsOs = null;
 const REPO_OWNER = "zhangkaihua88";
 const REPO_NAME = "WebDataScope";
 const CHECK_INTERVAL = 24 * 60 * 60 * 1000; // 24小时检查一次
@@ -138,8 +143,93 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     } else if (msg && msg.type === 'REQ_MONITOR_GET_EXCLUDED') {
         sendResponse({ ok: true, data: EXCLUDED_PREFIXES });
         return true;
+    } else if (msg && msg.type === 'AGGREGATE_SHARPE_RATIOS') {
+        aggregateAllSharpeRatios().then(data => {
+            console.log("Aggregated Sharpe Ratios:", data);
+            sendResponse({ ok: true, data: data });
+        }).catch(error => {
+            console.error("Aggregation failed:", error);
+            sendResponse({ ok: false, error: error.message });
+        });
+        return true;
     }
 });
+
+async function aggregateAllSharpeRatios() {
+    const tabs = await chrome.tabs.query({ url: "*://platform.worldquantbrain.com/*" });
+    if (tabs.length === 0) {
+        throw new Error("请打开一个 WorldQuant BRAIN 页面后再试。");
+    }
+    const proxyTabId = tabs[0].id;
+
+    const regions = ['USA', 'EUR', 'ASI', 'AMR', 'GLB', 'CHN', 'TWN', 'KOR', 'JPN'];
+    const structure = {};
+    
+    for (const region of regions) {
+        const [injectionResult] = await chrome.scripting.executeScript({
+            target: { tabId: proxyTabId },
+            func: async (apiUrl) => {
+                let results = [];
+                let nextUrl = apiUrl;
+                while (nextUrl) {
+                    const response = await fetch(nextUrl, { credentials: 'include' });
+                    if (!response.ok) {
+                        throw new Error(`API request failed with status ${response.status}`);
+                    }
+                    const data = await response.json();
+                    results = results.concat(data.results || []);
+                    nextUrl = data.next;
+                }
+                return results;
+            },
+            args: [`https://api.worldquantbrain.com/data-sets?region=${region}`],
+        });
+        
+        const datasets = injectionResult?.result || [];
+        for (const ds of datasets) {
+            if (!structure[ds.region]) structure[ds.region] = {};
+            if (!structure[ds.region][ds.delay]) {
+                structure[ds.region][ds.delay] = new Set();
+            }
+            structure[ds.region][ds.delay].add(ds.id);
+        }
+    }
+
+    if (dataIsOs === null) {
+        try {
+            const response = await fetch(dataIsOsUrl);
+            const arrayBuffer = await response.arrayBuffer();
+            const inflatedData = globalThis.pako.inflate(new Uint8Array(arrayBuffer));
+            dataIsOs = globalThis.msgpack.decode(new Uint8Array(inflatedData));
+        } catch (error) {
+            console.error("Failed to load local OS/IS data:", error);
+            dataIsOs = {};
+        }
+    }
+
+    const allData = {};
+    for (const region in structure) {
+        for (const delay in structure[region]) {
+            const regionDelayKey = `${region}_${delay}`;
+            const regionDelayData = dataIsOs[regionDelayKey]?.dataset;
+            const datasetsForCombo = Array.from(structure[region][delay]);
+
+            if (!allData[region]) allData[region] = {};
+            if (!allData[region][delay]) allData[region][delay] = [];
+            
+            datasetsForCombo.forEach(datasetId => {
+                const dataset = regionDelayData?.[datasetId];
+                allData[region][delay].push({
+                    datasetId: datasetId,
+                    "OS/IS Sharpe": dataset?.sharpe_ratio != null ? dataset.sharpe_ratio.toFixed(4) : 'UNKNOWN',
+                    "Count": dataset?.count != null ? dataset.count : '--'
+                });
+            });
+        }
+    }
+    return allData;
+}
+
 
 function broadcastRequest(rec) {
     // 仅向 platform.worldquantbrain.com 的标签分发
@@ -246,6 +336,15 @@ async function injectionDataFlagScript(tabId, tab) {
     if (dataSetList === null) {
         dataSetList = await getDataSetList();
     }
+    if (dataIsOs === null){
+        const response = await fetch(dataIsOsUrl);
+        const arrayBuffer = await response.arrayBuffer();
+        // pako 为 UMD 版本，已挂载到 globalThis；确保输入为 Uint8Array
+        const inflatedData = globalThis.pako.inflate(new Uint8Array(arrayBuffer));
+        dataIsOs = globalThis.msgpack.decode(new Uint8Array(inflatedData));
+    }
+
+    console.log('Decoded IS/OS data:', dataIsOs);
     try {
         chrome.scripting.executeScript({
             target: { tabId: tabId },
@@ -253,7 +352,7 @@ async function injectionDataFlagScript(tabId, tab) {
         }, () => {
             chrome.scripting.executeScript({
                 target: { tabId },
-                args: [dataSetList, tab.url],
+                args: [dataSetList, dataIsOs, tab.url],
                 func: (...args) => dataFlagFunc(...args),
             });
         });
@@ -278,28 +377,57 @@ function injectionGeniusScript(tabId) {
                 "src/css/responsive.dataTables.min.css",
                 "src/css/buttons.dataTables.min.css",
             ],
+        }, () => {
+            if (chrome.runtime.lastError) {
+                console.error("CSS注入失败", chrome.runtime.lastError.message);
+            } else {
+                console.log("CSS注入成功");
+            }
         });
 
-        // 注入 JS 文件
+        // 检查是否已经注入了js脚本
         chrome.scripting.executeScript({
             target: { tabId: tabId },
-            files: [
-                "src/scripts/lib/highcharts.js",
-                "src/scripts/requestMonitorUI.js",
-                "src/scripts/lib/jquery-3.7.0.min.js",
-                "src/scripts/lib/jquery.dataTables.min.js",
-                "src/scripts/lib/dataTables.columnControl.min.js",
-                "src/scripts/lib/columnControl.dataTables.min.js",
-                "src/scripts/lib/dataTables.responsive.min.js",
-                "src/scripts/lib/responsive.dataTables.min.js",
-                "src/scripts/lib/dataTables.buttons.min.js",
-                "src/scripts/lib/buttons.colVis.min.js",
-                "src/scripts/lib/buttons.html5.min.js",
-                "src/scripts/utils.js",
-                "src/scripts/uiCard.js",
-                "src/scripts/genius.js"
-            ],
+            func: () => {
+                return typeof OptUrl !== 'undefined';
+            },
+        }, (results) => {
+            if (!results || !results[0].result) {
+                // 如果 OptUrl 未定义，则注入脚本
+                chrome.scripting.executeScript({
+                    target: { tabId: tabId },
+                    files: [
+                        "src/scripts/requestMonitorUI.js",
+                        "src/scripts/lib/jquery-3.7.0.min.js",
+                        "src/scripts/lib/jquery.dataTables.min.js",
+                        "src/scripts/lib/dataTables.columnControl.min.js",
+                        "src/scripts/lib/columnControl.dataTables.min.js",
+                        "src/scripts/lib/dataTables.responsive.min.js",
+                        "src/scripts/lib/responsive.dataTables.min.js",
+                        "src/scripts/lib/dataTables.buttons.min.js",
+                        "src/scripts/lib/buttons.colVis.min.js",
+                        "src/scripts/lib/buttons.html5.min.js",
+                        "src/scripts/lib/highcharts.js",
+                        "src/scripts/utils.js",
+                        "src/scripts/uiCard.js",
+                        "src/scripts/genius.js"],
+                });
+            }
+            else {
+                // 如果 OptUrl 已定义，则直接注入数据
+                chrome.scripting.executeScript({
+                    target: { tabId: tabId },
+                    args: [],
+                    func: (...args) => watchForElementAndInsertButton(...args),
+                });
+                // 同时确保请求监视器 UI 注入
+                chrome.scripting.executeScript({
+                    target: { tabId: tabId },
+                    files: ["src/scripts/requestMonitorUI.js"],
+                });
+            }
         });
+        console.log(tabId.url);
     } catch (error) {
         console.error('Script injection failed: ', error);
     }

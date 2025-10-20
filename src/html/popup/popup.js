@@ -15,6 +15,7 @@ const exportCommunityBtn = document.getElementById('exportCommunityBtn');
 const exportCommunityCompressedBtn = document.getElementById('exportCommunityCompressedBtn');
 const importCommunityBtn = document.getElementById('importCommunityBtn');
 const importCommunityFile = document.getElementById('importCommunityFile');
+const aggregateSharpeBtn = document.getElementById('aggregateSharpeBtn');
 
 // 加载用户设置
 function loadSettings() {
@@ -206,3 +207,19 @@ exportCommunityBtn?.addEventListener('click', handleExportCommunity);
 exportCommunityCompressedBtn?.addEventListener('click', handleExportCommunityCompressed);
 importCommunityBtn?.addEventListener('click', handleImportClick);
 importCommunityFile?.addEventListener('change', handleImportFileChange);
+
+aggregateSharpeBtn?.addEventListener('click', () => {
+    console.log("Button clicked. Sending AGGREGATE_SHARPE_RATIOS message.");
+    showStatusMessage('正在汇总所有Sharpe数据...', true);
+    chrome.runtime.sendMessage({ type: 'AGGREGATE_SHARPE_RATIOS' }, (response) => {
+        console.log("Received response from background:", response);
+        if (response && response.ok) {
+            const json = JSON.stringify(response.data, null, 2);
+            downloadText(`WQP_Sharpe_Ratios_${formatNow()}.json`, json);
+            showStatusMessage('Sharpe ratios导出完成', true);
+        } else {
+            console.error("Aggregation failed:", response?.error);
+            showStatusMessage(`汇总失败: ${response?.error || '未知错误'}`, false);
+        }
+    });
+});

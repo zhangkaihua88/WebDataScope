@@ -24,7 +24,6 @@ WebDataScope是一个正在打造的Chrome/Edge插件。它可以让你在平台
   - add: Genius页面Combined Power Pool Alpha Performance进度条显示
   - feature: 使用Highcharts渲染与官网一致的彩色进度条
   - style: 进度条颜色方案与Combined Alpha Performance保持一致
-- V0.9.x
 - V0.9.4(20250924)
   - fix: 修复某些已知bug
   - del: 论坛中文搜索功能

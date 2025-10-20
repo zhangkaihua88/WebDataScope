@@ -1,46 +1,57 @@
-# -*- coding: utf-8 -*-
-import data_processor
+import msgpack
+import zlib
+import snappy # Import snappy
 import json
 
-def print_bin_data(dataset_name):
-    """
-    读取并打印指定 .bin 文件的数据结构。
-    """
-    print(f"--- 正在读取数据集: {dataset_name} ---")
-    data = data_processor.read_bin_file(dataset_name)
-    
-    if data:
-        print(f"成功读取并解码文件。包含 {len(data)} 个数据字段。")
-        print("\n数据结构预览 (第一个字段):")
+def read_and_decode_bin(file_path):
+    try:
+        with open(file_path, 'rb') as f:
+            compressed_data = f.read()
         
-        # 获取第一个字段的键和值
-        first_field_name = next(iter(data))
-        first_field_data = data[first_field_name]
-        
-        print(f"\n字段名: {first_field_name}")
-        print("字段内容 (数据结构):")
-        
-        # 使用 json.dumps 来格式化输出，使其更易读
-        # 我们将大的列表截断以保持输出简洁
-        formatted_data = {}
-        for key, value in first_field_data.items():
-            if isinstance(value, list) and len(value) > 10:
-                formatted_data[key] = f"(列表，长度 {len(value)}, 前3个元素: {value[:3]})"
-            else:
-                formatted_data[key] = value
+        decompressed_data = None
+        # Try zlib decompression first
+        try:
+            decompressed_data = zlib.decompress(compressed_data)
+        except zlib.error:
+            # If zlib fails, try snappy decompression
+            try:
+                decompressed_data = snappy.decompress(compressed_data)
+            except snappy.UncompressError:
+                print("Error: Data is neither zlib nor snappy compressed.")
+                return
 
-        print(json.dumps(formatted_data, indent=4, ensure_ascii=False))
-        
-    else:
-        print(f"未能读取或解码数据集: {dataset_name}")
+        if decompressed_data is None:
+            print("Error: Decompression failed.")
+            return
 
-if __name__ == '__main__':
-    # 获取数据集列表
-    dataset_list = data_processor.get_dataset_list()
-    
-    if dataset_list:
-        # 选择第一个 .bin 文件作为示例
-        sample_dataset = dataset_list[0]
-        print_bin_data(sample_dataset)
-    else:
-        print("未能找到数据集列表。请确保 data/dataSetList.json 文件存在。")
+        unpacker = msgpack.Unpacker(raw=False)
+        unpacker.feed(decompressed_data)
+        
+        decoded_data = {}
+        for item in unpacker:
+            # Assuming the bin file contains a single msgpack object which is a dict
+            if isinstance(item, dict):
+                # Convert keys to strings if they are bytes
+                decoded_data = {k.decode('utf-8') if isinstance(k, bytes) else k: v for k, v in item.items()}
+                # Further nested key conversion if necessary
+                for region_key, region_data in decoded_data.items():
+                    if isinstance(region_data, dict) and 'dataset' in region_data:
+                        dataset = region_data['dataset']
+                        decoded_data[region_key]['dataset'] = {
+                            k.decode('utf-8') if isinstance(k, bytes) else k: v
+                            for k, v in dataset.items()
+                        }
+
+        # Save the JSON to a file
+        output_file_path = "osis_data_decoded.json"
+        with open(output_file_path, 'w', encoding='utf-8') as outfile:
+            json.dump(decoded_data, outfile, indent=4, ensure_ascii=False)
+        print(f"Successfully decoded and saved data to {output_file_path}")
+
+    except Exception as e:
+        print(f"An error occurred: {e}")
+
+if __name__ == "__main__":
+    # Path to the .bin file inside the extension's data directory
+    bin_file_path = "data/oth/osis_data.bin"
+    read_and_decode_bin(bin_file_path)
