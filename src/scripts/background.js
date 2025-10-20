@@ -1,8 +1,13 @@
 // background.js: 后台脚本，用于监听浏览器事件，如标签页更新、插件安装等，以及与content scripts和popup交互
 console.log('Background script is running.');
+// 以副作用方式加载 pako（UMD 构建会挂到 globalThis.pako），适配 MV3 Service Worker
+import './lib/pako.min.js';
+import './lib/msgpack.min.js';
 
 const dataSetListUrl = chrome.runtime.getURL(`data/dataSetList.json`);
+const dataIsOsUrl = chrome.runtime.getURL(`data/oth/osis_data.bin`);
 let dataSetList = null; // 定义全局变量
+let dataIsOs = null;
 const REPO_OWNER = "zhangkaihua88";
 const REPO_NAME = "WebDataScope";
 const CHECK_INTERVAL = 24 * 60 * 60 * 1000; // 24小时检查一次
@@ -246,6 +251,15 @@ async function injectionDataFlagScript(tabId, tab) {
     if (dataSetList === null) {
         dataSetList = await getDataSetList();
     }
+    if (dataIsOs === null){
+        const response = await fetch(dataIsOsUrl);
+        const arrayBuffer = await response.arrayBuffer();
+        // pako 为 UMD 版本，已挂载到 globalThis；确保输入为 Uint8Array
+        const inflatedData = globalThis.pako.inflate(new Uint8Array(arrayBuffer));
+        dataIsOs = globalThis.msgpack.decode(new Uint8Array(inflatedData));
+    }
+
+    console.log('Decoded IS/OS data:', dataIsOs);
     try {
         chrome.scripting.executeScript({
             target: { tabId: tabId },
@@ -253,7 +267,7 @@ async function injectionDataFlagScript(tabId, tab) {
         }, () => {
             chrome.scripting.executeScript({
                 target: { tabId },
-                args: [dataSetList, tab.url],
+                args: [dataSetList, dataIsOs, tab.url],
                 func: (...args) => dataFlagFunc(...args),
             });
         });
@@ -308,6 +322,7 @@ function injectionGeniusScript(tabId) {
                         "src/scripts/lib/dataTables.buttons.min.js",
                         "src/scripts/lib/buttons.colVis.min.js",
                         "src/scripts/lib/buttons.html5.min.js",
+                        "src/scripts/lib/highcharts.js",
                         "src/scripts/utils.js",
                         "src/scripts/uiCard.js",
                         "src/scripts/genius.js"],
