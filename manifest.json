@@ -67,7 +67,7 @@
             ],
             "js": [
                 "src/scripts/lib/jquery-3.7.0.min.js",
-                "src/scripts/lib/dataTables.js",
+                "src/scripts/lib/jquery.dataTables.min.js",
                 "src/scripts/lib/dataTables.responsive.min.js",
                 "src/scripts/lib/dataTables.buttons.min.js",
                 "src/scripts/lib/buttons.colVis.min.js",

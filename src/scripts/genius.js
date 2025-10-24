@@ -171,6 +171,9 @@ function insertOpsTable() {
         }
     });
 }
+
+watchForElementAndInsertButton();
+document.addEventListener('mouseover', showGeniusCard);
 // 工具函數,提供inertOpsTable使用
 function generateOperatorTable(savedTimestamp, nonZeroCount, zeroCount, savedArray) {
     const [usTime, cnTime] = formatSavedTimestamp(savedTimestamp);
@@ -1777,6 +1780,9 @@ function addPowerPoolProgressBar() {
         console.log('[WQP] Initial check succeeded!');
     }
 }
+
+watchForElementAndInsertButton();
+document.addEventListener('mouseover', showGeniusCard);
 
 function createPowerPoolProgressBar(containerId, value) {
     // 使用 Highcharts 创建一个水平的条形图作为进度条
