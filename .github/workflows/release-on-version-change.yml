@@ -43,10 +43,10 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        git tag "v${{ env.VERSION }}"
-        git push origin "v${{ env.VERSION }}"
+        git tag "${{ env.VERSION }}"
+        git push origin "${{ env.VERSION }}"
 
         curl -X POST -H "Authorization: token $GITHUB_TOKEN" \
           -H "Accept: application/vnd.github.v3+json" \
           https://api.github.com/repos/${{ github.repository }}/releases \
-          -d "{\n            \"tag_name\": \"v${{ env.VERSION }}\",\n            \"name\": \"v${{ env.VERSION }}\",\n            \"body\": \"Release version ${{ env.VERSION }}\",\n            \"draft\": false,\n            \"prerelease\": false\n          }"
+          -d "{\n            \"tag_name\": \"${{ env.VERSION }}\",\n            \"name\": \"${{ env.VERSION }}\",\n            \"body\": \"Release version ${{ env.VERSION }}\",\n            \"draft\": false,\n            \"prerelease\": false\n          }"
