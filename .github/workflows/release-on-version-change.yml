@@ -51,7 +51,7 @@ jobs:
           https://api.github.com/repos/${{ github.repository }}/releases \
           -d '{
             "tag_name": "${{ env.VERSION }}",
-            "name": "${{ env.VERSION }}",
+            "name": "WebDataScope ${{ env.VERSION }} Release",
             "body": "Release version ${{ env.VERSION }}",
             "draft": false,
             "prerelease": false
