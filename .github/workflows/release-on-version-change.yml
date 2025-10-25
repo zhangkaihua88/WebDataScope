@@ -4,6 +4,7 @@ on:
   push:
     paths:
       - 'manifest.json'
+  workflow_dispatch:
 
 jobs:
   create-release:
