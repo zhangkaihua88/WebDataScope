@@ -5,9 +5,9 @@ import './lib/pako.min.js';
 import './lib/msgpack.min.js';
 
 const dataSetListUrl = chrome.runtime.getURL(`data/dataSetList.json`);
-const dataIsOsUrl = chrome.runtime.getURL(`data/oth/osis_data.bin`);
+const dataInfoUrl = chrome.runtime.getURL(`data/oth/info_data.bin`);
 let dataSetList = null; // 定义全局变量
-let dataIsOs = null;
+let dataInfo = null;
 const REPO_OWNER = "zhangkaihua88";
 const REPO_NAME = "WebDataScope";
 const CHECK_INTERVAL = 24 * 60 * 60 * 1000; // 24小时检查一次
@@ -251,15 +251,15 @@ async function injectionDataFlagScript(tabId, tab) {
     if (dataSetList === null) {
         dataSetList = await getDataSetList();
     }
-    if (dataIsOs === null){
-        const response = await fetch(dataIsOsUrl);
+    if (dataInfo === null){
+        const response = await fetch(dataInfoUrl);
         const arrayBuffer = await response.arrayBuffer();
         // pako 为 UMD 版本，已挂载到 globalThis；确保输入为 Uint8Array
         const inflatedData = globalThis.pako.inflate(new Uint8Array(arrayBuffer));
-        dataIsOs = globalThis.msgpack.decode(new Uint8Array(inflatedData));
+        dataInfo = globalThis.msgpack.decode(new Uint8Array(inflatedData));
     }
 
-    console.log('Decoded IS/OS data:', dataIsOs);
+    console.log('Decoded IS/OS data:', dataInfo);
     try {
         chrome.scripting.executeScript({
             target: { tabId: tabId },
@@ -267,7 +267,7 @@ async function injectionDataFlagScript(tabId, tab) {
         }, () => {
             chrome.scripting.executeScript({
                 target: { tabId },
-                args: [dataSetList, dataIsOs, tab.url],
+                args: [dataSetList, dataInfo, tab.url],
                 func: (...args) => dataFlagFunc(...args),
             });
         });
