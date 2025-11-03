@@ -1569,28 +1569,6 @@ function watchForElementAndInsertButton() {
 
 // ############################## Combined Power Pool 进度条 ##############################
 
-
-// 添加 Combined Power Pool 进度条 - 多次尝试以确保页面加载完成
-console.log('[WQP] Scheduling progress bar injection...');
-
-// 第一次尝试: 1秒后
-setTimeout(() => {
-    console.log('[WQP] First attempt (1s)');
-    addPowerPoolProgressBar();
-}, 1000);
-
-// 第二次尝试: 3秒后
-setTimeout(() => {
-    console.log('[WQP] Second attempt (3s)');
-    addPowerPoolProgressBar();
-}, 3000);
-
-// 第三次尝试: 5秒后
-setTimeout(() => {
-    console.log('[WQP] Third attempt (5s)');
-    addPowerPoolProgressBar();
-}, 5000);
-
 function addPowerPoolProgressBar() {
     // 为 Combined Power Pool Alpha Performance 添加进度条
     console.log('[WQP] Checking for Combined Power Pool Alpha Performance progress bar...');
@@ -1781,73 +1759,122 @@ function addPowerPoolProgressBar() {
     }
 }
 
-watchForElementAndInsertButton();
-document.addEventListener('mouseover', showGeniusCard);
-
 function createPowerPoolProgressBar(containerId, value) {
-    // 使用 Highcharts 创建一个水平的条形图作为进度条
-    Highcharts.chart(containerId, {
-        chart: {
-            type: 'bar',
-            backgroundColor: 'transparent',
-            margin: [0, 0, 0, 0],
-            spacing: [0, 0, 0, 0]
-        },
-        title: {
-            text: null
-        },
-        credits: {
-            enabled: false
-        },
-        xAxis: {
-            visible: false,
-            categories: ['']
-        },
-        yAxis: {
-            visible: false,
-            min: 0,
-            max: 2, // Genius 要求为 2
-            title: {
-                text: null
-            }
-        },
-        legend: {
-            enabled: false
-        },
-        plotOptions: {
-            series: {
-                stacking: 'normal',
-                borderWidth: 0,
-                pointPadding: 0,
-                groupPadding: 0,
-                animation: false
-            }
-        },
-        tooltip: {
-            enabled: true,
-            headerFormat: '',
-            pointFormat: '<b>{point.y:.2f} / 2</b>'
-        },
-        series: [{
-            name: 'Progress',
-            data: [Math.min(value, 2)], // 确保值不超过最大值
-            color: 'var(--brand-blue-50, #007bff)',
-            dataLabels: {
-                enabled: true,
-                align: 'center',
-                format: '{point.y:.2f} / 2',
-                style: {
-                    color: 'white',
-                    textOutline: 'none'
-                }
-            }
-        }, {
-            name: 'Remaining',
-            data: [Math.max(0, 2 - value)],
-            color: 'var(--fill-gray-100, #f0f0f0)',
-            dataLabels: {
-                enabled: false
-            }
-        }]
-    });
+    console.log('[WQP] Creating progress bar for:', containerId, 'with value:', value);
+    
+    const container = document.getElementById(containerId);
+    if (!container) {
+        console.error('[WQP] Container not found:', containerId);
+        return;
+    }
+    
+    const maxValue = 3;
+    
+    // 计算每个颜色段的宽度和颜色
+    // 关键:当前值落在某个区间时,该区间要分成两部分(深色+浅色)
+    const segments = [];
+    
+    // 区间 0-0.5 (深黄/浅黄)
+    if (value >= 0.5) {
+        segments.push({ width: 0.5, color: '#c59b00' }); // 完全达到,全深黄
+    } else if (value > 0) {
+        segments.push({ width: value, color: '#c59b00' }); // 部分达到,深黄
+        segments.push({ width: 0.5 - value, color: '#ffe9b3' }); // 未达到,浅黄
+    } else {
+        segments.push({ width: 0.5, color: '#ffe9b3' }); // 完全未达到,全浅黄
+    }
+    
+    // 区间 0.5-1.0 (深绿/浅绿)
+    if (value >= 1.0) {
+        segments.push({ width: 0.5, color: '#00ae00' }); // 完全达到,全深绿
+    } else if (value > 0.5) {
+        segments.push({ width: value - 0.5, color: '#00ae00' }); // 部分达到,深绿
+        segments.push({ width: 1.0 - value, color: '#d4f4d4' }); // 未达到,浅绿
+    } else {
+        segments.push({ width: 0.5, color: '#d4f4d4' }); // 完全未达到,全浅绿
+    }
+    
+    // 区间 1.0-2.0 (深蓝/浅蓝)
+    if (value >= 2.0) {
+        segments.push({ width: 1.0, color: '#0074c4' }); // 完全达到,全深蓝
+    } else if (value > 1.0) {
+        segments.push({ width: value - 1.0, color: '#0074c4' }); // 部分达到,深蓝
+        segments.push({ width: 2.0 - value, color: '#cce5f6' }); // 未达到,浅蓝
+    } else {
+        segments.push({ width: 1.0, color: '#cce5f6' }); // 完全未达到,全浅蓝
+    }
+    
+    // 区间 2.0-3.0 (深橙/浅橙)
+    if (value >= 3.0) {
+        segments.push({ width: 1.0, color: '#c34800' }); // 完全达到,全深橙
+    } else if (value > 2.0) {
+        segments.push({ width: value - 2.0, color: '#c34800' }); // 部分达到,深橙
+        segments.push({ width: 3.0 - value, color: '#ffd7a7' }); // 未达到,浅橙
+    } else {
+        segments.push({ width: 1.0, color: '#ffd7a7' }); // 完全未达到,全浅橙
+    }
+    
+    // 确定标记点的边框颜色 (根据当前所在区间)
+    let markerColor = '#c59b00'; // 默认黄色 (0-0.5)
+    if (value >= 2.0) {
+        markerColor = '#c34800'; // 深橙 (2.0-3.0)
+    } else if (value >= 1.0) {
+        markerColor = '#0074c4'; // 蓝色 (1.0-2.0)
+    } else if (value >= 0.5) {
+        markerColor = '#00ae00'; // 绿色 (0.5-1.0)
+    }
+    
+    const markerPosition = Math.min((value / maxValue) * 100, 100); // 百分比位置
+    
+    // 生成所有颜色段的 HTML
+    const segmentsHtml = segments.map(seg => 
+        `<div style="width: ${(seg.width / maxValue) * 100}%; background-color: ${seg.color}; height: 100%;"></div>`
+    ).join('');
+    
+    // 创建进度条 HTML
+    container.innerHTML = `
+        <div style="position: relative; width: 100%; height: 40px; padding-bottom: 10px; display: flex;">
+            <!-- 彩色条 -->
+            <div style="position: absolute; top: 0; left: 0; right: 0; height: 20px; display: flex; overflow: hidden;">
+                ${segmentsHtml}
+            </div>
+            
+            <!-- 标记点 -->
+            <div style="position: absolute; top: 10px; left: ${markerPosition}%; transform: translate(-50%, -50%); width: 18px; height: 18px; background: white; border: 3px solid ${markerColor}; border-radius: 50%; z-index: 10;"></div>
+            
+            <!-- 刻度标签 -->
+            <div style="position: absolute; bottom: 0; left: ${(0.5 / maxValue) * 100}%; transform: translateX(-50%); font-size: 0.75rem; color: #7b8292;">0.5</div>
+            <div style="position: absolute; bottom: 0; left: ${(1.0 / maxValue) * 100}%; transform: translateX(-50%); font-size: 0.75rem; color: #7b8292;">1</div>
+            <div style="position: absolute; bottom: 0; left: ${(2.0 / maxValue) * 100}%; transform: translateX(-50%); font-size: 0.75rem; color: #7b8292;">2</div>
+        </div>
+    `;
+    
+    console.log('[WQP] Progress bar created successfully with', segments.length, 'segments, value:', value, 'at position:', markerPosition.toFixed(1) + '%');
 }
+
+watchForElementAndInsertButton();
+document.addEventListener("mouseover", showGeniusCard);
+document.addEventListener("mousemove", (ev) => card.updateCursor(ev.pageX, ev.pageY));
+
+// 添加 Combined Power Pool 进度条 - 多次尝试以确保页面加载完成
+console.log('[WQP] Scheduling progress bar injection...');
+
+// 第一次尝试: 1秒后
+setTimeout(() => {
+    console.log('[WQP] First attempt (1s)');
+    addPowerPoolProgressBar();
+}, 1000);
+
+// 第二次尝试: 3秒后
+setTimeout(() => {
+    console.log('[WQP] Second attempt (3s)');
+    addPowerPoolProgressBar();
+}, 3000);
+
+// 第三次尝试: 5秒后
+setTimeout(() => {
+    console.log('[WQP] Third attempt (5s)');
+    addPowerPoolProgressBar();
+}, 5000);
+
+
