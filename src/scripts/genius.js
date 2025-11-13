@@ -1682,27 +1682,20 @@ function addPowerPoolProgressBar() {
         
         console.log(`[WQP] Final performance value: ${performanceValue}`);
         
-        // 检查是否已经有进度条 (通过 ID 检查)
-        const existingProgressBar = container.querySelector('[id^="wqp-power-pool-progress-chart-"]');
-        if (existingProgressBar) {
-            console.log('[WQP] Progress bar already exists, skipping');
-            return true;
+        // 检查并移除已有的进度条容器
+        const existingProgressBarContainer = container.querySelector('.genius__progress-bar-container');
+        if (existingProgressBarContainer) {
+            console.log('[WQP] Progress bar container already exists, removing for redraw.');
+            existingProgressBarContainer.remove();
         }
         
-        // 创建或查找进度条容器
-        let progressBarContainer = container.querySelector('.genius__progress-bar-container');
-        if (!progressBarContainer) {
-            progressBarContainer = document.createElement('div');
-            progressBarContainer.className = 'genius__progress-bar-container';
-            progressBarContainer.style.marginTop = '16px';
-            progressBarContainer.style.marginBottom = '16px';
-            
-            console.log('[WQP] Creating new progress bar container');
-            
-            // 直接添加到容器末尾
-            container.appendChild(progressBarContainer);
-            console.log('[WQP] Appended progress bar to container');
-        }
+        // 创建新的进度条容器
+        const progressBarContainer = document.createElement('div');
+        progressBarContainer.className = 'genius__progress-bar-container';
+        progressBarContainer.style.marginTop = '16px';
+        progressBarContainer.style.marginBottom = '16px';
+        container.appendChild(progressBarContainer);
+        console.log('[WQP] Created and appended new progress bar container');
         
         // 创建进度条图表容器
         const chartContainer = document.createElement('div');
@@ -1876,5 +1869,3 @@ setTimeout(() => {
     console.log('[WQP] Third attempt (5s)');
     addPowerPoolProgressBar();
 }, 5000);
-
-
