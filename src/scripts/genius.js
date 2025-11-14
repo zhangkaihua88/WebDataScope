@@ -45,64 +45,67 @@ async function fetchAllAlphas() {
 
 async function opsAna() {
     // 分析所有的alpha中的运算符, button 分析运算符的调用函数
+    try {
+        const data = await fetchAllAlphas();
+        let operators = await getDataFromUrl(OptUrl);
+        operators = operators.filter(item => item.scope.includes('REGULAR'));
 
-    const data = await fetchAllAlphas();
-    let operators = await getDataFromUrl(OptUrl);
-    operators = operators.filter(item => item.scope.includes('REGULAR'));
+        let regulars = data.map(item => item.type === 'REGULAR' ? item.regular.code : '');
+        // regulars = data.map(item => item.type === 'REGULAR' ? item.regular.code : item.combo.code);
+        console.log(regulars);
+        let use_ops = regulars.map(item => findOps(item, operators)).flat();
 
-    let regulars = data.map(item => item.type === 'REGULAR' ? item.regular.code : '');
-    // regulars = data.map(item => item.type === 'REGULAR' ? item.regular.code : item.combo.code);
-    console.log(regulars);
-    let use_ops = regulars.map(item => findOps(item, operators)).flat();
-
-    const operatorMapping = {
-        '+': 'add',
-        '-': 'subtract',
-        '*': 'multiply',
-        '/': 'divide',
-        '^': 'power',
-        '<=': 'less_equal',
-        '>=': 'greater_equal',
-        '<': 'less',
-        '>': 'greater',
-        '==': 'equal',
-        '!=': 'not_equal',
-        '?': 'if_else',
-        '&&': 'and',
-        '||': 'or',
-        '!': 'not'
-    };
-
-    use_ops = use_ops.map(op => operatorMapping[op] || op);
-
-    let counts = {};
-    // Count the occurrences of each item
-    use_ops.forEach(op => {
-        counts[op] = (counts[op] || 0) + 1;
-    });
-
-    // Assign the count to each element in the array
-    operators = operators.map(op => {
-        return {
-            name: op.name,
-            category: op.category,
-            definition: op.definition,
-            count: counts[op.name] || 0,
-            scope: op.scope,
-            level: op.level === 'ALL' ? 'base' : 'genius',
+        const operatorMapping = {
+            '+': 'add',
+            '-': 'subtract',
+            '*': 'multiply',
+            '/': 'divide',
+            '^': 'power',
+            '<=': 'less_equal',
+            '>=': 'greater_equal',
+            '<': 'less',
+            '>': 'greater',
+            '==': 'equal',
+            '!=': 'not_equal',
+            '?': 'if_else',
+            '&&': 'and',
+            '||': 'or',
+            '!': 'not'
         };
-    });
-    let currentTime = new Date().toISOString();
-    let dataToSave = {
-        array: operators,
-        timestamp: currentTime
-    };
-    chrome.storage.local.set({ WQPOPSAna: dataToSave }, function () {
-        console.log('数据已保存');
-        console.log(dataToSave);
-    });
-    insertOpsTable();
-    setButtonState('WQPOPSFetchButton', `运算符分析完成${data.length}`, 'enable');
+
+        use_ops = use_ops.map(op => operatorMapping[op] || op);
+
+        let counts = {};
+        // Count the occurrences of each item
+        use_ops.forEach(op => {
+            counts[op] = (counts[op] || 0) + 1;
+        });
+
+        // Assign the count to each element in the array
+        operators = operators.map(op => {
+            return {
+                name: op.name,
+                category: op.category,
+                definition: op.definition,
+                count: counts[op.name] || 0,
+                scope: op.scope,
+                level: op.level === 'ALL' ? 'base' : 'genius',
+            };
+        });
+        let currentTime = new Date().toISOString();
+        let dataToSave = {
+            array: operators,
+            timestamp: currentTime
+        };
+        chrome.storage.local.set({ WQPOPSAna: dataToSave }, function () {
+            console.log('数据已保存');
+            console.log(dataToSave);
+        });
+        setButtonState('WQPOPSFetchButton', `运算符分析完成${data.length}`, 'enable');
+    } catch (error) {
+        console.error("运算符分析失败:", error);
+        setButtonState('WQPOPSFetchButton', `分析失败,请查看控制台`, 'error');
+    }
 }
 
 
@@ -530,13 +533,6 @@ async function insertRankListInfo() {
             { title: 'Combined Selected Alpha Performance', data: 'combinedSelectedAlphaPerformance', visible: false },
             { title: 'Combined Power Pool Alpha Performance', data: 'combinedPowerPoolAlphaPerformance', visible: false },
 
-            { title: 'RA Count', data: 'submissionsCount', visible: false },
-            { title: 'RA Fields Used', data: 'dataFieldsUsed', visible: false },
-            { title: 'RA Prod Corr', data: 'meanProdCorrelation', visible: false },
-            { title: 'RA Self Corr', data: 'meanSelfCorrelation', visible: false },
-            { title: 'SA Count', data: 'superAlphaSubmissionsCount', visible: false },
-            { title: 'SA Prod Corr', data: 'superAlphaMeanProdCorrelation', visible: false },
-            { title: 'SA Self Corr', data: 'superAlphaMeanSelfCorrelation', visible: false },
             { title: 'University', data: 'university', visible: false },
             { title: 'Value Factor', data: 'valueFactor', visible: false },
             { title: 'Weight Factor', data: 'weightFactor', visible: false },
@@ -832,70 +828,110 @@ async function calculateRanks(data, userId, WQPSettings, ignoreCombine = false) 
 
 let customLevelCriteria = null; // 用于存储用户自定义的等级标准
 
-function rankInfo2Html(result, ignoreCombineChecked = false) {
+function rankInfo2Html(result, ignoreCombineChecked = false, isCard = false, twoWeekMetrics = null) {
     const userData = result['userData'];
     const currentLevelCriteria = customLevelCriteria || levelCriteria;
+    let detailedSections = '';
+
+    if (!isCard) {
+        detailedSections = `
+        <div style="margin-bottom: 20px; padding: 15px; border: 1px solid #ddd; border-radius: 4px;">
+            <h4>自定义等级标准</h4>
+            <div style="display: flex; justify-content: space-between; gap: 20px; margin-bottom: 10px;">
+                <div style="flex: 1;">
+                    <h5>Expert</h5>
+                    <div>
+                        <label>Alpha Count:</label>
+                        <input type="number" id="customExpertAlphaCount" value="${currentLevelCriteria.expert.alphaCount}" style="width: 100%;">
+                    </div>
+                    <div>
+                        <label>Pyramid Count:</label>
+                        <input type="number" id="customExpertPyramidCount" value="${currentLevelCriteria.expert.pyramidCount}" style="width: 100%;">
+                    </div>
+                    <div>
+                        <label>Combined Performance:</label>
+                        <input type="number" step="0.1" id="customExpertCombinedPerformance" value="${currentLevelCriteria.expert.combinedAlphaPerformance}" style="width: 100%;">
+                    </div>
+                </div>
+
+                <div style="flex: 1;">
+                    <h5>Master</h5>
+                    <div>
+                        <label>Alpha Count:</label>
+                        <input type="number" id="customMasterAlphaCount" value="${currentLevelCriteria.master.alphaCount}" style="width: 100%;">
+                    </div>
+                    <div>
+                        <label>Master Pyramid Count:</label>
+                        <input type="number" id="customMasterPyramidCount" value="${currentLevelCriteria.master.pyramidCount}" style="width: 100%;">
+                    </div>
+                    <div>
+                        <label>Master Combined Performance:</label>
+                        <input type="number" step="0.1" id="customMasterCombinedPerformance" value="${currentLevelCriteria.master.combinedAlphaPerformance}" style="width: 100%;">
+                    </div>
+                </div>
+
+                <div style="flex: 1;">
+                    <h5>Grandmaster</h5>
+                    <div>
+                        <label>Alpha Count:</label>
+                        <input type="number" id="customGrandmasterAlphaCount" value="${currentLevelCriteria.grandmaster.alphaCount}" style="width: 100%;">
+                    </div>
+                    <div>
+                        <label>Grandmaster Pyramid Count:</label>
+                        <input type="number" id="customGrandmasterPyramidCount" value="${currentLevelCriteria.grandmaster.pyramidCount}" style="width: 100%;">
+                    </div>
+                    <div>
+                        <label>Grandmaster Combined Performance:</label>
+                        <input type="number" step="0.1" id="customGrandmasterCombinedPerformance" value="${currentLevelCriteria.grandmaster.combinedAlphaPerformance}" style="width: 100%;">
+                    </div>
+                </div>
+            </div>
+            <button id="applyCustomLevelCriteria" style="margin-top: 10px; padding: 5px 10px; background-color: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer;">应用自定义标准</button>
+            <button id="resetCustomLevelCriteria" style="margin-top: 10px; margin-left: 10px; padding: 5px 10px; background-color: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer;">重置为默认标准</button>
+        </div>
+
+        <hr>
+        <div style="display: flex; gap: 20px; margin-bottom: 20px;">
+            <div style="flex: 1; padding: 15px; border: 1px solid #ddd; border-radius: 4px;">
+                <h4>本赛季表现指标</h4>
+                <ul>
+                    <li>RA Count: ${userData.submissionsCount !== undefined ? userData.submissionsCount : 'N/A'}</li>
+                    <li>RA Prod Corr: ${userData.meanProdCorrelation !== undefined ? userData.meanProdCorrelation.toFixed(4) : 'N/A'}</li>
+                    <li>RA Self Corr: ${userData.meanSelfCorrelation !== undefined ? userData.meanSelfCorrelation.toFixed(4) : 'N/A'}</li>
+                    <li>SA Count: ${userData.superAlphaSubmissionsCount !== undefined ? userData.superAlphaSubmissionsCount : 'N/A'}</li>
+                    <li>SA Prod Corr: ${userData.superAlphaMeanProdCorrelation !== undefined ? userData.superAlphaMeanProdCorrelation.toFixed(4) : 'N/A'}</li>
+                    <li>SA Self Corr: ${userData.superAlphaMeanSelfCorrelation !== undefined ? userData.superAlphaMeanSelfCorrelation.toFixed(4) : 'N/A'}</li>
+                </ul>
+            </div>
+            ${twoWeekMetrics ? `
+            <div style="flex: 1; padding: 15px; border: 1px solid #ddd; border-radius: 4px;">
+                <h4>最近两周表现指标</h4>
+                <ul>
+                    <li>RA Count: ${twoWeekMetrics.submissionsCount !== undefined ? twoWeekMetrics.submissionsCount : 'N/A'}</li>
+                    <li>RA Prod Corr: ${twoWeekMetrics.meanProdCorrelation !== undefined ? twoWeekMetrics.meanProdCorrelation.toFixed(4) : 'N/A'}</li>
+                    <li>RA Self Corr: ${twoWeekMetrics.meanSelfCorrelation !== undefined ? twoWeekMetrics.meanSelfCorrelation.toFixed(4) : 'N/A'}</li>
+                    <li>SA Count: ${twoWeekMetrics.superAlphaSubmissionsCount !== undefined ? twoWeekMetrics.superAlphaSubmissionsCount : 'N/A'}</li>
+                    <li>SA Prod Corr: ${twoWeekMetrics.superAlphaMeanProdCorrelation !== undefined ? twoWeekMetrics.superAlphaMeanProdCorrelation.toFixed(4) : 'N/A'}</li>
+                    <li>SA Self Corr: ${twoWeekMetrics.superAlphaMeanSelfCorrelation !== undefined ? twoWeekMetrics.superAlphaMeanSelfCorrelation.toFixed(4) : 'N/A'}</li>
+                </ul>
+            </div>
+            ` : ''}
+        </div>
+
+        <div style="margin-bottom: 10px;">
+            <input type="checkbox" id="ignoreCombineCheckbox" ${ignoreCombineChecked ? 'checked' : ''}>
+            <label for="ignoreCombineCheckbox">不按 combine 过滤</label>
+        </div>
+        `;
+    }
 
     return `
     <p>
     <strong>总人数:</strong> ${result.gold.count} 人<br>
     <strong>可能的基准人数:</strong> ${result.gold.baseCount} 人（交够${result.info.baseAlphaCount}个）
     </p>
-
-    <div style="margin-bottom: 20px; padding: 15px; border: 1px solid #ddd; border-radius: 4px;">
-        <h4>自定义等级标准</h4>
-        <div style="display: flex; justify-content: space-between; gap: 20px; margin-bottom: 10px;">
-            <div style="flex: 1;">
-                <h5>Expert</h5>
-                <div>
-                    <label>Alpha Count:</label>
-                    <input type="number" id="customExpertAlphaCount" value="${currentLevelCriteria.expert.alphaCount}" style="width: 100%;">
-                </div>
-                <div>
-                    <label>Pyramid Count:</label>
-                    <input type="number" id="customExpertPyramidCount" value="${currentLevelCriteria.expert.pyramidCount}" style="width: 100%;">
-                </div>
-                <div>
-                    <label>Combined Performance:</label>
-                    <input type="number" step="0.1" id="customExpertCombinedPerformance" value="${currentLevelCriteria.expert.combinedAlphaPerformance}" style="width: 100%;">
-                </div>
-            </div>
-
-            <div style="flex: 1;">
-                <h5>Master</h5>
-                <div>
-                    <label>Alpha Count:</label>
-                    <input type="number" id="customMasterAlphaCount" value="${currentLevelCriteria.master.alphaCount}" style="width: 100%;">
-                </div>
-                <div>
-                    <label>Master Pyramid Count:</label>
-                    <input type="number" id="customMasterPyramidCount" value="${currentLevelCriteria.master.pyramidCount}" style="width: 100%;">
-                </div>
-                <div>
-                    <label>Master Combined Performance:</label>
-                    <input type="number" step="0.1" id="customMasterCombinedPerformance" value="${currentLevelCriteria.master.combinedAlphaPerformance}" style="width: 100%;">
-                </div>
-            </div>
-
-            <div style="flex: 1;">
-                <h5>Grandmaster</h5>
-                <div>
-                    <label>Alpha Count:</label>
-                    <input type="number" id="customGrandmasterAlphaCount" value="${currentLevelCriteria.grandmaster.alphaCount}" style="width: 100%;">
-                </div>
-                <div>
-                    <label>Grandmaster Pyramid Count:</label>
-                    <input type="number" id="customGrandmasterPyramidCount" value="${currentLevelCriteria.grandmaster.pyramidCount}" style="width: 100%;">
-                </div>
-                <div>
-                    <label>Grandmaster Combined Performance:</label>
-                    <input type="number" step="0.1" id="customGrandmasterCombinedPerformance" value="${currentLevelCriteria.grandmaster.combinedAlphaPerformance}" style="width: 100%;">
-                </div>
-            </div>
-        </div>
-        <button id="applyCustomLevelCriteria" style="margin-top: 10px; padding: 5px 10px; background-color: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer;">应用自定义标准</button>
-        <button id="resetCustomLevelCriteria" style="margin-top: 10px; margin-left: 10px; padding: 5px 10px; background-color: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer;">重置为默认标准</button>
-    </div>
+    
+    ${detailedSections}
 
     <strong>各个Level 满足的人数 / 最终的人数:</strong><br>
     <ul>
@@ -909,24 +945,6 @@ function rankInfo2Html(result, ignoreCombineChecked = false) {
     <p>
     该用户目前满足的级别: <strong>${result.info.currentLevel}</strong>
     </p>
-
-    <hr>
-    <div style="margin-bottom: 20px; padding: 15px; border: 1px solid #ddd; border-radius: 4px;">
-        <h4>本赛季表现指标</h4>
-        <ul>
-            <li>RA Count: ${userData.submissionsCount !== undefined ? userData.submissionsCount : 'N/A'}</li>
-            <li>RA Prod Corr: ${userData.meanProdCorrelation !== undefined ? userData.meanProdCorrelation.toFixed(4) : 'N/A'}</li>
-            <li>RA Self Corr: ${userData.meanSelfCorrelation !== undefined ? userData.meanSelfCorrelation.toFixed(4) : 'N/A'}</li>
-            <li>SA Count: ${userData.superAlphaSubmissionsCount !== undefined ? userData.superAlphaSubmissionsCount : 'N/A'}</li>
-            <li>SA Prod Corr: ${userData.superAlphaMeanProdCorrelation !== undefined ? userData.superAlphaMeanProdCorrelation.toFixed(4) : 'N/A'}</li>
-            <li>SA Self Corr: ${userData.superAlphaMeanSelfCorrelation !== undefined ? userData.superAlphaMeanSelfCorrelation.toFixed(4) : 'N/A'}</li>
-        </ul>
-    </div>
-
-    <div style="margin-bottom: 10px;">
-        <input type="checkbox" id="ignoreCombineCheckbox" ${ignoreCombineChecked ? 'checked' : ''}>
-        <label for="ignoreCombineCheckbox">不按 combine 过滤</label>
-    </div>
 
     <button id="editRankButton" style="margin-bottom: 10px; padding: 5px 10px; background-color: #4CAF50; color: white; border: none; border-radius: 4px; cursor: pointer;">编辑六维指标</button>
     <div id="editRankForm" style="display: none; margin-bottom: 20px; padding: 15px; border: 1px solid #ddd; border-radius: 4px;">
@@ -1007,6 +1025,20 @@ function rankInfo2Html(result, ignoreCombineChecked = false) {
     `;
 }
 
+function calculatePerformanceMetrics(alphas) {
+    const regularAlphas = alphas.filter(a => a.type === 'REGULAR');
+    const superAlphas = alphas.filter(a => a.type === 'SUPER');
+
+    return {
+        submissionsCount: regularAlphas.length,
+        meanProdCorrelation: regularAlphas.length > 0 ? regularAlphas.reduce((sum, a) => sum + (a.is?.prodCorrelation || 0), 0) / regularAlphas.length : 0,
+        meanSelfCorrelation: regularAlphas.length > 0 ? regularAlphas.reduce((sum, a) => sum + (a.is?.selfCorrelation || 0), 0) / regularAlphas.length : 0,
+        superAlphaSubmissionsCount: superAlphas.length,
+        superAlphaMeanProdCorrelation: superAlphas.length > 0 ? superAlphas.reduce((sum, a) => sum + (a.is?.prodCorrelation || 0), 0) / superAlphas.length : 0,
+        superAlphaMeanSelfCorrelation: superAlphas.length > 0 ? superAlphas.reduce((sum, a) => sum + (a.is?.selfCorrelation || 0), 0) / superAlphas.length : 0,
+    };
+}
+
 async function insertMyRankInfo(data, savedTimestamp) {
     console.log('insertMyRankInfo function called.');
 
@@ -1047,20 +1079,18 @@ async function insertMyRankInfo(data, savedTimestamp) {
     const finalUserData = result.userData;
 
     // 4. Fetch user's alphas and calculate/attach season-specific metrics
+    let twoWeekMetrics = null;
     try {
         const userAlphas = await fetchAllAlphas(); // This fetches for 'self'
         
-        const regularAlphas = userAlphas.filter(a => a.type === 'REGULAR');
-        const superAlphas = userAlphas.filter(a => a.type === 'SUPER');
+        const seasonMetrics = calculatePerformanceMetrics(userAlphas);
+        Object.assign(finalUserData, seasonMetrics);
 
-        // Attach calculated metrics DIRECTLY to the object that will be rendered
-        finalUserData.submissionsCount = regularAlphas.length;
-        finalUserData.meanProdCorrelation = regularAlphas.length > 0 ? regularAlphas.reduce((sum, a) => sum + (a.is?.prodCorrelation || 0), 0) / regularAlphas.length : 0;
-        finalUserData.meanSelfCorrelation = regularAlphas.length > 0 ? regularAlphas.reduce((sum, a) => sum + (a.is?.selfCorrelation || 0), 0) / regularAlphas.length : 0;
+        const twoWeeksAgo = new Date();
+        twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14);
+        const twoWeekAlphas = userAlphas.filter(a => new Date(a.dateSubmitted) > twoWeeksAgo);
+        twoWeekMetrics = calculatePerformanceMetrics(twoWeekAlphas);
 
-        finalUserData.superAlphaSubmissionsCount = superAlphas.length;
-        finalUserData.superAlphaMeanProdCorrelation = superAlphas.length > 0 ? superAlphas.reduce((sum, a) => sum + (a.is?.prodCorrelation || 0), 0) / superAlphas.length : 0;
-        finalUserData.superAlphaMeanSelfCorrelation = superAlphas.length > 0 ? superAlphas.reduce((sum, a) => sum + (a.is?.selfCorrelation || 0), 0) / superAlphas.length : 0;
     } catch (error) {
         console.error("Failed to fetch or process user alphas:", error);
         finalUserData.submissionsCount = 'Error';
@@ -1091,7 +1121,7 @@ async function insertMyRankInfo(data, savedTimestamp) {
                         <span>美东时间: ${usTime}</span>
                         <span>北京时间: ${cnTime}</span>
                     </small>
-                    ${rankInfo2Html(result)}
+                    ${rankInfo2Html(result, false, false, twoWeekMetrics)}
                 </div>
             </div>
         </article>
@@ -1541,7 +1571,7 @@ async function showGeniusCard(event) {
             card.updateCursor(event.clientX, event.clientY);
             card.updateTargetHtml(userHtml);
             let cardTitle = `${userId} 排名信息`;
-            let cardContent = rankInfo2Html(result);
+            let cardContent = rankInfo2Html(result, false, true);
             card.updateData(cardTitle, cardContent);
         }
         return;
