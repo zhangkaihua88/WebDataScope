@@ -40,6 +40,15 @@
         },
         {
             "matches": [
+                "*://platform.worldquantbrain.com/profile/performance"
+            ],
+            "js": [
+                "src/scripts/performanceStyleFix.js"
+            ],
+            "run_at": "document_end"
+        },
+        {
+            "matches": [
                 "*://support.worldquantbrain.com/*",
                 "*://support.worldquantbrain.com/*"
             ],
