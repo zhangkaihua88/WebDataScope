@@ -1,0 +1,58 @@
+name: Release on Version Change
+
+on:
+  push:
+    paths:
+      - 'manifest.json'
+  workflow_dispatch:
+
+jobs:
+  create-release:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '16'
+
+    - name: Read version from manifest.json
+      id: read_version
+      run: |
+        VERSION=$(jq -r '.version' manifest.json)
+        echo "VERSION=$VERSION" >> $GITHUB_ENV
+
+    - name: Get the latest tag
+      id: get_latest_tag
+      run: |
+        LATEST_TAG=$(git describe --tags --abbrev=0 || echo "")
+        echo "LATEST_TAG=$LATEST_TAG" >> $GITHUB_ENV
+
+    - name: Compare versions
+      id: compare_versions
+      run: |
+        if [ "$LATEST_TAG" = "v$VERSION" ]; then
+          echo "No version change. Skipping release."
+          exit 0
+        fi
+
+    - name: Create tag and release
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        git tag "${{ env.VERSION }}"
+        git push origin "${{ env.VERSION }}"
+
+        curl -X POST -H "Authorization: token $GITHUB_TOKEN" \
+          -H "Accept: application/vnd.github.v3+json" \
+          https://api.github.com/repos/${{ github.repository }}/releases \
+          -d '{
+            "tag_name": "${{ env.VERSION }}",
+            "name": "WebDataScope ${{ env.VERSION }} Release",
+            "body": "Release version ${{ env.VERSION }}",
+            "draft": false,
+            "prerelease": false
+          }'

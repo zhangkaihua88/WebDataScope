@@ -452,9 +452,11 @@ async function insertRankListInfo() {
         let columns = [
             { title: '排名', data: 'index', type: 'num', render: function (data, type) { return `<span style="cursor:pointer;margin-right: 8px;">&#9654;</span>` + data; }, className: 'details-control', },
             { title: '用户ID', data: 'user' },
+            { title: '当前等级', data: 'geniusLevel' },
             { title: '达成等级', data: 'achievedLevel' },
             { title: '最终等级', data: 'finalLevel' },
             { title: '国家/地区', data: 'country', render: function (data, type) { return `<i title="${data}" class="${data.toLowerCase()} flag"></i>` + data; } },
+
             // 基础信息
             { title: 'Signals', data: 'alphaCount', visible: false }, // 信号数量
             { title: 'Pyramids', data: 'pyramidCount', visible: false }, // 金字塔数量
