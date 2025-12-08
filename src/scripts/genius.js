@@ -307,9 +307,9 @@ async function getAllRank() {
 
 
             baseCount = data.filter(item => item.alphaCount >= WQPSettings.geniusAlphaCount).length;
-            grandmasterCount = Math.round(baseCount * 0.02);
-            masterCount = Math.round(baseCount * 0.08);
-            expertCount = Math.round(baseCount * 0.2);
+            grandmasterCount = Math.min(75, Math.round(baseCount * 0.02));
+            masterCount = Math.min(250, Math.round(baseCount * 0.08));
+            expertCount = Math.min(675, Math.round(baseCount * 0.2));
 
 
             console.log('baseCount:', baseCount);
@@ -333,7 +333,6 @@ async function getAllRank() {
                     item.finalLevel = 'expert';
                 }
             });
-            // data.sort((a, b) => a.masterTotalRank - b.masterTotalRank);
             data.sort((a, b) => {
                 const rankA = isNaN(a.masterTotalRank) ? Number.MAX_SAFE_INTEGER : a.masterTotalRank;
                 const rankB = isNaN(b.masterTotalRank) ? Number.MAX_SAFE_INTEGER : b.masterTotalRank;
@@ -344,7 +343,6 @@ async function getAllRank() {
                     item.finalLevel = 'master';
                 }
             });
-            // data.sort((a, b) => a.grandmasterTotalRank - b.grandmasterTotalRank);
             data.sort((a, b) => {
                 const rankA = isNaN(a.grandmasterTotalRank) ? Number.MAX_SAFE_INTEGER : a.grandmasterTotalRank;
                 const rankB = isNaN(b.grandmasterTotalRank) ? Number.MAX_SAFE_INTEGER : b.grandmasterTotalRank;
@@ -801,9 +799,9 @@ function rankInfo2Html(result) {
     </p>
     <strong>各个Level 满足的人数 / 最终的人数:</strong><br>
     <ul>
-        <li>For Expert: ${result.expert.count} / ${Math.round(result.gold.baseCount * 0.2)}</li>
-        <li>For Master: ${result.master.count} / ${Math.round(result.gold.baseCount * 0.08)}</li>
-        <li>For Grandmaster: ${result.grandmaster.count} / ${Math.round(result.gold.baseCount * 0.02)}</li> 
+        <li>For Expert: ${result.expert.count} / ${Math.min(675, Math.round(result.gold.baseCount * 0.2))}</li>
+        <li>For Master: ${result.master.count} / ${Math.min(250, Math.round(result.gold.baseCount * 0.08))}</li>
+        <li>For Grandmaster: ${result.grandmaster.count} / ${Math.min(75, Math.round(result.gold.baseCount * 0.02))}</li>
     </ul>
     </p>
     
@@ -846,7 +844,7 @@ function rankInfo2Html(result) {
     <div style="display: flex; justify-content: space-between; gap: 20px;">
     <div style="flex: 1;">
         <h4>以 Expert 为 Universe</h4>
-        <p><strong>总排名:</strong> ${result.expert.rank} / ${Math.round(result.gold.baseCount * 0.2)}</p>
+        <p><strong>总排名:</strong> ${result.expert.rank} / ${Math.min(675, Math.round(result.gold.baseCount * 0.2))}</p>
         <ul>
             <li>Operator Count: ${result.expert.operatorCountRank} 名</li>
             <li>Operator Avg: ${result.expert.operatorAvgRank} 名</li>
@@ -861,7 +859,7 @@ function rankInfo2Html(result) {
 
     <div style="flex: 1;">
         <h4>以 Master 为 Universe</h4>
-        <p><strong>总排名:</strong> ${result.master.rank} / ${Math.round(result.gold.baseCount * 0.08)}</p>
+        <p><strong>总排名:</strong> ${result.master.rank} / ${Math.min(250, Math.round(result.gold.baseCount * 0.08))}</p>
         <ul>
             <li>Operator Count: ${result.master.operatorCountRank} 名</li>
             <li>Operator Avg: ${result.master.operatorAvgRank} 名</li>
@@ -876,7 +874,7 @@ function rankInfo2Html(result) {
 
     <div style="flex: 1;">
         <h4>以 Grandmaster 为 Universe</h4>
-        <p><strong>总排名:</strong> ${result.grandmaster.rank} / ${Math.round(result.gold.baseCount * 0.02)}</p>
+        <p><strong>总排名:</strong> ${result.grandmaster.rank} / ${Math.min(75, Math.round(result.gold.baseCount * 0.02))}</p>
         <ul>
             <li>Operator Count: ${result.grandmaster.operatorCountRank} 名</li>
             <li>Operator Avg: ${result.grandmaster.operatorAvgRank} 名</li>
