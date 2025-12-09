@@ -20,10 +20,29 @@ const targetSelectorButton = '#root > div > div.genius__container > div > div > 
 
 // ############################## 运算符分析 ##############################
 
-async function fetchAllAlphas() {
+async function fetchAllAlphas(forceRefresh = false) {
     // 抓取本季度所有的alpha
+    // Removed setButtonState('WQPOPSFetchButton', `开始抓取...`,'load'); as this function should not manage the button state directly.
 
-    setButtonState('WQPOPSFetchButton', `开始抓取...`,'load');
+    const cacheKey = 'WQPAllAlphasCache'; // New cache key for all alphas
+    const CACHE_DURATION = 5 * 60 * 1000; // Cache for 5 minutes
+
+    if (!forceRefresh) {
+        const storedCache = await new Promise(resolve => {
+            chrome.storage.local.get(cacheKey, (result) => {
+                resolve(result[cacheKey]);
+            });
+        });
+
+        if (storedCache && (Date.now() - storedCache.lastUpdated < CACHE_DURATION)) {
+            console.log('从缓存加载所有Alpha列表:', storedCache.data.length);
+            return storedCache.data;
+        }
+    } else {
+        console.log('Force refreshing: Clearing WQPAllAlphasCache from storage.');
+        await chrome.storage.local.remove(cacheKey);
+    }
+
 
     const currentDate = new Date();
     const year = currentDate.getUTCFullYear();
@@ -40,13 +59,22 @@ async function fetchAllAlphas() {
     const limit = 30; // Data limit per page
     const formatUrl = `https://api.worldquantbrain.com/users/self/alphas?limit={limit}&offset={offset}&status!=UNSUBMITTED%1FIS-FAIL&${dateRange}&order=-dateCreated&hidden=false`
     let data = await getDataFromUrlWithOffsetParallel(formatUrl, limit, 'WQPOPSFetchButton')
+
+    // Save to cache
+    await chrome.storage.local.set({ [cacheKey]: { data: data, lastUpdated: Date.now() } });
+
     return data;
 }
 
-async function opsAna() {
+async function opsAna(forceRefresh = false) {
     // 分析所有的alpha中的运算符, button 分析运算符的调用函数
     try {
-        const data = await fetchAllAlphas();
+        if (forceRefresh) {
+            console.log('Force refreshing: Clearing WQPOPSAna from storage.');
+            await chrome.storage.local.remove('WQPOPSAna');
+        }
+        
+        let data = await fetchAllAlphas(forceRefresh);
         let operators = await getDataFromUrl(OptUrl);
         operators = operators.filter(item => item.scope.includes('REGULAR'));
 
@@ -102,6 +130,8 @@ async function opsAna() {
             console.log(dataToSave);
         });
         setButtonState('WQPOPSFetchButton', `运算符分析完成${data.length}`, 'enable');
+        // Automatically display "我的排名" after Operator Analysis is complete
+        await insertMyRankInfo(null, null, true); // Force refresh for my rank info
     } catch (error) {
         console.error("运算符分析失败:", error);
         setButtonState('WQPOPSFetchButton', `分析失败,请查看控制台`, 'error');
@@ -258,7 +288,7 @@ async function calculateLevelRankStats(allUsersData, WQPSettings, mode, candidat
         "operatorAvg", "fieldAvg"
     ];
 
-    const currentLevelCriteria = customLevelCriteria || levelCriteria;
+    const currentLevelCriteria = levelCriteria; // Always use default levelCriteria
 
     for (const level of ["expert", "master", "grandmaster"]) {
         let levelUsers;
@@ -317,7 +347,7 @@ async function calculateLevelRankStats(allUsersData, WQPSettings, mode, candidat
 
 function determineUserLevel(userData, geniusCombineTag, ignoreCombine = false) {
     // 根据用户数据判断用户级别
-    const currentLevelCriteria = customLevelCriteria || levelCriteria;
+    const currentLevelCriteria = levelCriteria; // Always use default levelCriteria
 
     for (const level of ["grandmaster", "master", "expert"]) {
         const criteria = currentLevelCriteria[level];
@@ -358,11 +388,10 @@ async function getAllRank(ignoreCombine = false) {
                 reject(chrome.runtime.lastError);
                 return;
             }
-
             let data = WQPRankData?.array || [];
             const savedTimestamp = WQPRankData?.timestamp || 'N/A';
             let itemData;
-            const currentLevelCriteria = customLevelCriteria || levelCriteria;
+            const currentLevelCriteria = levelCriteria; // Always use default levelCriteria
 
             data.forEach(item => item['finalLevel'] = 'gold');
             data = data.filter(item => item.alphaCount > 0);
@@ -378,16 +407,16 @@ async function getAllRank(ignoreCombine = false) {
                         }
                     }
                 }
-                itemData.forEach(item => item['TotalRank'] = 0);
+                itemData.forEach(item => item.TotalRank = 0);
                 for (const col of ["operatorCount", "fieldCount", "communityActivity", "completedReferrals", "maxSimulationStreak"]) {
                     let sorted = itemData.map(item => item[col]).sort((a, b) => b - a);
                     itemData.forEach(item => item[col + 'Rank'] = sorted.indexOf(item[col]) + 1);
-                    itemData.forEach(item => item['TotalRank'] = item['TotalRank'] + item[col + 'Rank']);
+                    itemData.forEach(item => item.TotalRank += item[col + 'Rank']);
                 }
                 for (const col of ["operatorAvg", "fieldAvg"]) {
                     let sorted = itemData.map(item => item[col]).sort((a, b) => a - b);
                     itemData.forEach(item => item[col + 'Rank'] = sorted.indexOf(item[col]) + 1);
-                    itemData.forEach(item => item['TotalRank'] = item['TotalRank'] + item[col + 'Rank']);
+                    itemData.forEach(item => item.TotalRank += item[col + 'Rank']);
                 }
                 itemData.forEach(item => {
                     data[item.originalIndex][model + 'TotalRank'] = item['TotalRank'];
@@ -398,7 +427,8 @@ async function getAllRank(ignoreCombine = false) {
                 });
             }
 
-            const filteredBaseCountData = data.filter(item => item.alphaCount >= WQPSettings.geniusAlphaCount);
+            const geniusAlphaCount = parseInt(WQPSettings.geniusAlphaCount) || 0; // Ensure it's a number
+            const filteredBaseCountData = data.filter(item => item.alphaCount >= geniusAlphaCount);
             let baseCount = filteredBaseCountData.length;
 
             let expertCandidates = filteredBaseCountData.filter(item => determineUserLevel(item, WQPSettings.geniusCombineTag, ignoreCombine) === 'expert' || determineUserLevel(item, WQPSettings.geniusCombineTag, ignoreCombine) === 'master' || determineUserLevel(item, WQPSettings.geniusCombineTag, ignoreCombine) === 'grandmaster');
@@ -533,6 +563,12 @@ async function insertRankListInfo() {
             { title: 'Combined Selected Alpha Performance', data: 'combinedSelectedAlphaPerformance', visible: false },
             { title: 'Combined Power Pool Alpha Performance', data: 'combinedPowerPoolAlphaPerformance', visible: false },
 
+            { title: 'RA Count', data: 'submissionsCount', visible: false },
+            { title: 'RA Prod Corr', data: 'meanProdCorrelation', visible: false },
+            { title: 'RA Self Corr', data: 'meanSelfCorrelation', visible: false },
+            { title: 'SA Count', data: 'superAlphaSubmissionsCount', visible: false },
+            { title: 'SA Prod Corr', data: 'superAlphaMeanProdCorrelation', visible: false },
+            { title: 'SA Self Corr', data: 'superAlphaMeanSelfCorrelation', visible: false },
             { title: 'University', data: 'university', visible: false },
             { title: 'Value Factor', data: 'valueFactor', visible: false },
             { title: 'Weight Factor', data: 'weightFactor', visible: false },
@@ -571,7 +607,7 @@ async function insertRankListInfo() {
 
             { title: 'Grandmaster Total Rank', data: 'grandmasterTotalRank', visible: false },
             { title: 'Grandmaster Operator Count Rank', data: 'grandmasteroperatorCountRank', visible: false },
-            { title: 'Grandmaster Operator Avg Rank', data: 'grandmasteroperatorAvg Rank', visible: false },
+            { title: 'Grandmaster Operator Avg Rank', data: 'grandmasteroperatorAvgRank', visible: false },
             { title: 'Grandmaster Field Count Rank', data: 'grandmasterfieldCountRank', visible: false },
             { title: 'Grandmaster Field Avg Rank', data: 'grandmasterfieldAvgRank', visible: false },
             { title: 'Grandmaster Community Activity Rank', data: 'grandmastercommunityActivityRank', visible: false },
@@ -779,19 +815,23 @@ async function calculateRanks(data, userId, WQPSettings, ignoreCombine = false) 
 
     const result = {};
     result['userData'] = userData;
+    console.log('WQPSettings in calculateRanks:', WQPSettings);
+    const geniusAlphaCount = parseInt(WQPSettings.geniusAlphaCount) || 0; // Ensure it's a number
+    console.log('geniusAlphaCount in calculateRanks:', geniusAlphaCount);
     result['info'] = {
         "currentLevel": determineUserLevel(userData, WQPSettings.geniusCombineTag, ignoreCombine),
-        "baseAlphaCount": WQPSettings.geniusAlphaCount,
+        "baseAlphaCount": geniusAlphaCount, // Use the parsed value
     };
     result['gold'] = Object.fromEntries(Object.entries(userData).filter(([key, value]) => key.endsWith('Rank')));
     result['gold']['rank'] = data.filter(item => item.totalRank < userData.totalRank).length;
     result['gold']['count'] = data.length;
-    result['gold']['baseCount'] = data.filter(item => item.alphaCount >= WQPSettings.geniusAlphaCount).length;
-    const currentLevelCriteria = customLevelCriteria || levelCriteria;
+    result['gold']['baseCount'] = data.filter(item => item.alphaCount >= geniusAlphaCount).length;
+    console.log('result.gold.baseCount in calculateRanks:', result['gold']['baseCount']);
+    const currentLevelCriteria = levelCriteria; // Always use default levelCriteria
 
     for (const model of ["expert", "master", "grandmaster"]) {
         let itemData = data.filter(item => item.alphaCount >= currentLevelCriteria[model].alphaCount && item.pyramidCount >= currentLevelCriteria[model].pyramidCount);
-        if (!ignoreCombine) {
+        if (!ignoreCombine) { // Only filter by combine metrics if not ignoring
             if (WQPSettings.geniusCombineTag) {
                 itemData = itemData.filter(item => item.combinedAlphaPerformance >= currentLevelCriteria[model].combinedAlphaPerformance || item.combinedSelectedAlphaPerformance >= currentLevelCriteria[model].combinedSelectedAlphaPerformance || item.combinedPowerPoolAlphaPerformance >= currentLevelCriteria[model].combinedPowerPoolAlphaPerformance);
             }
@@ -826,70 +866,13 @@ async function calculateRanks(data, userId, WQPSettings, ignoreCombine = false) 
     return result;
 }
 
-let customLevelCriteria = null; // 用于存储用户自定义的等级标准
-
-function rankInfo2Html(result, ignoreCombineChecked = false, isCard = false, twoWeekMetrics = null) {
+function rankInfo2Html(result, ignoreCombineChecked = false, isCard = false, twoWeekMetrics = null, oneWeekMetrics = null) {
     const userData = result['userData'];
-    const currentLevelCriteria = customLevelCriteria || levelCriteria;
+    const currentLevelCriteria = levelCriteria; // Always use default levelCriteria
     let detailedSections = '';
 
     if (!isCard) {
         detailedSections = `
-        <div style="margin-bottom: 20px; padding: 15px; border: 1px solid #ddd; border-radius: 4px;">
-            <h4>自定义等级标准</h4>
-            <div style="display: flex; justify-content: space-between; gap: 20px; margin-bottom: 10px;">
-                <div style="flex: 1;">
-                    <h5>Expert</h5>
-                    <div>
-                        <label>Alpha Count:</label>
-                        <input type="number" id="customExpertAlphaCount" value="${currentLevelCriteria.expert.alphaCount}" style="width: 100%;">
-                    </div>
-                    <div>
-                        <label>Pyramid Count:</label>
-                        <input type="number" id="customExpertPyramidCount" value="${currentLevelCriteria.expert.pyramidCount}" style="width: 100%;">
-                    </div>
-                    <div>
-                        <label>Combined Performance:</label>
-                        <input type="number" step="0.1" id="customExpertCombinedPerformance" value="${currentLevelCriteria.expert.combinedAlphaPerformance}" style="width: 100%;">
-                    </div>
-                </div>
-
-                <div style="flex: 1;">
-                    <h5>Master</h5>
-                    <div>
-                        <label>Alpha Count:</label>
-                        <input type="number" id="customMasterAlphaCount" value="${currentLevelCriteria.master.alphaCount}" style="width: 100%;">
-                    </div>
-                    <div>
-                        <label>Master Pyramid Count:</label>
-                        <input type="number" id="customMasterPyramidCount" value="${currentLevelCriteria.master.pyramidCount}" style="width: 100%;">
-                    </div>
-                    <div>
-                        <label>Master Combined Performance:</label>
-                        <input type="number" step="0.1" id="customMasterCombinedPerformance" value="${currentLevelCriteria.master.combinedAlphaPerformance}" style="width: 100%;">
-                    </div>
-                </div>
-
-                <div style="flex: 1;">
-                    <h5>Grandmaster</h5>
-                    <div>
-                        <label>Alpha Count:</label>
-                        <input type="number" id="customGrandmasterAlphaCount" value="${currentLevelCriteria.grandmaster.alphaCount}" style="width: 100%;">
-                    </div>
-                    <div>
-                        <label>Grandmaster Pyramid Count:</label>
-                        <input type="number" id="customGrandmasterPyramidCount" value="${currentLevelCriteria.grandmaster.pyramidCount}" style="width: 100%;">
-                    </div>
-                    <div>
-                        <label>Grandmaster Combined Performance:</label>
-                        <input type="number" step="0.1" id="customGrandmasterCombinedPerformance" value="${currentLevelCriteria.grandmaster.combinedAlphaPerformance}" style="width: 100%;">
-                    </div>
-                </div>
-            </div>
-            <button id="applyCustomLevelCriteria" style="margin-top: 10px; padding: 5px 10px; background-color: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer;">应用自定义标准</button>
-            <button id="resetCustomLevelCriteria" style="margin-top: 10px; margin-left: 10px; padding: 5px 10px; background-color: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer;">重置为默认标准</button>
-        </div>
-
         <hr>
         <div style="display: flex; gap: 20px; margin-bottom: 20px;">
             <div style="flex: 1; padding: 15px; border: 1px solid #ddd; border-radius: 4px;">
@@ -916,12 +899,21 @@ function rankInfo2Html(result, ignoreCombineChecked = false, isCard = false, two
                 </ul>
             </div>
             ` : ''}
+            ${oneWeekMetrics ? `
+            <div style="flex: 1; padding: 15px; border: 1px solid #ddd; border-radius: 4px;">
+                <h4>最近一周表现指标</h4>
+                <ul>
+                    <li>RA Count: ${oneWeekMetrics.submissionsCount !== undefined ? oneWeekMetrics.submissionsCount : 'N/A'}</li>
+                    <li>RA Prod Corr: ${oneWeekMetrics.meanProdCorrelation !== undefined ? oneWeekMetrics.meanProdCorrelation.toFixed(4) : 'N/A'}</li>
+                    <li>RA Self Corr: ${oneWeekMetrics.meanSelfCorrelation !== undefined ? oneWeekMetrics.meanSelfCorrelation.toFixed(4) : 'N/A'}</li>
+                    <li>SA Count: ${oneWeekMetrics.superAlphaSubmissionsCount !== undefined ? oneWeekMetrics.superAlphaSubmissionsCount : 'N/A'}</li>
+                    <li>SA Prod Corr: ${oneWeekMetrics.superAlphaMeanProdCorrelation !== undefined ? oneWeekMetrics.superAlphaMeanProdCorrelation.toFixed(4) : 'N/A'}</li>
+                    <li>SA Self Corr: ${oneWeekMetrics.superAlphaMeanSelfCorrelation !== undefined ? oneWeekMetrics.superAlphaMeanSelfCorrelation.toFixed(4) : 'N/A'}</li>
+                </ul>
+            </div>
+            ` : ''}
         </div>
 
-        <div style="margin-bottom: 10px;">
-            <input type="checkbox" id="ignoreCombineCheckbox" ${ignoreCombineChecked ? 'checked' : ''}>
-            <label for="ignoreCombineCheckbox">不按 combine 过滤</label>
-        </div>
         `;
     }
 
@@ -1039,7 +1031,7 @@ function calculatePerformanceMetrics(alphas) {
     };
 }
 
-async function insertMyRankInfo(data, savedTimestamp) {
+async function insertMyRankInfo(data, savedTimestamp, forceRefresh = false) { // Add forceRefresh parameter
     console.log('insertMyRankInfo function called.');
 
     // 1. Load base leaderboard data if not provided
@@ -1080,8 +1072,10 @@ async function insertMyRankInfo(data, savedTimestamp) {
 
     // 4. Fetch user's alphas and calculate/attach season-specific metrics
     let twoWeekMetrics = null;
+    let oneWeekMetrics = null;
     try {
-        const userAlphas = await fetchAllAlphas(); // This fetches for 'self'
+        // Removed setButtonState calls related to WQPOPSFetchButton from here.
+        const userAlphas = await fetchAllAlphas(forceRefresh); // Pass forceRefresh to fetchAllAlphas
         
         const seasonMetrics = calculatePerformanceMetrics(userAlphas);
         Object.assign(finalUserData, seasonMetrics);
@@ -1090,6 +1084,11 @@ async function insertMyRankInfo(data, savedTimestamp) {
         twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14);
         const twoWeekAlphas = userAlphas.filter(a => new Date(a.dateSubmitted) > twoWeeksAgo);
         twoWeekMetrics = calculatePerformanceMetrics(twoWeekAlphas);
+
+        const oneWeekAgo = new Date();
+        oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+        const oneWeekAlphas = userAlphas.filter(a => new Date(a.dateSubmitted) > oneWeekAgo);
+        oneWeekMetrics = calculatePerformanceMetrics(oneWeekAlphas);
 
     } catch (error) {
         console.error("Failed to fetch or process user alphas:", error);
@@ -1121,7 +1120,7 @@ async function insertMyRankInfo(data, savedTimestamp) {
                         <span>美东时间: ${usTime}</span>
                         <span>北京时间: ${cnTime}</span>
                     </small>
-                    ${rankInfo2Html(result, false, false, twoWeekMetrics)}
+                    ${rankInfo2Html(result, false, false, twoWeekMetrics, oneWeekMetrics)}
                 </div>
             </div>
         </article>
@@ -1153,8 +1152,8 @@ function bindRankEditEvents(userId, savedTimestamp) {
     const editForm = document.getElementById('editRankForm');
     const updateButton = document.getElementById('updateRankButton');
     const ignoreCombineCheckbox = document.getElementById('ignoreCombineCheckbox');
-    const applyCustomLevelCriteriaButton = document.getElementById('applyCustomLevelCriteria');
-    const resetCustomLevelCriteriaButton = document.getElementById('resetCustomLevelCriteria');
+    // const applyCustomLevelCriteriaButton = document.getElementById('applyCustomLevelCriteria'); // Removed custom criteria buttons
+    // const resetCustomLevelCriteriaButton = document.getElementById('resetCustomLevelCriteria'); // Removed custom criteria buttons
 
 
     if (editButton && editForm && updateButton && ignoreCombineCheckbox) {
@@ -1208,84 +1207,85 @@ function bindRankEditEvents(userId, savedTimestamp) {
         });
     }
 
-    if (applyCustomLevelCriteriaButton) {
-        console.log('Attaching event listener to applyCustomLevelCriteriaButton');
-        applyCustomLevelCriteriaButton.addEventListener('click', async () => {
-            console.log('Apply Custom Level Criteria button clicked');
-            const newCustomCriteria = {
-                "expert": {
-                    "alphaCount": parseInt(document.getElementById('customExpertAlphaCount').value) || 0,
-                    "pyramidCount": parseInt(document.getElementById('customExpertPyramidCount').value) || 0,
-                    "combinedAlphaPerformance": parseFloat(document.getElementById('customExpertCombinedPerformance').value) || 0
-                },
-                "master": {
-                    "alphaCount": parseInt(document.getElementById('customMasterAlphaCount').value) || 0,
-                    "pyramidCount": parseInt(document.getElementById('customMasterPyramidCount').value) || 0,
-                    "combinedAlphaPerformance": parseFloat(document.getElementById('customMasterCombinedPerformance').value) || 0
-                },
-                "grandmaster": {
-                    "alphaCount": parseInt(document.getElementById('customGrandmasterAlphaCount').value) || 0,
-                    "pyramidCount": parseInt(document.getElementById('customGrandmasterPyramidCount').value) || 0,
-                    "combinedAlphaPerformance": parseFloat(document.getElementById('customGrandmasterCombinedPerformance').value) || 0
-                }
-            };
+    // Removed custom criteria buttons and their event listeners entirely
+    // if (applyCustomLevelCriteriaButton) {
+    //     console.log('Attaching event listener to applyCustomLevelCriteriaButton');
+    //     applyCustomLevelCriteriaButton.addEventListener('click', async () => {
+    //         console.log('Apply Custom Level Criteria button clicked');
+    //         const newCustomCriteria = {
+    //             "expert": {
+    //                 "alphaCount": parseInt(document.getElementById('customExpertAlphaCount').value) || 0,
+    //                 "pyramidCount": parseInt(document.getElementById('customExpertPyramidCount').value) || 0,
+    //                 "combinedAlphaPerformance": parseFloat(document.getElementById('customExpertCombinedPerformance').value) || 0
+    //             },
+    //             "master": {
+    //                 "alphaCount": parseInt(document.getElementById('customMasterAlphaCount').value) || 0,
+    //                 "pyramidCount": parseInt(document.getElementById('customMasterPyramidCount').value) || 0,
+    //                 "combinedAlphaPerformance": parseFloat(document.getElementById('customMasterCombinedPerformance').value) || 0
+    //             },
+    //             "grandmaster": {
+    //                 "alphaCount": parseInt(document.getElementById('customGrandmasterAlphaCount').value) || 0,
+    //                 "pyramidCount": parseInt(document.getElementById('customGrandmasterPyramidCount').value) || 0,
+    //                 "combinedAlphaPerformance": parseFloat(document.getElementById('customGrandmasterCombinedPerformance').value) || 0
+    //             }
+    //         };
 
-            let allMatchDefaults = true;
-            for (const level of ["expert", "master", "grandmaster"]) {
-                if (newCustomCriteria[level].alphaCount !== levelCriteria[level].alphaCount ||
-                    newCustomCriteria[level].pyramidCount !== levelCriteria[level].pyramidCount ||
-                    newCustomCriteria[level].combinedAlphaPerformance !== levelCriteria[level].combinedAlphaPerformance) {
-                    allMatchDefaults = false;
-                    break;
-                }
-            }
+    //         let allMatchDefaults = true;
+    //         for (const level of ["expert", "master", "grandmaster"]) {
+    //             if (newCustomCriteria[level].alphaCount !== levelCriteria[level].alphaCount ||
+    //                 newCustomCriteria[level].pyramidCount !== levelCriteria[level].pyramidCount ||
+    //                 newCustomCriteria[level].combinedAlphaPerformance !== levelCriteria[level].combinedAlphaPerformance) {
+    //                 allMatchDefaults = false;
+    //                 break;
+    //             }
+    //         }
 
-            if (allMatchDefaults) {
-                customLevelCriteria = null;
-            } else {
-                customLevelCriteria = newCustomCriteria;
-            }
+    //         if (allMatchDefaults) {
+    //             customLevelCriteria = null;
+    //         } else {
+    //             customLevelCriteria = newCustomCriteria;
+    //         }
 
-            const { result, savedTimestamp } = await getSingleRankByUserId(userId, ignoreCombineCheckbox.checked);
-            const rankCard = document.getElementById('rankCard');
-            if (rankCard) {
-                rankCard.querySelector('.card__content').innerHTML = `
-                    <h3 style="font-size: 1.5rem; font-weight: bold; margin-bottom: 10px;">我的排名信息</h3>
-                    <small class="genius__hint genius__hint--dark">
-                        <span>美东时间: ${formatSavedTimestamp(savedTimestamp)[0]}</span>
-                        <span>北京时间: ${formatSavedTimestamp(savedTimestamp)[1]}</span>
-                    </small>
-                    ${rankInfo2Html(result, ignoreCombineCheckbox.checked)}
-                `;
-                bindRankEditEvents(userId, savedTimestamp);
-            }
-        });
-    } else {
-        console.log('applyCustomLevelCriteriaButton not found');
-    }
+    //         const { result, savedTimestamp } = await getSingleRankByUserId(userId, ignoreCombineCheckbox.checked);
+    //         const rankCard = document.getElementById('rankCard');
+    //         if (rankCard) {
+    //             rankCard.querySelector('.card__content').innerHTML = `
+    //                 <h3 style="font-size: 1.5rem; font-weight: bold; margin-bottom: 10px;">我的排名信息</h3>
+    //                 <small class="genius__hint genius__hint--dark">
+    //                     <span>美东时间: ${formatSavedTimestamp(savedTimestamp)[0]}</span>
+    //                     <span>北京时间: ${formatSavedTimestamp(savedTimestamp)[1]}</span>
+    //                 </small>
+    //                 ${rankInfo2Html(result, ignoreCombineCheckbox.checked)}
+    //             `;
+    //             bindRankEditEvents(userId, savedTimestamp);
+    //         }
+    //     });
+    // } else {
+    //     console.log('applyCustomLevelCriteriaButton not found');
+    // }
 
-    if (resetCustomLevelCriteriaButton) {
-        console.log('Attaching event listener to resetCustomLevelCriteriaButton');
-        resetCustomLevelCriteriaButton.addEventListener('click', async () => {
-            console.log('Reset Custom Level Criteria button clicked');
-            customLevelCriteria = null;
-            const { result, savedTimestamp } = await getSingleRankByUserId(userId, ignoreCombineCheckbox.checked);
-            const rankCard = document.getElementById('rankCard');
-            if (rankCard) {
-                rankCard.querySelector('.card__content').innerHTML = `
-                    <h3 style="font-size: 1.5rem; font-weight: bold; margin-bottom: 10px;">我的排名信息</h3>
-                    <small class="genius__hint genius__hint--dark">
-                        <span>美东时间: ${formatSavedTimestamp(savedTimestamp)[0]}</span>
-                        <span>北京时间: ${formatSavedTimestamp(savedTimestamp)[1]}</span>
-                    </small>
-                    ${rankInfo2Html(result, ignoreCombineCheckbox.checked)}
-                `;
-                bindRankEditEvents(userId, savedTimestamp);
-            }
-        });
-    } else {
-        console.log('resetCustomLevelCriteriaButton not found');
-    }
+    // if (resetCustomLevelCriteriaButton) {
+    //     console.log('Attaching event listener to resetCustomLevelCriteriaButton');
+    //     resetCustomLevelCriteriaButton.addEventListener('click', async () => {
+    //         console.log('Reset Custom Level Criteria button clicked');
+    //         customLevelCriteria = null;
+    //         const { result, savedTimestamp } = await getSingleRankByUserId(userId, ignoreCombineCheckbox.checked);
+    //         const rankCard = document.getElementById('rankCard');
+    //         if (rankCard) {
+    //             rankCard.querySelector('.card__content').innerHTML = `
+    //                 <h3 style="font-size: 1.5rem; font-weight: bold; margin-bottom: 10px;">我的排名信息</h3>
+    //                 <small class="genius__hint genius__hint--dark">
+    //                     <span>美东时间: ${formatSavedTimestamp(savedTimestamp)[0]}</span>
+    //                     <span>北京时间: ${formatSavedTimestamp(savedTimestamp)[1]}</span>
+    //                 </small>
+    //                 ${rankInfo2Html(result, ignoreCombineCheckbox.checked)}
+    //             `;
+    //             bindRankEditEvents(userId, savedTimestamp);
+    //         }
+    //     });
+    // } else {
+    //     console.log('resetCustomLevelCriteriaButton not found');
+    // }
 }
 
 async function updateUserRankings(userId, newData, ignoreCombine = false) {
@@ -1403,7 +1403,14 @@ async function rankAna() {
             if (item.user !== undefined) {
                 consultantMap.set(item.user, {
                     valueFactor: item.valueFactor,
-                    weightFactor: item.weightFactor
+                    weightFactor: item.weightFactor,
+                    university: item.university,
+                    submissionsCount: item.submissionsCount,
+                    meanProdCorrelation: item.meanProdCorrelation,
+                    meanSelfCorrelation: item.meanSelfCorrelation,
+                    superAlphaSubmissionsCount: item.superAlphaSubmissionsCount,
+                    superAlphaMeanProdCorrelation: item.superAlphaMeanProdCorrelation,
+                    superAlphaMeanSelfCorrelation: item.superAlphaMeanSelfCorrelation
                 });
             }
         }
@@ -1503,14 +1510,18 @@ async function updateRankButtonState() {
 
     let progress = await new Promise(resolve => chrome.storage.local.get(geniusStorageKey, result => resolve(result[geniusStorageKey])));
 
-    if (progress && (progress.status === 'in_progress' || progress.status === 'paused')) {
+    if (progress && progress.status === 'paused') { // If paused, allow resuming
         const percentage = progress.total ? Math.min(Math.round((progress.data.length / progress.total) * 100), 100) : 0;
         const fetchedCount = progress.data.length;
-        setButtonState('WQPRankFetchButton', `继续分析 ${fetchedCount}/${progress.total} (${percentage}%)`, 'enable');
+        setButtonState('WQPRankFetchButton', `继续分析 ${fetchedCount}/${progress.total} (${percentage}%)`, 'resume'); // Use 'resume' mode
+    } else if (progress && progress.status === 'in_progress') { // If in progress, disable
+        const percentage = progress.total ? Math.min(Math.round((progress.data.length / progress.total) * 100), 100) : 0;
+        const fetchedCount = progress.data.length;
+        setButtonState('WQPRankFetchButton', `分析中 ${fetchedCount}/${progress.total} (${percentage}%)`, 'load'); // Still use 'load' (disabled)
     } else {
          let finalData = await new Promise(resolve => chrome.storage.local.get('WQPRankData', result => resolve(result.WQPRankData)));
          if (finalData && finalData.array && finalData.array.length > 0 && finalData.status !== 'completed'){
-            setButtonState('WQPRankFetchButton', `继续分析 (?)`, 'enable');
+            setButtonState('WQPRankFetchButton', `继续分析 (?)`, 'resume'); // If final data exists but not completed, allow resuming
          } else {
             setButtonState('WQPRankFetchButton', `排名分析`, 'enable');
          }
@@ -1529,16 +1540,17 @@ function insertButton() {
         buttonContainer.style.gap = '10px';
 
         buttonContainer.appendChild(ButtonGen('配置插件', 'WQPAuth', setup));
-        buttonContainer.appendChild(ButtonGen('运算符分析', 'WQPOPSFetchButton', opsAna));
+        buttonContainer.appendChild(ButtonGen('运算符分析', 'WQPOPSFetchButton', () => opsAna(true))); // Pass true for forceRefresh
         buttonContainer.appendChild(ButtonGen('显示运算符分析', 'WQPOPSShowButton', insertOpsTable));
         buttonContainer.appendChild(ButtonGen('排名分析', 'WQPRankFetchButton', rankAnaClickHandler));
         buttonContainer.appendChild(ButtonGen('显示排名分析', 'WQPRankShowButton', insertMyRankInfo));
         buttonContainer.appendChild(ButtonGen('显示排名列表', 'WQPRankListShowButton', insertRankListInfo));
+        // Removed "显示我的排名" button as per user request.
 
         targetElement.insertAdjacentElement('afterend', buttonContainer);
         
         updateRankButtonState(); // Set initial button state
-        insertMyRankInfo(); // Attempt to display info from any existing data
+        insertPyramidDistributionCard(); // Display the card, but don't fetch data automatically
     }
 }
 
@@ -1594,6 +1606,294 @@ function watchForElementAndInsertButton() {
 
     // Configure the MutationObserver
     observer.observe(document.body, { childList: true, subtree: true });
+}
+
+async function insertPyramidDistributionCard() {
+    console.log('insertPyramidDistributionCard called');
+    const cardHTML = `
+        <div id="pyramidDistributionCard" class="card">
+            <div class="card_wrapper">
+                <div class="card__content" style="padding-bottom: 26px;max-width: 100%">
+                    <h3 style="font-size: 1.5rem; font-weight: bold; margin-bottom: 10px;">Pyramid Distribution</h3>
+                    <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+                        <select id="pyramidYearSelect"></select>
+                        <select id="pyramidMonthSelect"></select>
+                        <button id="fetchPyramidData">获取数据</button>
+                    </div>
+                    <div id="pyramidTableWrapper" style="display: none;"> <!-- Add this wrapper and hide it -->
+                        <table id="pyramidDistributionTable" class="display nowrap">
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    const buttonContainer = document.getElementById('WQButtonContainer');
+    if (buttonContainer) {
+        const existingCard = buttonContainer.querySelector("#pyramidDistributionCard");
+        if(existingCard) {
+            existingCard.remove();
+        }
+        buttonContainer.insertAdjacentHTML('afterend', cardHTML);
+        populateDateSelectors();
+        document.getElementById('fetchPyramidData').addEventListener('click', displayPyramidDistribution);
+        console.log('Event listener for fetchPyramidData attached');
+    } else {
+        console.error('WQButtonContainer element not found in insertPyramidDistributionCard');
+    }
+}
+
+function populateDateSelectors() {
+    const yearSelect = document.getElementById('pyramidYearSelect');
+    const monthSelect = document.getElementById('pyramidMonthSelect');
+    const currentYear = new Date().getUTCFullYear();
+    const currentMonth = new Date().getUTCMonth() + 1;
+
+    for (let year = currentYear; year >= 2022; year--) {
+        let option = new Option(year, year);
+        yearSelect.add(option);
+    }
+
+    for (let month = 1; month <= 12; month++) {
+        let option = new Option(month, month);
+        monthSelect.add(option);
+    }
+
+    yearSelect.value = currentYear;
+    monthSelect.value = currentMonth;
+}
+
+async function displayPyramidDistribution() {
+    const fetchButton = document.getElementById('fetchPyramidData');
+    fetchButton.textContent = '获取中...';
+    fetchButton.disabled = true;
+
+    try {
+        console.log('displayPyramidDistribution called');
+        const year = document.getElementById('pyramidYearSelect').value;
+        const month = document.getElementById('pyramidMonthSelect').value;
+        const startDate = new Date(Date.UTC(year, month - 1, 1));
+        const endDate = new Date(Date.UTC(year, month, 0, 23, 59, 59));
+
+        console.log('Fetching alphas for:', startDate.toISOString(), 'to', endDate.toISOString());
+        const userAlphas = await getAlphasByMonth(startDate, endDate); // Pass Date objects directly
+        console.log('Finished fetching alphas. Count:', userAlphas.length);
+        const { categoryRegionDelayCounts, allCategories, allRegionDelays } = processPyramidData(userAlphas);
+
+        console.log('Category Region Delay Counts:', categoryRegionDelayCounts);
+        console.log('All Categories:', allCategories);
+        console.log('All Region Delays:', allRegionDelays);
+
+        // Remove the total alphas display as it's no longer needed.
+        const totalAlphasDisplay = document.getElementById('totalAlphasDisplay');
+        if (totalAlphasDisplay) {
+            totalAlphasDisplay.remove();
+        }
+
+        // Prepare DataTable columns
+        const dataTableColumns = [{ title: 'Category', data: 'category' }];
+        allRegionDelays.sort().forEach(regionDelay => {
+            dataTableColumns.push({
+                title: regionDelay,
+                data: regionDelay,
+                render: function (data, type, row) {
+                    if (type === 'display' || type === 'filter') {
+                        const value = parseInt(data);
+                        const fontSize = '14px'; // Adjust as needed to fit
+
+                        let boxStyle = `height: 24px; line-height: 24px; width: 100%; border-radius: 3px; text-align: center; font-size: ${fontSize}; display: flex; align-items: center; justify-content: center;`;
+                        let bgColor = '';
+                        let textColor = '';
+
+                        if (value >= 3) {
+                            bgColor = '#4CAF50'; // Darker green
+                            textColor = 'white';
+                        } else if (value > 0 && value < 3) {
+                            bgColor = '#A5D6A7'; // Lighter green
+                            textColor = 'black';
+                        } else {
+                            // For value === 0, no background color, just center text
+                            bgColor = ''; // No specific background for 0
+                            textColor = 'black'; // Or default text color
+                            boxStyle = `height: 24px; line-height: 24px; width: 100%; text-align: center; font-size: ${fontSize}; display: flex; align-items: center; justify-content: center;`;
+                            return `<div style="${boxStyle} color: ${textColor};">${value}</div>`;
+                        }
+                        return `<div style="background-color: ${bgColor}; color: ${textColor}; ${boxStyle}">${value}</div>`;
+                    }
+                    return data;
+                }
+            });
+        });
+
+        // Prepare table rows
+        const tableRows = [];
+        allCategories.sort().forEach(category => {
+            const rowObject = { category: category };
+            allRegionDelays.sort().forEach(regionDelay => {
+                rowObject[regionDelay] = categoryRegionDelayCounts[category]?.[regionDelay] || 0;
+            });
+            tableRows.push(rowObject);
+        });
+
+        // Calculate column sums for header
+        const columnSums = {};
+        allRegionDelays.sort().forEach(regionDelay => {
+            columnSums[regionDelay] = 0;
+            allCategories.sort().forEach(category => {
+                columnSums[regionDelay] += categoryRegionDelayCounts[category]?.[regionDelay] || 0;
+            });
+        });
+
+        console.log('Generated DataTables Columns:', dataTableColumns);
+        console.log('Generated Table Rows:', tableRows);
+        console.log('Column Sums:', columnSums);
+        console.log('Number of rows:', tableRows.length);
+
+        // Check if DataTable is already initialized and destroy it
+        if ($.fn.DataTable.isDataTable('#pyramidDistributionTable')) {
+            console.log('Destroying existing DataTable instance.');
+            $('#pyramidDistributionTable').DataTable().destroy();
+            // Clear the table's HTML to prevent issues with re-initialization
+            $('#pyramidDistributionTable').empty();
+        } else {
+            console.log('DataTable not yet initialized.');
+        }
+
+        // Manually create the header HTML
+        const tableElement = document.getElementById('pyramidDistributionTable');
+        let headerHtml = `<thead><tr><th>Category</th>`;
+        allRegionDelays.sort().forEach(regionDelay => {
+            headerHtml += `<th>${regionDelay} (${columnSums[regionDelay]})</th>`; // Re-added column sums to header
+        });
+        headerHtml += `</tr></thead><tbody></tbody>`;
+        tableElement.innerHTML = headerHtml;
+
+        $('#pyramidDistributionTable').DataTable({
+            data: tableRows,
+            columns: dataTableColumns,
+            scrollX: true,
+            responsive: false,
+            paging: false,
+            searching: false,
+            info: false,
+            ordering: false,
+            layout: {
+                bottomStart: 'info',
+                bottomEnd: 'paging'
+            },
+        });
+        console.log('DataTable initialized.');
+        // Unhide the table wrapper
+        document.getElementById('pyramidTableWrapper').style.display = 'block';
+    } catch (error) {
+        console.error("Error displaying pyramid distribution:", error);
+    } finally {
+        fetchButton.textContent = '获取数据';
+        fetchButton.disabled = false;
+    }
+}
+
+async function getAlphasByMonth(startDateObj, endDateObj) { // Renamed parameters to avoid confusion with formatted strings
+    console.log('getAlphasByMonth called with Date objects:', startDateObj, endDateObj);
+    const limit = 100;
+    let offset = 0;
+    let allAlphas = [];
+    let hasMore = true;
+
+    // Helper function to format date into YYYY-MM-DDTHH:MM:SS-04:00
+    // The API expects times to be in Eastern Time (-04:00 offset)
+    const formatToET = (date, isEndDate = false) => {
+        const year = date.getFullYear();
+        const month = (date.getMonth() + 1).toString().padStart(2, '0');
+        const day = date.getDate().toString().padStart(2, '0');
+        
+        // For start date, time should be 00:00:00 ET
+        // For end date, time should be 23:59:59 ET
+        const hours = isEndDate ? '23' : '00';
+        const minutes = isEndDate ? '59' : '00';
+        const seconds = isEndDate ? '59' : '00';
+
+        return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}-04:00`;
+    };
+
+    while(hasMore) {
+        // Apply different time components for start and end dates based on user's example
+        // The API uses '<' for the end date, so formattedEndDateForAPI should be 00:00:00 of the *next* day
+        // to include all of endDateObj.
+        const nextDayAfterEndDate = new Date(endDateObj);
+        nextDayAfterEndDate.setDate(endDateObj.getDate() + 1);
+
+        const formattedStartDate = formatToET(startDateObj, false); // 00:00:00 of startDateObj
+        const formattedEndDateForAPI = formatToET(nextDayAfterEndDate, false); // 00:00:00 of the day *after* endDateObj
+
+        const url = `https://api.worldquantbrain.com/users/self/alphas?limit=${limit}&offset=${offset}&stage=OS&dateSubmitted>=${formattedStartDate}&dateSubmitted<${formattedEndDateForAPI}&order=-dateSubmitted`;
+        console.log('API URL:', url);
+        try {
+            const response = await getDataFromUrl(url);
+            if (response && response.results) {
+                allAlphas.push(...response.results);
+                offset += limit;
+                if (response.results.length < limit) {
+                    hasMore = false;
+                }
+            } else {
+                hasMore = false;
+            }
+        } catch (error) {
+            console.error('Error fetching data from API:', error);
+            hasMore = false; // Stop trying to fetch if there's an error
+        }
+    }
+    
+    console.log('Fetched new alphas. Total:', allAlphas.length);
+    return allAlphas;
+}
+
+function processPyramidData(alphas) {
+    const categoryRegionDelayCounts = {};
+    const allCategories = new Set();
+    const allRegionDelays = new Set();
+
+    alphas.forEach(alpha => {
+        if (!alpha.settings || !alpha.settings.region || alpha.settings.delay === undefined) {
+            console.warn('Skipping alpha due to missing alpha.settings.region or alpha.settings.delay:', alpha);
+            return;
+        }
+
+        const region = alpha.settings.region;
+        const delay = alpha.settings.delay;
+        const region_delay_key = `${region}_${delay}`;
+        allRegionDelays.add(region_delay_key);
+
+        let pyramidsToProcess = [];
+        if (alpha.pyramids && Array.isArray(alpha.pyramids)) {
+            pyramidsToProcess = alpha.pyramids;
+        } else if (alpha.pyramidThemes && alpha.pyramidThemes.pyramids && Array.isArray(alpha.pyramidThemes.pyramids)) {
+            pyramidsToProcess = alpha.pyramidThemes.pyramids;
+        } else {
+            return; // No valid pyramid array found, skip this alpha for pyramid distribution
+        }
+
+        pyramidsToProcess.forEach(pyramidObj => {
+            if (pyramidObj && pyramidObj.name) {
+                // Extract the base category name to handle both "Analyst D1" and "AMR/D1/ANALYST" formats.
+                // First, get the last part after '/', then get the first part before ' '.
+                const tempName = pyramidObj.name.split('/').pop();
+                const categoryName = tempName.split(' ')[0];
+                allCategories.add(categoryName);
+
+                if (!categoryRegionDelayCounts[categoryName]) {
+                    categoryRegionDelayCounts[categoryName] = {};
+                }
+                if (!categoryRegionDelayCounts[categoryName][region_delay_key]) {
+                    categoryRegionDelayCounts[categoryName][region_delay_key] = 0;
+                }
+                categoryRegionDelayCounts[categoryName][region_delay_key]++;
+            }
+        });
+    });
+
+    return { categoryRegionDelayCounts, allCategories: Array.from(allCategories), allRegionDelays: Array.from(allRegionDelays) };
 }
 
 
@@ -1882,7 +2182,7 @@ document.addEventListener("mousemove", (ev) => card.updateCursor(ev.pageX, ev.pa
 // 添加 Combined Power Pool 进度条 - 多次尝试以确保页面加载完成
 console.log('[WQP] Scheduling progress bar injection...');
 
-// 第一次尝试: 1秒后
+// 第一次尝试: getAlphasByMonth
 setTimeout(() => {
     console.log('[WQP] First attempt (1s)');
     addPowerPoolProgressBar();

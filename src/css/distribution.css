@@ -7,3 +7,53 @@
     height: 400px; 
     margin: 0px;
 }
+
+.pyramid-distribution-table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed; /* Ensures columns are of equal width */
+}
+
+.pyramid-distribution-table th,
+.pyramid-distribution-table td {
+    border: 1px solid #e0e0e0; /* Light gray border */
+    padding: 0 !important;
+    margin: 0;
+    text-align: center;
+    vertical-align: top; /* Changed to top */
+    white-space: nowrap;
+    overflow: hidden;
+    box-sizing: border-box;
+}
+
+.pyramid-distribution-table th {
+    background-color: #f5f5f5;
+    font-weight: bold;
+    height: 14px; /* Slightly taller header */
+    line-height: 14px;
+}
+
+.pyramid-distribution-table tr {
+    height: 10px; /* Fixed row height */
+    line-height: 10px; /* Match line-height to row height */
+    padding: 0;
+    margin: 0;
+}
+
+.pyramid-distribution-table td {
+    height: 10px !important; /* Make td fill the height of the tr */
+}
+
+.alpha-count-box {
+    width: 100%;
+    padding: 0;
+    margin: 0;
+    display: flex; /* Restore flex display */
+    align-items: center; /* Restore vertical centering */
+    justify-content: center; /* Restore horizontal centering */
+    box-sizing: border-box;
+    border-radius: 4px; /* Slightly rounded corners for the boxes */
+    font-weight: bold;
+    color: white; /* Text color for the numbers */
+    /* Remove line-height and height: 100% !important; as it will be set inline */
+}

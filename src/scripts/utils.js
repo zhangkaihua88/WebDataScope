@@ -27,6 +27,11 @@ function setButtonState(buttonId, buttonText, mode = 'disable') {
         button.style.cursor = 'wait';
         button.setAttribute('disabled', true);
         button.style.opacity = '0.6';
+    } else if (mode === 'resume') { // New mode for clickable loading state
+        button.innerText = '⏳ ' + (buttonText || 'Resuming...');
+        button.style.cursor = 'pointer'; // Should be clickable
+        button.removeAttribute('disabled'); // Ensure it's not disabled
+        button.style.opacity = '1'; // Full opacity for clickable button
     } else if (mode === 'disable') {
         button.innerText = buttonText;
         button.style.cursor = 'default';
@@ -56,17 +61,22 @@ async function getDataFromUrl(url, options = {}) {
         timeoutMs = 15000,            // 单次请求超时
         initialDelayMs = 1000,        // 初始重试延迟
         maxDelayMs = 10000,           // 最大重试延迟
-        maxRetries = Infinity,        // 默认无限重试，直到 response.ok
-        onRetry = null                // 可选回调：({ attempt, status?, error?, nextDelayMs })
+        maxRetries = 5,               // 默认重试5次，避免无限等待
+        onRetry = null,               // 可选回调：({ attempt, status?, error?, nextDelayMs })
+        onFailure = null              // 新增可选回调：({ url, error })
     } = options;
 
     let attempt = 0;
     let delayMs = initialDelayMs;
 
-    while (true) {
+    while (attempt < maxRetries) { // 修改循环条件，使用有限次重试
         attempt += 1;
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(new DOMException('Timeout', 'AbortError')), timeoutMs);
+        const timeoutId = setTimeout(() => {
+            controller.abort(new DOMException('Timeout', 'AbortError'));
+            console.warn(`Request to ${url} timed out after ${timeoutMs}ms.`);
+        }, timeoutMs);
+
         try {
             const response = await fetch(url, {
                 referrer: "https://platform.worldquantbrain.com/",
@@ -84,34 +94,36 @@ async function getDataFromUrl(url, options = {}) {
                 return data;
             }
 
-            // 非 2xx，准备重试
+            // 非 2xx 响应，准备重试
             const nextDelay = Math.min(maxDelayMs, Math.floor(delayMs * 1.5 + Math.random() * 200));
+            console.warn(`Attempt ${attempt} for ${url} failed with status ${response.status}. Retrying in ${nextDelay}ms...`);
             if (typeof onRetry === 'function') {
-                try { onRetry({ attempt, status: response.status, nextDelayMs: nextDelay }); } catch (_) { /* noop */ }
+                try { onRetry({ attempt, status: response.status, nextDelayMs: nextDelay }); } catch (e) { console.error("onRetry callback error:", e); }
             }
-
-            if (attempt >= maxRetries) {
-                throw new Error(`Failed to fetch ${url} after ${attempt} attempts, last status: ${response.status}`);
-            }
-
+            
             await new Promise(res => setTimeout(res, delayMs));
             delayMs = nextDelay;
+
         } catch (err) {
             clearTimeout(timeoutId);
-            // 网络错误或超时，继续重试
+            // 网络错误或超时，准备重试
             const nextDelay = Math.min(maxDelayMs, Math.floor(delayMs * 1.5 + Math.random() * 200));
+            console.warn(`Attempt ${attempt} for ${url} failed due to error: ${err?.message || err}. Retrying in ${nextDelay}ms...`);
             if (typeof onRetry === 'function') {
-                try { onRetry({ attempt, error: err, nextDelayMs: nextDelay }); } catch (_) { /* noop */ }
-            }
-
-            if (attempt >= maxRetries) {
-                throw new Error(`Failed to fetch ${url} after ${attempt} attempts due to error: ${err?.message || err}`);
+                try { onRetry({ attempt, error: err, nextDelayMs: nextDelay }); } catch (e) { console.error("onRetry callback error:", e); }
             }
 
             await new Promise(res => setTimeout(res, delayMs));
             delayMs = nextDelay;
         }
     }
+    // 如果所有重试都失败了，抛出错误
+    const finalError = new Error(`Failed to fetch ${url} after ${maxRetries} attempts.`);
+    console.error(finalError.message);
+    if (typeof onFailure === 'function') {
+        try { onFailure({ url, error: finalError }); } catch (e) { console.error("onFailure callback error:", e); }
+    }
+    throw finalError;
 }
 
 async function getDataFromUrlWithOffsetParallel(formatUrl, limit, buttonName){
@@ -209,7 +221,7 @@ let submittedAlphasCache = {
 
 // 增量更新和本地缓存已提交 Alpha 的函数
 // 增量更新和本地缓存已提交 Alpha 的函数
-async function fetchSubmittedAlphas(buttonId) {
+async function fetchSubmittedAlphas(buttonId, forceRefresh = false) { // Add forceRefresh parameter
     const CACHE_DURATION = 1 * 60 * 60 * 1000; // 缓存有效期1小时
 
     // 从本地存储获取缓存
@@ -219,7 +231,11 @@ async function fetchSubmittedAlphas(buttonId) {
         });
     });
 
-    if (storedCache && (Date.now() - storedCache.lastUpdated < CACHE_DURATION)) {
+    if (forceRefresh) {
+        console.log('Force refreshing: Clearing submittedAlphasCache from storage.');
+        await chrome.storage.local.remove('submittedAlphasCache');
+        submittedAlphasCache = { data: [], lastUpdated: 0 }; // Reset in-memory cache
+    } else if (storedCache && (Date.now() - storedCache.lastUpdated < CACHE_DURATION)) {
         submittedAlphasCache = storedCache;
         console.log('从缓存加载已提交的Alpha列表:', submittedAlphasCache.data.length);
         return submittedAlphasCache.data;
@@ -350,7 +366,7 @@ async function getSubmittedFields(forceRefresh = false) {
     submittedFieldsPromise = new Promise(async (resolve, reject) => {
         try {
             // fetchSubmittedAlphas is already in utils.js
-            const alphas = await fetchSubmittedAlphas('submitAlphaListLoading'); 
+            const alphas = await fetchSubmittedAlphas('submitAlphaListLoading', forceRefresh); // Pass forceRefresh here
             submittedFieldsCache.data = alphas;
             submittedFieldsCache.lastUpdated = Date.now();
             resolve(alphas);

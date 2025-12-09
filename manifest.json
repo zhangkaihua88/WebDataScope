@@ -32,10 +32,12 @@
                 "src/scripts/uiCard.js",
                 "src/scripts/dataAna.js",
                 "src/scripts/noMoreDifficulties.js",
-                "src/scripts/requestMonitorUI.js"
+                "src/scripts/requestMonitorUI.js",
+                "src/scripts/distribution.js"
             ],
             "css": [
-                "src/css/idcard.css"
+                "src/css/idcard.css",
+                "src/css/distribution.css"
             ]
         },
         {
@@ -74,14 +76,16 @@
                 "src/scripts/lib/columnControl.dataTables.min.js",
                 "src/scripts/utils.js",
                 "src/scripts/uiCard.js",
-                "src/scripts/genius.js"
+                "src/scripts/genius.js",
+                "src/scripts/distribution.js"
             ],
             "css": [
                 "src/css/genius.css",
                 "src/css/dataTables.dataTables.css",
                 "src/css/responsive.dataTables.min.css",
                 "src/css/buttons.dataTables.min.css",
-                "src/css/columnControl.dataTables.min.css"
+                "src/css/columnControl.dataTables.min.css",
+                "src/css/distribution.css"
             ]
         }
     ],

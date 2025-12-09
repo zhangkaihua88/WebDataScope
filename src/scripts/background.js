@@ -6,12 +6,9 @@ import './lib/msgpack.min.js';
 
 const dataSetListUrl = chrome.runtime.getURL(`data/dataSetList.json`);
 const dataIsOsUrl = chrome.runtime.getURL(`data/oth/osis_data.bin`);
-let dataSetList = null; // 定义全局变量
-let dataIsOs = null;
 const REPO_OWNER = "zhangkaihua88";
 const REPO_NAME = "WebDataScope";
 const CHECK_INTERVAL = 24 * 60 * 60 * 1000; // 24小时检查一次
-
 
 // 内存中仅会话级别缓存，不做长期持久化
 let recentApiRequests = [];
@@ -19,14 +16,47 @@ const MAX_RECENT = 200;
 // 在此处直接维护需要排除的前缀列表
 const EXCLUDED_PREFIXES = [
     'https://api.worldquantbrain.com/errors/api/2/envelope/'
-
 ];
 
+// Helper functions for data loading and storage
+async function loadDataSetList() {
+    let data = await chrome.storage.local.get('dataSetList');
+    if (data.dataSetList) {
+        console.log('dataSetList loaded from chrome.storage.local');
+        return data.dataSetList;
+    }
+
+    console.log('Fetching dataSetList from URL...');
+    const response = await fetch(dataSetListUrl);
+    if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status} for ${dataSetListUrl}`);
+    }
+    const fetchedData = await response.json();
+    await chrome.storage.local.set({ dataSetList: fetchedData });
+    console.log('dataSetList fetched and saved to chrome.storage.local');
+    return fetchedData;
+}
+
+async function loadDataIsOs() {
+    let data = await chrome.storage.local.get('dataIsOs');
+    if (data.dataIsOs) {
+        console.log('dataIsOs loaded from chrome.storage.local');
+        return data.dataIsOs;
+    }
+
+    console.log('Fetching dataIsOs from URL...');
+    const response = await fetch(dataIsOsUrl);
+    const arrayBuffer = await response.arrayBuffer();
+    const inflatedData = globalThis.pako.inflate(new Uint8Array(arrayBuffer));
+    const decodedData = globalThis.msgpack.decode(new Uint8Array(inflatedData));
+    await chrome.storage.local.set({ dataIsOs: decodedData });
+    console.log('dataIsOs fetched, decoded, and saved to chrome.storage.local');
+    return decodedData;
+}
 
 // 初始化设置
 chrome.runtime.onInstalled.addListener(async () => {
     chrome.storage.local.get('WQPSettings', ({ WQPSettings }) => {
-        // 如果没有找到 WQPSettings，则设置默认值
         if (!WQPSettings) {
             const defaultSettings = {
                 apiAddress: "https://wq-backend.vercel.app",
@@ -36,8 +66,6 @@ chrome.runtime.onInstalled.addListener(async () => {
                 geniusCombineTag: true,
                 apiMonitorEnabled: true,
             };
-
-            // 将默认设置保存到 Chrome 存储中
             chrome.storage.local.set({ WQPSettings: defaultSettings }, () => {
                 console.log('Default settings have been applied.');
             });
@@ -45,8 +73,9 @@ chrome.runtime.onInstalled.addListener(async () => {
             console.log('Current settings:', WQPSettings);
         }
     });
-    // 获取数据集列表
-    dataSetList = await getDataSetList();
+    // Ensure dataSetList is loaded and persisted on install
+    await loadDataSetList(); 
+    await loadDataIsOs(); // Also load and persist dataIsOs on install
     checkUpdate();
 });
 
@@ -195,17 +224,7 @@ async function aggregateAllSharpeRatios() {
         }
     }
 
-    if (dataIsOs === null) {
-        try {
-            const response = await fetch(dataIsOsUrl);
-            const arrayBuffer = await response.arrayBuffer();
-            const inflatedData = globalThis.pako.inflate(new Uint8Array(arrayBuffer));
-            dataIsOs = globalThis.msgpack.decode(new Uint8Array(inflatedData));
-        } catch (error) {
-            console.error("Failed to load local OS/IS data:", error);
-            dataIsOs = {};
-        }
-    }
+    const dataIsOs = await loadDataIsOs(); // Use the new function to load dataIsOs
 
     const allData = {};
     for (const region in structure) {
@@ -306,16 +325,6 @@ function showNotification(version, url) {
 
 
 
-// 获取数据集列表
-async function getDataSetList() {
-    const response = await fetch(dataSetListUrl);
-    if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status} for ${dataSetListUrl}`);
-    }
-    const data = await response.json(); // Parse JSON data
-    return data
-}
-
 // 注入分布图脚本
 function injectionDistributionScript(tabId) {
     try {
@@ -333,16 +342,8 @@ function injectionDistributionScript(tabId) {
 }
 // 注入数据标记脚本
 async function injectionDataFlagScript(tabId, tab) {
-    if (dataSetList === null) {
-        dataSetList = await getDataSetList();
-    }
-    if (dataIsOs === null){
-        const response = await fetch(dataIsOsUrl);
-        const arrayBuffer = await response.arrayBuffer();
-        // pako 为 UMD 版本，已挂载到 globalThis；确保输入为 Uint8Array
-        const inflatedData = globalThis.pako.inflate(new Uint8Array(arrayBuffer));
-        dataIsOs = globalThis.msgpack.decode(new Uint8Array(inflatedData));
-    }
+    const dataSetList = await loadDataSetList(); // Use the new function to load dataSetList
+    const dataIsOs = await loadDataIsOs();       // Use the new function to load dataIsOs
 
     console.log('Decoded IS/OS data:', dataIsOs);
     try {
