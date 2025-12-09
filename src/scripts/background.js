@@ -59,16 +59,27 @@ chrome.runtime.onStartup.addListener(() => {
 
 // 监听标签页更新事件
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
-    if (changeInfo.status === 'complete' && tab.url == "https://platform.worldquantbrain.com/alphas/distribution") {
-        injectionDistributionScript(tabId);
-    } else if (changeInfo.status === 'complete' && tab.url.startsWith("https://platform.worldquantbrain.com/genius")) {
-        injectionGeniusScript(tabId);
-    } else if (changeInfo.status === 'complete' && (
-        tab.url.includes("data/data-sets") ||
-        tab.url.includes("data/search/data-fields") ||
-        tab.url.includes("data/data-fields")
-    )) {
-        injectionDataFlagScript(tabId, tab);
+    if (changeInfo.status === 'complete' && tab.url) {
+        const url = tab.url
+
+        const distributionFlag = url == "https://platform.worldquantbrain.com/alphas/distribution"
+        const geniusFlag = url.startsWith("https://platform.worldquantbrain.com/genius")
+        const dataFlag = (
+            url.includes("data/data-sets") ||
+            url.includes("data/search/data-fields") ||
+            url.includes("data/data-fields")
+        )
+        const simulateFlag = url.startsWith("https://platform.worldquantbrain.com/simulate")
+
+        if (distributionFlag) {
+            injectionDistributionScript(tabId);
+        } else if (geniusFlag) {
+            injectionGeniusScript(tabId);
+        } else if (dataFlag) {
+            injectionDataFlagScript(tabId, tab);
+        }else if(simulateFlag){
+            injectionSimulateScript(tabId);
+        }
     }
 });
 
@@ -119,12 +130,14 @@ try {
                 url,
                 statusCode: details.statusCode,
                 tabId: details.tabId,
+                responseHeaders: details.responseHeaders || [],
             };
             recentApiRequests.push(rec);
             if (recentApiRequests.length > MAX_RECENT) recentApiRequests.shift();
             broadcastRequest(rec);
         },
-        { urls: ["https://api.worldquantbrain.com/*"] }
+        { urls: ["https://api.worldquantbrain.com/*"] },
+        ["responseHeaders"]
     );
 } catch (e) {
     console.warn('webRequest listeners failed to register', e);
@@ -251,7 +264,7 @@ async function injectionDataFlagScript(tabId, tab) {
     if (dataSetList === null) {
         dataSetList = await getDataSetList();
     }
-    if (dataInfo === null){
+    if (dataInfo === null) {
         const response = await fetch(dataInfoUrl);
         const arrayBuffer = await response.arrayBuffer();
         // pako 为 UMD 版本，已挂载到 globalThis；确保输入为 Uint8Array
@@ -343,6 +356,25 @@ function injectionGeniusScript(tabId) {
             }
         });
         console.log(tabId.url);
+    } catch (error) {
+        console.error('Script injection failed: ', error);
+    }
+}
+
+function injectionSimulateScript(tabId) {
+    try {
+        chrome.scripting.insertCSS({
+            target: { tabId: tabId },
+            files: [
+                "src/css/simulate.css",
+            ],
+        });
+        chrome.scripting.executeScript({
+            target: { tabId: tabId },
+            files: [
+                "src/scripts/simulate.js",
+            ],
+        });
     } catch (error) {
         console.error('Script injection failed: ', error);
     }
