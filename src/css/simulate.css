@@ -18,6 +18,7 @@
 .wq-rate-title {
   font-size: 12px;
   color: #F2F2F2;
+  text-align: center;
 }
 
 .wq-rate-track {
@@ -49,7 +50,71 @@
   color: #111827;
 }
 
-.wq-rate-reset {
+.wq-rate-refresh {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 12px;
+  color: #2563eb;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+}
+
+.wq-rate-refresh.disabled {
+  opacity: 0.6;
+  cursor: default;
+  pointer-events: none;
+}
+
+.wq-rate-refresh-icon {
+  display: inline-block;
+}
+
+@keyframes wq-spin {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.wq-rate-refresh.spinning .wq-rate-refresh-icon {
+  animation: wq-spin 1s linear infinite;
+}
+
+.wq-spinner {
+  width: 12px;
+  height: 12px;
+  border: 2px solid rgba(37, 99, 235, 0.3);
+  border-top-color: #2563eb;
+  border-radius: 50%;
+  display: none;
+}
+
+.wq-rate-refresh.spinning .wq-spinner {
+  display: inline-block;
+  animation: wq-spin 0.8s linear infinite;
+}
+
+.wq-rate-refresh.spinning .wq-glyph {
+  display: none;
+}
+
+.wq-rate-hint {
+  position: absolute;
+  right: 28px;
+  top: 50%;
+  transform: translateY(-50%);
   font-size: 11px;
-  color: #F2F2F2;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.7);
+  padding: 4px 8px;
+  border-radius: 4px;
+  pointer-events: none;
+  z-index: 1;
 }
