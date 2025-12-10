@@ -1,31 +1,25 @@
-// simulate.js: 在 WQ Simulate 页面底部工具栏中插入速率限制进度条，并根据
-// https://api.worldquantbrain.com/simulations 响应头实时更新。
-// 设计要点：
-// 1) 容器容错：页面类名可能变化或尚未渲染，使用主选择器 + 备用选择器查找容器。
-// 2) 插入位置：优先插入在 editor-button-container 与 simulate 区块之间；若一端缺失，择优插入同级位置；皆不可用则附加到容器末尾。
-// 3) 防抖与防卡顿：插入后避免重复移动同一元素；监听 DOM 变化，当元素被 React 重绘移除后，延时重插并从存储恢复。
-// 4) 数据来源：后台脚本广播完整响应记录（含 responseHeaders）；仅在 /simulations 完成事件上解析 x-ratelimit-* 并更新；缺头时不覆盖为 0/0。
-// 5) 持久化与初始化：每次更新写入 chrome.storage.local；页面加载或重插后从存储初始化 UI。
+// 入口概览：
+// - 加载后：插入进度条、恢复显示、监听 DOM
+// - 监听后台：/simulations 完成时根据响应头更新配额（不删除正常模拟）
+// - 刷新按钮：触发一次模拟，仅删除本次刷新产生的模拟，用于刷新配额
+// - 限流策略：10 分钟最多刷新 5 次（持久化）
 console.log('simulate.js loaded');
 
-// 主容器选择器（完整类名）：定位底部工具栏左侧区域
+// 页面元素选择器：定位工具栏与插入位置
 const containerSelector = '.editor-bottom-bar-left-monaco.editor-bottom-bar-left-monaco--isConsultant.editor-bottom-bar-left-monaco--is-code';
-// 备用容器选择器（简化类名）：当完整类名不可用时使用
 const fallbackContainerSelector = '.editor-bottom-bar-left-monaco';
-// 模拟区域块选择器：用于确定插入位置（目标是插在它前面）
 const simulateBlockSelector = '.editor-simulate.editor-simulate--isConsultant.editor-simulate--is-code';
-// 左侧按钮容器选择器：用于插在它后面
 const buttonContainerSelector = '.editor-button-container';
-// 本地存储键：保存速率限制状态
+// 本地存储键：配额显示与刷新次数
 const storageKey = 'WQ_SIM_RATE_LIMIT';
 const refreshQuotaKey = 'WQ_SIM_REFRESH_QUOTA';
 
-// 查找底部左侧容器，优先完整类名；若失败则使用简化类名
+// 查找底部工具栏容器：优先完整类名，找不到则降级简化类名
 function findContainer() {
     return document.querySelector(containerSelector) || document.querySelector(fallbackContainerSelector) || null;
 }
 
-// 创建或返回进度条占位容器及内部结构（仅创建一次）
+// 创建进度条占位容器（仅创建一次），并绑定刷新按钮事件
 function ensureBar() {
     let holder = document.getElementById('WQSimulateBetween');
     if (!holder) {
@@ -42,12 +36,7 @@ function ensureBar() {
     return holder;
 }
 
-// 将进度条插入到合适位置：
-// - 优先：在 simulateBlock 前（位于按钮容器与模拟块之间）
-// - 次优：按钮容器后
-// - 次优：simulateBlock 前
-// - 兜底：容器末尾
-// 已在容器下则不重复移动，避免触发多次 Mutation
+// 插入进度条到最佳位置（按钮与模拟块之间），避免重复移动
 function insertBetweenBar() {
     const container = findContainer();
     if (!container) return;
@@ -66,7 +55,7 @@ function insertBetweenBar() {
     }
 }
 
-// 观察 DOM 变化，若占位容器被 React 重绘移除，则延时补插并恢复上次值
+// 监听 DOM：当进度条被重绘移除时，延时重插并恢复显示
 let reinsertionScheduled = false;
 function watchAndInsert() {
     insertBetweenBar();
@@ -85,25 +74,20 @@ function watchAndInsert() {
     obs.observe(document.body, { childList: true, subtree: true });
 }
 
-// 将响应头数组转为小写键的 Map，便于读取 x-ratelimit-*
+// 工具：响应头数组转为小写键字典，便于读取配额头
 function parseHeaders(headers) {
     const map = {};
     (headers || []).forEach(h => { if (h && h.name) map[h.name.toLowerCase()] = h.value; });
     return map;
 }
 
-// 安全转整：缺失或非数字时返回 0
+// 工具：安全转整，非法返回 0
 function toInt(val) {
     const n = parseInt(val, 10);
     return isNaN(n) ? 0 : n;
 }
 
-// 更新进度条：
-// - 百分比 = remaining / limit
-// - 文本 = "remaining / limit"
-// - reset 支持两种语义：绝对 epoch 秒或相对秒数
-// - 缺失头（0/0）时不覆盖当前显示
-// - 每次成功更新写入存储
+// 更新配额 UI：填充进度与文本；0/0 时不覆盖；成功后写入存储
 function updateRateBar(limit, remaining) {
     if (limit === 0 && remaining === 0) return;
     const holder = document.getElementById('WQSimulateBetween');
@@ -118,8 +102,7 @@ function updateRateBar(limit, remaining) {
     } catch (_) { }
 }
 
-// 监听后台广播的新请求记录，仅处理 /simulations 完成事件
-// 注意：后台脚本已将 responseHeaders 透传至页面
+// 后台事件监听：当 /simulations 完成时基于响应头更新配额（不做删除）
 try {
     chrome.runtime.onMessage.addListener((msg) => {
         if (msg && msg.type === 'REQ_MONITOR_NEW') {
@@ -129,17 +112,12 @@ try {
                 const limit = toInt(h['x-ratelimit-limit']);
                 const remaining = toInt(h['x-ratelimit-remaining']);
                 updateRateBar(limit, remaining);
-                const loc = h['location'];
-                if (autoDeleteWait && d.method === 'POST' && loc && /^https?:\/\//.test(loc)) {
-                    autoDeleteWait = false;
-                    deleteSimOnce(loc);
-                }
             }
         }
     });
 } catch (_) { }
 
-// 初始化：从本地存储读取上次配额，避免初始空白
+// 初始化显示：从本地存储恢复配额，避免初始空白
 function initFromStorage() {
     try {
         chrome.storage?.local?.get(storageKey, (obj) => {
@@ -151,20 +129,20 @@ function initFromStorage() {
     } catch (_) { }
 }
 
-// 启动：插入进度条并开始观察
+// 启动：插入进度条、恢复显示、监听 DOM
 watchAndInsert();
 
-
+// 刷新场景控制：只在我们主动刷新时创建并随后删除该次模拟
 let autoPostedOnce = false;
-let autoDeleteWait = false;
 const pendingDelete = new Set();
+
+// 刷新按钮：检查并消费刷新额度，触发一次模拟，仅删除本次刷新
 function doSimRequest() {
     hasRemainingRefreshQuota().then(async (ok) => {
         if (!ok) { showHint('每10分钟最多刷新5次'); return; }
         const reserved = await consumeRefreshQuota();
         if (!reserved) { showHint('每10分钟最多刷新5次'); return; }
         setRefreshState('spinning');
-        autoDeleteWait = true;
         const payload = {
             type: 'REGULAR',
             settings: {
@@ -201,7 +179,6 @@ function doSimRequest() {
             fetch('https://api.worldquantbrain.com/simulations', opts).then((res) => {
                 const loc = res.headers?.get('Location');
                 if (loc) {
-                    autoDeleteWait = false;
                     deleteSimOnce(loc);
                 }
                 setRefreshState('idle');
@@ -214,6 +191,7 @@ function doSimRequest() {
     });
 }
 
+// 删除一次模拟（幂等）：用于清理“刷新用”模拟
 async function deleteSimOnce(url) {
     if (pendingDelete.has(url)) return;
     pendingDelete.add(url);
@@ -223,7 +201,7 @@ async function deleteSimOnce(url) {
     pendingDelete.delete(url);
 }
 
-
+// 刷新限流：是否仍有余量（10 分钟滑窗内 < 5 次）
 function hasRemainingRefreshQuota() {
     return new Promise((resolve) => {
         try {
@@ -242,6 +220,7 @@ function hasRemainingRefreshQuota() {
     });
 }
 
+// 刷新限流：消费一次并写回存储（超限返回 false）
 function consumeRefreshQuota() {
     return new Promise((resolve) => {
         try {
@@ -265,6 +244,7 @@ function consumeRefreshQuota() {
     });
 }
 
+// 在进度条中展示 2 秒提示
 function showHint(text) {
     const holder = document.getElementById('WQSimulateBetween');
     if (!holder) return;
@@ -279,6 +259,7 @@ function showHint(text) {
     setTimeout(() => { hint.remove(); }, 2000);
 }
 
+// 刷新按钮的 loading/idle 状态切换
 function setRefreshState(state) {
     const holder = document.getElementById('WQSimulateBetween');
     if (!holder) return;
@@ -288,6 +269,7 @@ function setRefreshState(state) {
     if (state === 'spinning') { btn.classList.add('spinning', 'disabled'); }
 }
 
+// 页面加载后自动刷新一次（只触发一次），尽快拿到配额显示
 function autoCreateAndDeleteSim() {
     if (autoPostedOnce) return;
     autoPostedOnce = true;
