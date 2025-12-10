@@ -140,8 +140,6 @@ const pendingDelete = new Set();
 function doSimRequest() {
     hasRemainingRefreshQuota().then(async (ok) => {
         if (!ok) { showHint('每10分钟最多刷新5次'); return; }
-        const reserved = await consumeRefreshQuota();
-        if (!reserved) { showHint('每10分钟最多刷新5次'); return; }
         setRefreshState('spinning');
         const payload = {
             type: 'REGULAR',
@@ -177,9 +175,13 @@ function doSimRequest() {
         };
         try {
             fetch('https://api.worldquantbrain.com/simulations', opts).then((res) => {
+                if (res && res.status === 429) {
+                    showHint('SIMULATION_LIMIT_EXCEEDED');
+                }
                 const loc = res.headers?.get('Location');
                 if (loc) {
                     deleteSimOnce(loc);
+                    consumeRefreshQuota();
                 }
                 setRefreshState('idle');
             }).catch((e) => {
