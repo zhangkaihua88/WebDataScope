@@ -1156,13 +1156,13 @@ function bindRankEditEvents(userId, savedTimestamp) {
     // const resetCustomLevelCriteriaButton = document.getElementById('resetCustomLevelCriteria'); // Removed custom criteria buttons
 
 
-    if (editButton && editForm && updateButton && ignoreCombineCheckbox) {
+    if (editButton && editForm && updateButton) {
         editButton.addEventListener('click', () => {
             editForm.style.display = editForm.style.display === 'none' ? 'block' : 'none';
         });
 
         updateButton.addEventListener('click', async () => {
-            console.log('Update Rank button clicked');
+            console.log('Update Rank button clicked - Event listener triggered.');
             const newData = {
                 operatorCount: parseInt(document.getElementById('operatorCount').value) || 0,
                 operatorAvg: parseFloat(document.getElementById('operatorAvg').value) || 0,
@@ -1173,22 +1173,32 @@ function bindRankEditEvents(userId, savedTimestamp) {
             };
             console.debug('newData', newData);
 
-            const updatedResult = await updateUserRankings(userId, newData, ignoreCombineCheckbox.checked);
+            try {
+                const updatedResult = await updateUserRankings(userId, newData, ignoreCombineCheckbox ? ignoreCombineCheckbox.checked : false);
+                console.log('updateUserRankings completed successfully.');
 
-            const rankCard = document.getElementById('rankCard');
-            if (rankCard) {
-                rankCard.querySelector('.card__content').innerHTML = `
-                    <h3 style="font-size: 1.5rem; font-weight: bold; margin-bottom: 10px;">我的排名信息</h3>
-                    <small class="genius__hint genius__hint--dark">
-                        <span>美东时间: ${formatSavedTimestamp(savedTimestamp)[0]}</span>
-                        <span>北京时间: ${formatSavedTimestamp(savedTimestamp)[1]}</span>
-                    </small>
-                    ${rankInfo2Html(updatedResult, ignoreCombineCheckbox.checked)}
-                `;
-                bindRankEditEvents(userId, savedTimestamp);
+                const rankCard = document.getElementById('rankCard');
+                if (rankCard) {
+                    rankCard.querySelector('.card__content').innerHTML = `
+                        <h3 style="font-size: 1.5rem; font-weight: bold; margin-bottom: 10px;">我的排名信息</h3>
+                        <small class="genius__hint genius__hint--dark">
+                            <span>美东时间: ${formatSavedTimestamp(savedTimestamp)[0]}</span>
+                            <span>北京时间: ${formatSavedTimestamp(savedTimestamp)[1]}</span>
+                        </small>
+                        ${rankInfo2Html(updatedResult, ignoreCombineCheckbox ? ignoreCombineCheckbox.checked : false)}
+                    `;
+                    bindRankEditEvents(userId, savedTimestamp);
+                    console.log('Rank card re-rendered and events re-bound.');
+                }
+            } catch (error) {
+                console.error('Error during update rank process:', error);
             }
         });
+        // The closing brace for the `if (editButton && editForm && updateButton)` block was here.
+    }
 
+    // Now, handle ignoreCombineCheckbox separately
+    if (ignoreCombineCheckbox) {
         ignoreCombineCheckbox.addEventListener('change', async () => {
             console.log('Ignore Combine checkbox changed');
             const { result, savedTimestamp } = await getSingleRankByUserId(userId, ignoreCombineCheckbox.checked);
@@ -1802,31 +1812,29 @@ async function getAlphasByMonth(startDateObj, endDateObj) { // Renamed parameter
 
     // Helper function to format date into YYYY-MM-DDTHH:MM:SS-04:00
     // The API expects times to be in Eastern Time (-04:00 offset)
-    const formatToET = (date, isEndDate = false) => {
+    const formatToET = (date) => {
         const year = date.getFullYear();
         const month = (date.getMonth() + 1).toString().padStart(2, '0');
         const day = date.getDate().toString().padStart(2, '0');
-        
-        // For start date, time should be 00:00:00 ET
-        // For end date, time should be 23:59:59 ET
-        const hours = isEndDate ? '23' : '00';
-        const minutes = isEndDate ? '59' : '00';
-        const seconds = isEndDate ? '59' : '00';
-
+        const hours = date.getHours().toString().padStart(2, '0');
+        const minutes = date.getMinutes().toString().padStart(2, '0');
+        const seconds = date.getSeconds().toString().padStart(2, '0');
         return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}-04:00`;
     };
 
+    // Adjust fetch range to be broader than the target month for safety
+    const fetchStartDate = new Date(startDateObj);
+    fetchStartDate.setDate(fetchStartDate.getDate() - 2); // Fetch 2 days before the start of the month
+
+    const fetchEndDate = new Date(endDateObj);
+    fetchEndDate.setDate(fetchEndDate.getDate() + 2); // Fetch 2 days after the end of the month
+
+    const formattedFetchStartDate = formatToET(fetchStartDate);
+    const formattedFetchEndDate = formatToET(fetchEndDate);
+
+
     while(hasMore) {
-        // Apply different time components for start and end dates based on user's example
-        // The API uses '<' for the end date, so formattedEndDateForAPI should be 00:00:00 of the *next* day
-        // to include all of endDateObj.
-        const nextDayAfterEndDate = new Date(endDateObj);
-        nextDayAfterEndDate.setDate(endDateObj.getDate() + 1);
-
-        const formattedStartDate = formatToET(startDateObj, false); // 00:00:00 of startDateObj
-        const formattedEndDateForAPI = formatToET(nextDayAfterEndDate, false); // 00:00:00 of the day *after* endDateObj
-
-        const url = `https://api.worldquantbrain.com/users/self/alphas?limit=${limit}&offset=${offset}&stage=OS&dateSubmitted>=${formattedStartDate}&dateSubmitted<${formattedEndDateForAPI}&order=-dateSubmitted`;
+        const url = `https://api.worldquantbrain.com/users/self/alphas?limit=${limit}&offset=${offset}&stage=OS&dateSubmitted>=${formattedFetchStartDate}&dateSubmitted<=${formattedFetchEndDate}&order=-dateSubmitted`;
         console.log('API URL:', url);
         try {
             const response = await getDataFromUrl(url);
@@ -1846,7 +1854,14 @@ async function getAlphasByMonth(startDateObj, endDateObj) { // Renamed parameter
     }
     
     console.log('Fetched new alphas. Total:', allAlphas.length);
-    return allAlphas;
+
+    // Client-side filtering to ensure strict monthly attribution
+    const strictlyFilteredAlphas = allAlphas.filter(alpha => {
+        const submittedDate = new Date(alpha.dateSubmitted);
+        return submittedDate >= startDateObj && submittedDate <= endDateObj;
+    });
+
+    return strictlyFilteredAlphas;
 }
 
 function processPyramidData(alphas) {
