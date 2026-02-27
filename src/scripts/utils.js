@@ -271,15 +271,50 @@ async function fetchSubmittedAlphas(buttonId, forceRefresh = false) { // Add for
         throw error; // 抛出错误以便调用方处理
     }
 
+    // 过滤REGULAR类型：每天只保留前4个
+    const regularAlphas = allAlphas.filter(item => item.type === 'REGULAR');
+    const otherAlphas = allAlphas.filter(item => item.type !== 'REGULAR');
+
+    console.log('原始REGULAR alpha数量:', regularAlphas.length);
+
+    // 按日期分组
+    const alphasByDate = {};
+    regularAlphas.forEach(alpha => {
+        if (!alpha.dateSubmitted) return;
+
+        // 获取日期部分（YYYY-MM-DD）
+        const dateStr = alpha.dateSubmitted.split('T')[0];
+
+        if (!alphasByDate[dateStr]) {
+            alphasByDate[dateStr] = [];
+        }
+        alphasByDate[dateStr].push(alpha);
+    });
+
+    // 每天按提交时间排序，只保留前4个
+    const filteredRegularAlphas = [];
+    Object.keys(alphasByDate).forEach(dateStr => {
+        const dayAlphas = alphasByDate[dateStr];
+        // 按dateSubmitted升序排序（早的在前）
+        dayAlphas.sort((a, b) => new Date(a.dateSubmitted) - new Date(b.dateSubmitted));
+        // 只取前4个
+        filteredRegularAlphas.push(...dayAlphas.slice(0, 4));
+    });
+
+    console.log('过滤后REGULAR alpha数量（每天前4个）:', filteredRegularAlphas.length);
+
+    // 合并过滤后的REGULAR alpha和其他类型的alpha
+    const filteredAlphas = [...filteredRegularAlphas, ...otherAlphas];
+
     // 更新缓存
     submittedAlphasCache = {
-        data: allAlphas,
+        data: filteredAlphas,
         lastUpdated: Date.now()
     };
     chrome.storage.local.set({ submittedAlphasCache: submittedAlphasCache });
-    console.log('已提交的Alpha列表更新完成，总数:', allAlphas.length);
-    setButtonState(buttonId, `加载完成 (${allAlphas.length}个)`, 'enable');
-    return allAlphas;
+    console.log('已提交的Alpha列表更新完成，总数:', filteredAlphas.length, '(REGULAR:', filteredRegularAlphas.length, ', 其他:', otherAlphas.length, ')');
+    setButtonState(buttonId, `加载完成 (${filteredAlphas.length}个)`, 'enable');
+    return filteredAlphas;
 }
 
 

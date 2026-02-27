@@ -104,7 +104,8 @@
     ],
     "host_permissions": [
         "https://*/*",
-        "https://api.worldquantbrain.com/*"
+        "https://api.worldquantbrain.com/*",
+        "https://wqmanager.qzz.io/*"
     ],
     "permissions": [
         "scripting",

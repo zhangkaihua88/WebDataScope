@@ -114,12 +114,43 @@ async function opsAna(forceRefresh = false) {
             console.log('Force refreshing: Clearing WQPOPSAna from storage.');
             await chrome.storage.local.remove('WQPOPSAna');
         }
-        
+
         let data = await fetchAllAlphas(forceRefresh, true); // Changed to true for isSelf
+
+        // 过滤出REGULAR类型的alpha
+        let regularAlphas = data.filter(item => item.type === 'REGULAR');
+        console.log('总REGULAR alpha数量:', regularAlphas.length);
+
+        // 按日期分组，每天只取前4个
+        const alphasByDate = {};
+        regularAlphas.forEach(alpha => {
+            if (!alpha.dateSubmitted) return;
+
+            // 获取日期部分（YYYY-MM-DD）
+            const dateStr = alpha.dateSubmitted.split('T')[0];
+
+            if (!alphasByDate[dateStr]) {
+                alphasByDate[dateStr] = [];
+            }
+            alphasByDate[dateStr].push(alpha);
+        });
+
+        // 每天按提交时间排序，只保留前4个
+        const filteredAlphas = [];
+        Object.keys(alphasByDate).forEach(dateStr => {
+            const dayAlphas = alphasByDate[dateStr];
+            // 按dateSubmitted升序排序（早的在前）
+            dayAlphas.sort((a, b) => new Date(a.dateSubmitted) - new Date(b.dateSubmitted));
+            // 只取前4个
+            filteredAlphas.push(...dayAlphas.slice(0, 4));
+        });
+
+        console.log('过滤后统计的REGULAR alpha数量（每天前4个）:', filteredAlphas.length);
+
         let operators = await getDataFromUrl(OptUrl);
         operators = operators.filter(item => item.scope.includes('REGULAR'));
 
-        let regulars = data.map(item => item.type === 'REGULAR' ? item.regular.code : '');
+        let regulars = filteredAlphas.map(item => item.regular.code);
         // regulars = data.map(item => item.type === 'REGULAR' ? item.regular.code : item.combo.code);
         console.log(regulars);
         let use_ops = regulars.map(item => findOps(item, operators)).flat();
@@ -164,13 +195,15 @@ async function opsAna(forceRefresh = false) {
         let currentTime = new Date().toISOString();
         let dataToSave = {
             array: operators,
-            timestamp: currentTime
+            timestamp: currentTime,
+            version: '1.0', // 添加版本号，用于识别新的过滤逻辑
+            alphaCount: filteredAlphas.length // 保存过滤后的alpha数量
         };
         chrome.storage.local.set({ WQPOPSAna: dataToSave }, function () {
             console.log('数据已保存');
             console.log(dataToSave);
         });
-        setButtonState('WQPOPSFetchButton', `运算符分析完成${data.length}`, 'enable');
+        setButtonState('WQPOPSFetchButton', `运算符分析完成(${filteredAlphas.length}个Alpha)`, 'enable');
         // Automatically display "我的排名" after Operator Analysis is complete
         // await insertMyRankInfo(null, null, true); // Temporarily commented out to prevent 'No rank data found' error
     } catch (error) {
@@ -185,17 +218,28 @@ function insertOpsTable() {
 
     chrome.storage.local.get('WQPOPSAna', function (result) {
         if (result.WQPOPSAna) {
+            // 检查缓存版本，如果是旧版本（没有version字段），清除缓存并提示重新分析
+            if (!result.WQPOPSAna.version || result.WQPOPSAna.version !== '1.0') {
+                console.log('检测到旧版本缓存，正在清除...');
+                chrome.storage.local.remove('WQPOPSAna', () => {
+                    alert('检测到旧的分析数据，请重新点击"运算符分析"按钮进行分析。');
+                });
+                return;
+            }
+
             console.log('读取的数据:', result.WQPOPSAna);
             let savedArray = result.WQPOPSAna.array;
             let savedTimestamp = result.WQPOPSAna.timestamp;
+            let alphaCount = result.WQPOPSAna.alphaCount || 0; // 获取统计的alpha数量
             const zeroCount = savedArray.filter(item => item.count === 0).length;
             const nonZeroCount = savedArray.filter(item => item.count !== 0).length;
 
             console.log(savedArray);
             console.log(savedTimestamp);
+            console.log('统计的Alpha数量:', alphaCount);
 
             // 创建表格结构
-            let tableHTML = generateOperatorTable(savedTimestamp, nonZeroCount, zeroCount, savedArray);
+            let tableHTML = generateOperatorTable(savedTimestamp, nonZeroCount, zeroCount, savedArray, alphaCount);
 
             // 查找目标插入位置
             const mainContent = document.querySelector('.genius__main-content');
@@ -212,6 +256,18 @@ function insertOpsTable() {
                 } else {
                     console.error('未找到 mainContent 元素');
                 }
+
+            // 给第二列（运算符定义）添加双击事件的函数
+            function attachOperatorDoubleClickEvents() {
+                const definitionCells = table.querySelectorAll("tbody tr td:nth-child(2)");
+                definitionCells.forEach(cell => {
+                    cell.style.cursor = 'pointer';
+                    cell.style.userSelect = 'text';
+                    // 移除旧的监听器（如果存在）
+                    cell.removeEventListener('dblclick', showOperatorAlphasCard);
+                    cell.addEventListener('dblclick', showOperatorAlphasCard);
+                });
+            }
 
             // 排序功能
             const table = document.getElementById("operatorTable");
@@ -237,8 +293,14 @@ function insertOpsTable() {
                     const tbody = table.querySelector("tbody");
                     tbody.innerHTML = '';
                     sortedRows.forEach(row => tbody.appendChild(row));
+
+                    // 重新绑定双击事件
+                    attachOperatorDoubleClickEvents();
                 });
             });
+
+            // 初始绑定双击事件
+            attachOperatorDoubleClickEvents();
 
         } else {
             console.log('没有找到保存的数据');
@@ -249,7 +311,7 @@ function insertOpsTable() {
 watchForElementAndInsertButton();
 document.addEventListener('mouseover', showGeniusCard);
 // 工具函數,提供inertOpsTable使用
-function generateOperatorTable(savedTimestamp, nonZeroCount, zeroCount, savedArray) {
+function generateOperatorTable(savedTimestamp, nonZeroCount, zeroCount, savedArray, alphaCount) {
     const [usTime, cnTime] = formatSavedTimestamp(savedTimestamp);
 
     const rowsHTML = savedArray.map((item, index) => `
@@ -270,11 +332,11 @@ function generateOperatorTable(savedTimestamp, nonZeroCount, zeroCount, savedArr
                             <span>北京时间: ${cnTime}</span>
                         </small>
                     </div>
-                    
+
                     <article class="card">
                         <div class="card_wrapper">
                             <div class="card__content" style="padding-bottom: 26px;">
-                                <h3>在你可用的运算符中，共有${nonZeroCount}种运算符被使用，${zeroCount}种运算符未被使用。</h3>
+                                <h3>统计了${alphaCount}个REGULAR Alpha（每天前4个），在你可用的运算符中，共有${nonZeroCount}种运算符被使用，${zeroCount}种运算符未被使用。</h3>
                                 <p>'-'有两种含义分别是substract和revers, 此处统一为substrac
                                 <div class="operator-table">
                                     <table id="operatorTable" class="sortable WQScope_table">
@@ -1596,6 +1658,7 @@ function insertButton() {
         buttonContainer.appendChild(ButtonGen('显示排名分析', 'WQPRankShowButton', insertMyRankInfo));
         buttonContainer.appendChild(ButtonGen('显示排名列表', 'WQPRankListShowButton', insertRankListInfo));
         buttonContainer.appendChild(ButtonGen('季度分析', 'WQPQuarterlyAnalysisButton', displayQuarterlyAnalysis));
+        buttonContainer.appendChild(ButtonGen('WQ Manager', 'WQPDataOverviewButton', openDataOverview));
         // Removed "显示我的排名" button as per user request.
 
         targetElement.insertAdjacentElement('afterend', buttonContainer);
@@ -2549,4 +2612,177 @@ function generateQuarterlyAnalysisHTML(stats) {
 
     html += '</div>';
     return html;
+}
+// ############################## 数据总览 ##############################
+
+async function openDataOverview() {
+    try {
+        setButtonState('WQPDataOverviewButton', '登录中...', 'load');
+
+        const selfSummary = await getDataFromUrl('https://api.worldquantbrain.com/users/self/consultant/summary');
+
+        if (!selfSummary || !selfSummary.leaderboard || !selfSummary.leaderboard.user) {
+            alert('无法获取用户ID，请检查网络连接');
+            setButtonState('WQPDataOverviewButton', 'WQ Manager', 'enable');
+            return;
+        }
+
+        const wqId = selfSummary.leaderboard.user;
+
+        chrome.runtime.sendMessage(
+            { type: 'WQ_MANAGER_LOGIN_AND_OPEN', wq_id: wqId },
+            (response) => {
+                if (response && response.ok) {
+                    setButtonState('WQPDataOverviewButton', 'WQ Manager', 'enable');
+                } else {
+                    alert('登录失败: ' + (response?.error || '未知错误'));
+                    setButtonState('WQPDataOverviewButton', 'WQ Manager', 'enable');
+                }
+            }
+        );
+    } catch (error) {
+        alert('登录失败: ' + error.message);
+        setButtonState('WQPDataOverviewButton', 'WQ Manager', 'enable');
+    }
+}
+
+// ############################## 运算符Alpha卡片显示 ##############################
+
+let operatorAlphaCard = null;
+
+function dismissOperatorAlphaCard() {
+    if (operatorAlphaCard && operatorAlphaCard.parentNode) {
+        operatorAlphaCard.parentNode.removeChild(operatorAlphaCard);
+    }
+    operatorAlphaCard = null;
+    document.removeEventListener('click', dismissOperatorAlphaCardOutside);
+    document.removeEventListener('keydown', dismissOperatorAlphaCardOnEscape);
+}
+
+function dismissOperatorAlphaCardOutside(event) {
+    if (operatorAlphaCard && !operatorAlphaCard.contains(event.target)) {
+        dismissOperatorAlphaCard();
+    }
+}
+
+function dismissOperatorAlphaCardOnEscape(event) {
+    if (event.key === 'Escape') {
+        dismissOperatorAlphaCard();
+    }
+}
+
+async function showOperatorAlphasCard(event) {
+    // 关闭任何现有的卡片
+    dismissOperatorAlphaCard();
+
+    const operatorText = event.target.innerText.trim();
+
+    if (!operatorText) {
+        return;
+    }
+
+    // 创建卡片元素
+    operatorAlphaCard = document.createElement('div');
+    operatorAlphaCard.id = 'operatorAlphaDetailsCard';
+    operatorAlphaCard.style.cssText = `
+        position: fixed;
+        background-color: #f8f8f8;
+        border: 1px solid #ddd;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        padding: 20px;
+        z-index: 10000;
+        max-width: 600px;
+        max-height: 500px;
+        overflow-y: auto;
+        border-radius: 10px;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        color: #333;
+        line-height: 1.6;
+        cursor: auto;
+    `;
+
+    // 定位卡片
+    operatorAlphaCard.style.left = `${event.clientX + 15}px`;
+    operatorAlphaCard.style.top = `${event.clientY + 15}px`;
+
+    document.body.appendChild(operatorAlphaCard);
+
+    // 初始加载状态
+    operatorAlphaCard.innerHTML = `
+        <div style="font-size: 1.1em; font-weight: bold; margin-bottom: 15px;">
+            <span style="color: #007bff;">${operatorText}</span> 使用情况查询
+        </div>
+        <div style="text-align: center; padding: 20px;">查询中... <div class="loading-spinner" style="display: inline-block; width: 20px; height: 20px; border: 3px solid #f3f3f3; border-top: 3px solid #3498db; border-radius: 50%; animation: spin 1s linear infinite;"></div></div>
+        <button id="closeOperatorAlphaCard" style="position: absolute; top: 10px; right: 10px; background: none; border: none; font-size: 24px; cursor: pointer; color: #666;">&times;</button>
+        <style>
+            @keyframes spin {
+                0% { transform: rotate(0deg); }
+                100% { transform: rotate(360deg); }
+            }
+        </style>
+    `;
+
+    // 关闭按钮功能
+    document.getElementById('closeOperatorAlphaCard').addEventListener('click', dismissOperatorAlphaCard);
+
+    // 添加点击外部和ESC键关闭
+    document.addEventListener('click', dismissOperatorAlphaCardOutside);
+    document.addEventListener('keydown', dismissOperatorAlphaCardOnEscape);
+
+    try {
+        // 获取所有已提交的Alpha
+        const alphas = await getSubmittedFields();
+
+        console.log("运算符:", operatorText);
+        // 过滤包含该运算符的alpha
+        const matchedAlphas = alphas.filter(alpha =>
+            alpha.regular && alpha.regular.code && alpha.regular.code.includes(operatorText)
+        );
+        console.log("匹配的Alphas:", matchedAlphas);
+
+        let cardContentHtml = '';
+        let mainTitleText = `<span style="color: #007bff;">${operatorText}</span> 在本赛季使用情况 (共 ${matchedAlphas.length} 个):`;
+
+        if (matchedAlphas.length > 0) {
+            cardContentHtml += `<ul style="list-style-type: none; padding: 0;">`;
+            matchedAlphas.forEach(alpha => {
+                if (alpha && alpha.id) {
+                    const settings = `${alpha.settings.instrumentType || 'N/A'} / ${alpha.settings.region || 'N/A'} / ${alpha.settings.universe || 'N/A'} / D${alpha.settings.delay || 'N/A'}`;
+                    const alphaCode = alpha.regular && alpha.regular.code ? alpha.regular.code : 'N/A';
+
+                    cardContentHtml += `
+                        <li style="margin-bottom: 20px; padding: 10px; border: 1px solid #eee; border-radius: 5px; background-color: #fff;">
+                            <div style="font-weight: bold; margin-bottom: 5px;">Alpha ID: <a href="https://platform.worldquantbrain.com/alpha/${alpha.id}" target="_blank" style="color: #007bff; text-decoration: none;">${alpha.id}</a></div>
+                            <div style="margin-bottom: 5px;">设置: ${settings}</div>
+                            <div>代码:<pre style="background-color: #f0f0f0; padding: 10px; border-radius: 5px; overflow-x: auto; white-space: pre-wrap; word-break: break-all; font-family: 'Courier New', Courier, monospace; font-size: 0.9em;"><code>${alphaCode}</code></pre></div>
+                        </li>
+                    `;
+                }
+            });
+            cardContentHtml += `</ul>`;
+        } else {
+            cardContentHtml = `<div style="text-align: center; padding: 20px;">本赛季未使用此运算符。</div>`;
+        }
+
+        operatorAlphaCard.innerHTML = `
+            <div style="font-size: 1.1em; font-weight: bold; margin-bottom: 15px;">
+                ${mainTitleText}
+            </div>
+            ${cardContentHtml}
+            <button id="closeOperatorAlphaCard" style="position: absolute; top: 10px; right: 10px; background: none; border: none; font-size: 24px; cursor: pointer; color: #666;">&times;</button>
+        `;
+        // 重新绑定关闭按钮
+        document.getElementById('closeOperatorAlphaCard').addEventListener('click', dismissOperatorAlphaCard);
+
+    } catch (error) {
+        console.error('查询运算符使用情况失败:', error);
+        operatorAlphaCard.innerHTML = `
+            <div style="font-size: 1.1em; font-weight: bold; margin-bottom: 15px;">
+                <span style="color: #007bff;">${operatorText}</span> 使用情况查询失败
+            </div>
+            <div style="text-align: center; padding: 20px; color: red;">查询失败: ${error.message}</div>
+            <button id="closeOperatorAlphaCard" style="position: absolute; top: 10px; right: 10px; background: none; border: none; font-size: 24px; cursor: pointer; color: #666;">&times;</button>
+        `;
+        document.getElementById('closeOperatorAlphaCard').addEventListener('click', dismissOperatorAlphaCard);
+    }
 }
