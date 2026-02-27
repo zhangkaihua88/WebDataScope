@@ -155,8 +155,71 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     } else if (msg && msg.type === 'REQ_MONITOR_GET_EXCLUDED') {
         sendResponse({ ok: true, data: EXCLUDED_PREFIXES });
         return true;
+    } else if (msg && msg.type === 'WQ_MANAGER_LOGIN_AND_OPEN') {
+        // 处理WQ Manager登录并打开页面
+        loginAndOpenWqManager(msg.wq_id, sender.tab.id).then(() => {
+            sendResponse({ ok: true });
+        }).catch(error => {
+            sendResponse({ ok: false, error: error.message });
+        });
+        return true;
     }
 });
+
+async function loginAndOpenWqManager(wqId, currentTabId) {
+    // 在当前标签页打开登录页面
+    await chrome.tabs.update(currentTabId, {
+        url: 'https://wqmanager.qzz.io/login'
+    });
+
+    // 等待页面加载完成后，填充wq_id并自动提交
+    return new Promise((resolve, reject) => {
+        const listener = (tabId, changeInfo) => {
+            if (tabId === currentTabId && changeInfo.status === 'complete') {
+                chrome.tabs.onUpdated.removeListener(listener);
+
+                // 在页面中自动填充wq_id并提交登录表单
+                chrome.scripting.executeScript({
+                    target: { tabId: currentTabId },
+                    func: async (wq_id) => {
+                        // 查找wq_id输入框
+                        const wqIdInput = document.querySelector('input[type="text"]') ||
+                                         document.querySelector('input[name="wq_id"]') ||
+                                         document.querySelector('input[placeholder*="WQ"]');
+
+                        if (wqIdInput) {
+                            // 填充wq_id
+                            wqIdInput.value = wq_id;
+                            wqIdInput.dispatchEvent(new Event('input', { bubbles: true }));
+                            wqIdInput.dispatchEvent(new Event('change', { bubbles: true }));
+
+                            // 等待一下，然后查找并点击登录按钮
+                            setTimeout(() => {
+                                const loginButton = document.querySelector('button[type="submit"]') ||
+                                                   document.querySelector('button');
+                                if (loginButton) {
+                                    loginButton.click();
+                                }
+                            }, 100);
+                        }
+                    },
+                    args: [wqId]
+                }).then(() => {
+                    resolve();
+                }).catch((error) => {
+                    reject(error);
+                });
+            }
+        };
+
+        chrome.tabs.onUpdated.addListener(listener);
+
+        setTimeout(() => {
+            chrome.tabs.onUpdated.removeListener(listener);
+            reject(new Error('页面加载超时'));
+        }, 10000);
+    });
+}
 
 function broadcastRequest(rec) {
     // 仅向 platform.worldquantbrain.com 的标签分发
