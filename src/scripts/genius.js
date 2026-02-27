@@ -1089,6 +1089,39 @@ async function setup(){
     setButtonState('WQPAuth', `配置完成${authToken}`, 'disable');
 }
 
+// ############################## WQ Manager ##############################
+
+async function openDataOverview() {
+    try {
+        setButtonState('WQPDataOverviewButton', '登录中...', 'load');
+
+        const selfSummary = await getDataFromUrl('https://api.worldquantbrain.com/users/self/consultant/summary');
+
+        if (!selfSummary || !selfSummary.leaderboard || !selfSummary.leaderboard.user) {
+            alert('无法获取用户ID，请检查网络连接');
+            setButtonState('WQPDataOverviewButton', 'WQ Manager', 'enable');
+            return;
+        }
+
+        const wqId = selfSummary.leaderboard.user;
+
+        chrome.runtime.sendMessage(
+            { type: 'WQ_MANAGER_LOGIN_AND_OPEN', wq_id: wqId },
+            (response) => {
+                if (response && response.ok) {
+                    setButtonState('WQPDataOverviewButton', 'WQ Manager', 'enable');
+                } else {
+                    alert('登录失败: ' + (response?.error || '未知错误'));
+                    setButtonState('WQPDataOverviewButton', 'WQ Manager', 'enable');
+                }
+            }
+        );
+    } catch (error) {
+        alert('登录失败: ' + error.message);
+        setButtonState('WQPDataOverviewButton', 'WQ Manager', 'enable');
+    }
+}
+
 
 // ############################## 插入按钮 ##############################
 
@@ -1142,6 +1175,7 @@ function insertButton() {
         buttonContainer.appendChild(ButtonGen('排名分析', 'WQPRankFetchButton', rankAna));
         buttonContainer.appendChild(ButtonGen('显示排名分析', 'WQPRankShowButton', insertMyRankInfo));
         buttonContainer.appendChild(ButtonGen('显示排名列表', 'WQPRankListShowButton', insertRankListInfo));
+        buttonContainer.appendChild(ButtonGen('WQ Manager', 'WQPDataOverviewButton', openDataOverview));
 
         // Insert the button container after the target element
         targetElement.insertAdjacentElement('afterend', buttonContainer);
