@@ -157,6 +157,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         return true;
     } else if (msg && msg.type === 'WQ_MANAGER_LOGIN_AND_OPEN') {
         // 处理WQ Manager登录并打开页面
+        console.log(msg.id)
         loginAndOpenWqManager(msg.wq_id, sender.tab.id).then(() => {
             sendResponse({ ok: true });
         }).catch(error => {
@@ -168,9 +169,16 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
 async function loginAndOpenWqManager(wqId, currentTabId) {
     // 在当前标签页打开登录页面
-    await chrome.tabs.update(currentTabId, {
-        url: 'https://wqmanager.qzz.io/login'
+    currentTabId = await new Promise((resolve, reject) => {
+        chrome.tabs.create({ url: 'https://wqmanager.qzz.io/login', active: true }, (tab) => {
+            if (chrome.runtime.lastError) return reject(chrome.runtime.lastError);
+            resolve(tab.id);
+        });
     });
+
+
+    
+    
 
     // 等待页面加载完成后，填充wq_id并自动提交
     return new Promise((resolve, reject) => {
@@ -211,6 +219,11 @@ async function loginAndOpenWqManager(wqId, currentTabId) {
                 });
             }
         };
+
+        // 导航到 Profile 页面以触发 onUpdated 事件
+        chrome.tabs.update(currentTabId, {
+            url: 'https://wqmanager.qzz.io/Profile'
+        });
 
         chrome.tabs.onUpdated.addListener(listener);
 
