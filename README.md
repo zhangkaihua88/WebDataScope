@@ -3,6 +3,10 @@ WebDataScope是一个正在打造的Chrome/Edge插件。它可以让你在平台
 
 使用方法和功能详见使用教程
 
+## Star History
+
+[![Star History Chart](https://api.star-history.com/image?repos=zhangkaihua88/WebDataScope&type=date&legend=top-left)](https://www.star-history.com/?repos=zhangkaihua88%2FWebDataScope&type=date&legend=top-left)
+
 # 存储的变量
 - `WQPSettings`: 插件设置
 - `WQPOPSAna`: Genius运算符使用分析结果
