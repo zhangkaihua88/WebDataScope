@@ -6,9 +6,19 @@
 
     const SEARCH = '},...e===i.kC.SUBMITTED?[l]:[c],{';
     const VERSION_REGEX = /version:\s*"1\.0\.6"/;
-    const VERSION_REPLACE = 'version:"1.0.6-wqp1"';
+    const VERSION_REPLACE = 'version:"1.0.6-wqp2"';
 
     const EXTRA_COLUMNS = [
+        {
+            id: 'id',
+            name: 'Alpha ID',
+            active: false,
+            category: 'WQP',
+            activeTabsWithoutParent: ['unsubmitted', 'submitted'],
+            display: true,
+            type: 'string',
+            width: 100
+        },
         {
             id: 'failedNumRA',
             parent: 'is',
@@ -46,6 +56,7 @@
             let patched = false;
             if (code.includes(SEARCH)) {
                 code = code.replace(SEARCH, buildReplacement());
+                code = code.replace('readOnly:!0,display:!0,', 'readOnly:!1,display:!0,');
                 console.log('[WQP] patchColumns: 成功注入列定义', src);
                 patched = true;
             } else {

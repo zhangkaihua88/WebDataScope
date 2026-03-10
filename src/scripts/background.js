@@ -124,11 +124,16 @@ function injectFetchInterceptor(tabId) {
                 ]));
 
                 // 2. 核心逻辑：遍历数据，统计不合格数量并新增字段
+                // 
+                // 比如sub-univers ,robust 其实能不能把那些fail的具体值做出来，比如robust 那些的值
+                // 能不能加个显示负的alpha的功能，比如当sharp为负的时候，如果测试值的绝对值都能通过平台标准就显示’-0‘
+                // risk neut那个就是用传统neut跑的时候 会有个risk neut的线 大概sharpe 和 fit都更高的话 就需要遍历risk neut
+                // 按照具体的pyramid筛选
                 originalData.results.forEach(item => {
                     // 容错处理：如果is/checks不存在，直接赋值0
                     if (!item?.is?.checks || !Array.isArray(item.is.checks)) {
-                        item.is.failed_num_RA = 0;
-                        item.is.failed_num_PPA = 0;
+                        item.is.failedNumRA = 0;
+                        item.is.failedNumPPA = 0;
                         return;
                     }
                     item.is.failedNumRA = item.is.checks.filter(check => 
