@@ -24,7 +24,7 @@
             parent: 'is',
             name: 'Failed RA',
             active: true,
-            filterOperator: "~",
+            // filterOperator: "~",
             category: 'WQP',
             activeTabsWithoutParent: ['unsubmitted', 'submitted'],
             display: true,
