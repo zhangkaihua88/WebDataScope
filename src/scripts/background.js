@@ -144,6 +144,12 @@ function injectFetchInterceptor(tabId) {
                         (PPA_CHECK_NAMES.includes(check.name) && check.result !== 'PASS' && check.result !== 'PENDING') || (check.name === "LOW_SHARPE" && check.value < 1)
                     ).length;
                     
+                    item.is.WQPPYS = item.is.checks
+                        .find(check => check.name === "MATCHES_PYRAMID")?.pyramids
+                        ?.map(pyramid => (pyramid.name?.split('/').pop() || '').toLowerCase())
+                        ?.join('/') || '';
+
+                    
                 });
                 return originalData;
             }

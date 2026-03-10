@@ -6,7 +6,7 @@
 
     const SEARCH = '},...e===i.kC.SUBMITTED?[l]:[c],{';
     const VERSION_REGEX = /version:\s*"1\.0\.6"/;
-    const VERSION_REPLACE = 'version:"1.0.6-wqp2"';
+    const VERSION_REPLACE = 'version:"1.0.6-wqp4"';
 
     const EXTRA_COLUMNS = [
         {
@@ -42,7 +42,27 @@
             display: true,
             type: 'integer',
             width: 80
-
+        },
+        {
+            id: 'WQPPYS',
+            parent: 'is',
+            name: 'Pyramid',
+            active: false,
+            category: 'WQP',
+            activeTabsWithoutParent: ['unsubmitted', 'submitted'],
+            display: true,
+            type: 'string',
+        },
+        {
+            id: 'operatorCount',
+            parent: 'regular',
+            name: 'Operator Count',
+            active: false,
+            category: 'WQP',
+            activeTabsWithoutParent: ['unsubmitted', 'submitted'],
+            display: true,
+            type: 'integer',
+            width: 80
         },
     ];
     function buildReplacement() {
