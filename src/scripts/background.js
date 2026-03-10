@@ -76,15 +76,110 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
             injectionGeniusScript(tabId);
         } else if (dataFlag) {
             injectionDataFlagScript(tabId, tab);
-        }else if(simulateFlag){
+        } else if (simulateFlag) {
             injectionSimulateScript(tabId);
         }
     }
 });
 
+// 用 webNavigation.onCommitted 在导航提交时（DOM 为空、JS 尚未插入）立即注入到 MAIN world
+// 比 tabs.onUpdated 的 'loading' 更早，确保 MutationObserver 在 WQ 第一个 <script> 插入前就已就位
+chrome.webNavigation.onCommitted.addListener((details) => {
+    // 只处理顶层主框架，忽略 iframe
+    if (details.frameId !== 0) return;
+    if (!details.url || !details.url.includes('platform.worldquantbrain.com')) return;
+    injectFetchInterceptor(details.tabId);
+}, { url: [{ hostContains: 'platform.worldquantbrain.com' }] });
 
+// 注入 Fetch 拦截器到页面的 MAIN 环境中
+function injectFetchInterceptor(tabId) {
+    chrome.scripting.executeScript({
+        target: { tabId: tabId },
+        world: "MAIN", // 必须指定 MAIN，否则无法覆盖页面本身的 window.fetch
+        func: () => {
 
+            // 将辅助函数定义在注入的内容脚本内
+            function getAlphaCheckStates(originalData) {
+                // 1. 定义需要校验的RA检查项名称（自动去重，避免重复统计）
+                const RA_CHECK_NAMES = Array.from(new Set([
+                    "HIGH_TURNOVER", "LOW_TURNOVER",
+                    "LOW_FITNESS", "LOW_RETURNS", "LOW_SHARPE", 
 
+                    'LOW_GLB_AMER_SHARPE', 'LOW_GLB_APAC_SHARPE', 'LOW_GLB_EMEA_SHARPE', 'LOW_ASI_JPN_SHARPE',
+
+                    "IS_LADDER_SHARPE", // ATOM豁免 
+                    "LOW_2Y_SHARPE",  "LOW_SUB_UNIVERSE_SHARPE",  "LOW_ROBUST_UNIVERSE_SHARPE", 
+                    "LOW_AFTER_COST_ILLIQUID_UNIVERSE_SHARPE", 'LOW_INVESTABILITY_CONSTRAINED_SHARPE',
+
+                    "LOW_ROBUST_UNIVERSE_RETURNS", 
+                    "CONCENTRATED_WEIGHT",  
+                ]));
+                const PPA_CHECK_NAMES = Array.from(new Set([
+                    'LOW_TURNOVER',
+                    'HIGH_TURNOVER',
+                    'LOW_SUB_UNIVERSE_SHARPE', 
+                    'LOW_ROBUST_UNIVERSE_SHARPE', 
+                    'LOW_ROBUST_UNIVERSE_SHARPE.WITH_RATIO',
+                    'LOW_INVESTABILITY_CONSTRAINED_SHARPE'
+                ]));
+
+                // 2. 核心逻辑：遍历数据，统计不合格数量并新增字段
+                originalData.results.forEach(item => {
+                    // 容错处理：如果is/checks不存在，直接赋值0
+                    if (!item?.is?.checks || !Array.isArray(item.is.checks)) {
+                        item.is.failed_num_RA = 0;
+                        item.is.failed_num_PPA = 0;
+                        return;
+                    }
+                    item.is.failedNumRA = item.is.checks.filter(check => 
+                        RA_CHECK_NAMES.includes(check.name) && check.result !== 'PASS' && check.result !== 'PENDING'
+                    ).length;
+                    
+                    item.is.failedNumPPA = item.is.checks.filter(check => 
+                        (PPA_CHECK_NAMES.includes(check.name) && check.result !== 'PASS' && check.result !== 'PENDING') || (check.name === "LOW_SHARPE" && check.value < 1)
+                    ).length;
+                    
+                });
+                return originalData;
+            }
+
+            if (window.__wq_fetch_intercepted) return;
+            window.__wq_fetch_intercepted = true;
+
+            const originalFetch = window.fetch;
+            window.fetch = async function (...args) {
+                const url = typeof args[0] === 'string' ? args[0] : (args[0]?.url || '');
+
+                // 执行原始请求
+                const response = await originalFetch.apply(this, args);
+
+                // 拦截并修改目标接口的响应
+                if (url && url.includes("https://api.worldquantbrain.com/users/self/alphas?")) {
+                    try {
+                        const clone = response.clone();
+                        let originalData = await clone.json();
+
+                        // 👉 自定义你的修改逻辑
+                        const modifiedData = getAlphaCheckStates(originalData);
+                        console.log('拦截并修改了 alphas 响应：', modifiedData);
+                        
+                        // 构造新 Response 返回给前端
+                        return new Response(JSON.stringify(modifiedData), {
+                            status: response.status,
+                            statusText: response.statusText,
+                            headers: response.headers
+                        });
+                    } catch (e) {
+                        console.error("修改响应提取失败：", e);
+                    }
+                }
+                return response;
+            };
+        }
+    }).catch(err => console.error("注入 Fetch 拦截器失败：", err));
+}
+
+// alphaPath: ["is", "sharpe"]， 从select performence开始搜索， activeTabsWithoutParent: ["unsubmitted", "submitted"],
 // ############################## 以下为辅助函数 #################################
 
 
