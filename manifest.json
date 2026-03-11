@@ -65,6 +65,41 @@
             "css": [
                 "src/css/menu.css"
             ]
+        },
+        {
+            "matches": [
+                "*://platform.worldquantbrain.com/alpha/*",
+                "*://platform.worldquantbrain.com/alphas/unsubmitted",
+                "*://platform.worldquantbrain.com/learn/operators"
+            ],
+            "js": [
+                "src/scripts/alphaDetailsPopup.js"
+            ]
+        },
+        {
+            "matches": [
+                "*://platform.worldquantbrain.com/genius/*"
+            ],
+            "js": [
+                "src/scripts/lib/jquery-3.7.0.min.js",
+                "src/scripts/lib/jquery.dataTables.min.js",
+                "src/scripts/lib/dataTables.responsive.min.js",
+                "src/scripts/lib/dataTables.buttons.min.js",
+                "src/scripts/lib/buttons.colVis.min.js",
+                "src/scripts/lib/columnControl.dataTables.min.js",
+                "src/scripts/utils.js",
+                "src/scripts/uiCard.js",
+                "src/scripts/genius.js",
+                "src/scripts/distribution.js"
+            ],
+            "css": [
+                "src/css/genius.css",
+                "src/css/dataTables.dataTables.css",
+                "src/css/responsive.dataTables.min.css",
+                "src/css/buttons.dataTables.min.css",
+                "src/css/columnControl.dataTables.min.css",
+                "src/css/distribution.css"
+            ]
         }
     ],
     "web_accessible_resources": [

@@ -56,17 +56,22 @@ async function getDataFromUrl(url, options = {}) {
         timeoutMs = 15000,            // 单次请求超时
         initialDelayMs = 1000,        // 初始重试延迟
         maxDelayMs = 10000,           // 最大重试延迟
-        maxRetries = Infinity,        // 默认无限重试，直到 response.ok
-        onRetry = null                // 可选回调：({ attempt, status?, error?, nextDelayMs })
+        maxRetries = 5,               // 默认重试5次，避免无限等待
+        onRetry = null,               // 可选回调：({ attempt, status?, error?, nextDelayMs })
+        onFailure = null              // 新增可选回调：({ url, error })
     } = options;
 
     let attempt = 0;
     let delayMs = initialDelayMs;
 
-    while (true) {
+    while (attempt < maxRetries) { // 修改循环条件，使用有限次重试
         attempt += 1;
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(new DOMException('Timeout', 'AbortError')), timeoutMs);
+        const timeoutId = setTimeout(() => {
+            controller.abort(new DOMException('Timeout', 'AbortError'));
+            console.warn(`Request to ${url} timed out after ${timeoutMs}ms.`);
+        }, timeoutMs);
+
         try {
             const response = await fetch(url, {
                 referrer: "https://platform.worldquantbrain.com/",
@@ -84,34 +89,36 @@ async function getDataFromUrl(url, options = {}) {
                 return data;
             }
 
-            // 非 2xx，准备重试
+            // 非 2xx 响应，准备重试
             const nextDelay = Math.min(maxDelayMs, Math.floor(delayMs * 1.5 + Math.random() * 200));
+            console.warn(`Attempt ${attempt} for ${url} failed with status ${response.status}. Retrying in ${nextDelay}ms...`);
             if (typeof onRetry === 'function') {
-                try { onRetry({ attempt, status: response.status, nextDelayMs: nextDelay }); } catch (_) { /* noop */ }
+                try { onRetry({ attempt, status: response.status, nextDelayMs: nextDelay }); } catch (e) { console.error("onRetry callback error:", e); }
             }
-
-            if (attempt >= maxRetries) {
-                throw new Error(`Failed to fetch ${url} after ${attempt} attempts, last status: ${response.status}`);
-            }
-
+            
             await new Promise(res => setTimeout(res, delayMs));
             delayMs = nextDelay;
+
         } catch (err) {
             clearTimeout(timeoutId);
-            // 网络错误或超时，继续重试
+            // 网络错误或超时，准备重试
             const nextDelay = Math.min(maxDelayMs, Math.floor(delayMs * 1.5 + Math.random() * 200));
+            console.warn(`Attempt ${attempt} for ${url} failed due to error: ${err?.message || err}. Retrying in ${nextDelay}ms...`);
             if (typeof onRetry === 'function') {
-                try { onRetry({ attempt, error: err, nextDelayMs: nextDelay }); } catch (_) { /* noop */ }
-            }
-
-            if (attempt >= maxRetries) {
-                throw new Error(`Failed to fetch ${url} after ${attempt} attempts due to error: ${err?.message || err}`);
+                try { onRetry({ attempt, error: err, nextDelayMs: nextDelay }); } catch (e) { console.error("onRetry callback error:", e); }
             }
 
             await new Promise(res => setTimeout(res, delayMs));
             delayMs = nextDelay;
         }
     }
+    // 如果所有重试都失败了，抛出错误
+    const finalError = new Error(`Failed to fetch ${url} after ${maxRetries} attempts.`);
+    console.error(finalError.message);
+    if (typeof onFailure === 'function') {
+        try { onFailure({ url, error: finalError }); } catch (e) { console.error("onFailure callback error:", e); }
+    }
+    throw finalError;
 }
 
 async function getDataFromUrlWithOffsetParallel(formatUrl, limit, buttonName){
@@ -176,8 +183,174 @@ function waitForElement(selector, nonselector) {
 
 
 
-async function getAuth(){n=5||0;return new Promise((r,j)=>{chrome.storage.local.get('WQPSummary',async({WQPSummary:a})=>{let d=a;try{if(!a){d=await getDataFromUrl("https://api.worldquantbrain.com/users/self/consultant/summary"),chrome.storage.local.set({WQPSummary:d},()=>{})}}catch(e){if(n<3)return getAuth(n+1).then(r).catch(j);return j(e)}r(["CN","HK"].includes(d?.leaderboard?.country))})})}
+async function getAuth() {
+    let n = 0; // Initialize n for retry count
+    return new Promise((r, j) => {
+        chrome.storage.local.get('WQPSummary', async ({ WQPSummary: a }) => {
+            let d = a;
+            try {
+                if (!a) {
+                    d = await getDataFromUrl("https://api.worldquantbrain.com/users/self/consultant/summary");
+                    chrome.storage.local.set({ WQPSummary: d }, () => { });
+                }
+            } catch (e) {
+                if (n < 3) {
+                    n++; // Increment n on retry
+                    return getAuth().then(r).catch(j); // Recursive call without n as param
+                }
+                return j(e);
+            }
+            r(["CN", "HK"].includes(d?.leaderboard?.country));
+        });
+    });
+}
 
+
+function formatSavedTimestamp(dateString) {
+    const date = new Date(dateString);
+
+    // 美东时间 (Eastern Time, America/New_York)
+    const easternTime = date.toLocaleString("zh-CN", {
+        timeZone: "America/New_York",
+        hour12: false
+    });
+
+    // 北京时间 (Asia/Shanghai)
+    const beijingTime = date.toLocaleString("zh-CN", {
+        timeZone: "Asia/Shanghai",
+        hour12: false
+    });
+
+    return [easternTime, beijingTime];
+}
+
+// 定义一个变量来存储已提交的 Alpha 列表和上次更新时间
+let submittedAlphasCache = {
+    data: [],
+    lastUpdated: 0
+};
+
+// 增量更新和本地缓存已提交 Alpha 的函数
+async function fetchSubmittedAlphas(buttonId, forceRefresh = false) { // Add forceRefresh parameter
+    const CACHE_DURATION = 1 * 60 * 60 * 1000; // 缓存有效期1小时
+
+    // 从本地存储获取缓存
+    const storedCache = await new Promise(resolve => {
+        chrome.storage.local.get('submittedAlphasCache', (result) => {
+            resolve(result.submittedAlphasCache);
+        });
+    });
+
+    if (forceRefresh) {
+        console.log('Force refreshing: Clearing submittedAlphasCache from storage.');
+        await chrome.storage.local.remove('submittedAlphasCache');
+        submittedAlphasCache = { data: [], lastUpdated: 0 }; // Reset in-memory cache
+    } else if (storedCache && (Date.now() - storedCache.lastUpdated < CACHE_DURATION)) {
+        submittedAlphasCache = storedCache;
+        console.log('从缓存加载已提交的Alpha列表:', submittedAlphasCache.data.length);
+        return submittedAlphasCache.data;
+    }
+
+    console.log('缓存失效或不存在，开始获取新的已提交Alpha列表...');
+    // setButtonState(buttonId, `正在加载已提交的Alpha...`, 'load'); // Commented out as this buttonId might not exist globally
+
+    // 获取当前赛季的起始日期，与 genius.js 中的 fetchAllAlphas 逻辑类似
+    const currentDate = new Date();
+    const year = currentDate.getUTCFullYear();
+    const quarter = Math.floor((currentDate.getMonth() + 3) / 3);
+    const quarters = [
+        { start: `${year}-01-01T05:00:00.000Z`, end: `${year}-04-01T04:00:00.000Z` },  // 第一季度
+        { start: `${year}-04-01T04:00:00.000Z`, end: `${year}-07-01T04:00:00.000Z` },  // 第二季度
+        { start: `${year}-07-01T04:00:00.000Z`, end: `${year}-10-01T04:00:00.000Z` },  // 第三季度
+        { start: `${year}-10-01T04:00:00.000Z`, end: `${year + 1}-01-01T05:00:00.000Z` }   // 第四季度 (注意年份加1)
+    ];
+    const { start, end } = quarters[quarter - 1];
+    const dateRange = `dateSubmitted%3E${start}&dateSubmitted%3C${end}`;
+
+
+    const limit = 50; // Data limit per page
+    // 使用与 genius.js 中 fetchAllAlphas 类似的 URL 格式，但调整为获取已提交的 alpha
+    const formatUrl = `https://api.worldquantbrain.com/users/self/alphas?limit={limit}&offset={offset}&status!=UNSUBMITTED%1FIS-FAIL&${dateRange}&order=-dateCreated&hidden=false`;
+    
+    let allAlphas = [];
+    try {
+        allAlphas = await getDataFromUrlWithOffsetParallel(formatUrl, limit, buttonId);
+    } catch (error) {
+        console.error('获取已提交Alpha失败:', error);
+        // setButtonState(buttonId, `加载失败`, 'enable'); // Commented out
+        throw error; // 抛出错误以便调用方处理
+    }
+
+    // 过滤REGULAR类型：每天只保留前4个
+    const regularAlphas = allAlphas.filter(item => item.type === 'REGULAR');
+    const otherAlphas = allAlphas.filter(item => item.type !== 'REGULAR');
+
+    console.log('原始REGULAR alpha数量:', regularAlphas.length);
+
+    // 按日期分组
+    const alphasByDate = {};
+    regularAlphas.forEach(alpha => {
+        if (!alpha.dateSubmitted) return;
+
+        // 获取日期部分（YYYY-MM-DD）
+        const dateStr = alpha.dateSubmitted.split('T')[0];
+
+        if (!alphasByDate[dateStr]) {
+            alphasByDate[dateStr] = [];
+        }
+        alphasByDate[dateStr].push(alpha);
+    });
+
+    // 每天按提交时间排序，只保留前4个
+    const filteredRegularAlphas = [];
+    Object.keys(alphasByDate).forEach(dateStr => {
+        const dayAlphas = alphasByDate[dateStr];
+        // 按dateSubmitted升序排序（早的在前）
+        dayAlphas.sort((a, b) => new Date(a.dateSubmitted) - new Date(b.dateSubmitted));
+        // 只取前4个
+        filteredRegularAlphas.push(...dayAlphas.slice(0, 4));
+    });
+
+    console.log('过滤后REGULAR alpha数量（每天前4个）:', filteredRegularAlphas.length);
+
+    // 合并过滤后的REGULAR alpha和其他类型的alpha
+    const filteredAlphas = [...filteredRegularAlphas, ...otherAlphas];
+
+    // 更新缓存
+    submittedAlphasCache = {
+        data: filteredAlphas,
+        lastUpdated: Date.now()
+    };
+    chrome.storage.local.set({ submittedAlphasCache: submittedAlphasCache });
+    console.log('已提交的Alpha列表更新完成，总数:', filteredAlphas.length, '(REGULAR:', filteredRegularAlphas.length, ', 其他:', otherAlphas.length, ')');
+    // setButtonState(buttonId, `加载完成 (${filteredAlphas.length}个)`, 'enable'); // Commented out
+    return filteredAlphas;
+}
+
+let submittedFieldsCache = { data: [], lastUpdated: 0 }; // Used by getSubmittedFields
+let submittedFieldsPromise = null; // Used by getSubmittedFields
+
+async function getSubmittedFields(forceRefresh = false) {
+    if (submittedFieldsPromise && !forceRefresh) {
+        return submittedFieldsPromise;
+    }
+
+    submittedFieldsPromise = new Promise(async (resolve, reject) => {
+        try {
+            // fetchSubmittedAlphas is already in utils.js
+            const alphas = await fetchSubmittedAlphas('submitAlphaListLoading', forceRefresh); // Pass forceRefresh here
+            submittedFieldsCache.data = alphas;
+            submittedFieldsCache.lastUpdated = Date.now();
+            resolve(alphas);
+        } catch (error) {
+            console.error('获取已提交 Alpha 列表失败:', error);
+            submittedFieldsCache.data = []; // Clear cache on error
+            submittedFieldsCache.lastUpdated = 0;
+            reject(error);
+        }
+    });
+    return submittedFieldsPromise;
+}
 
 function removeComments(code) {
     const lines = code.split('\n');
