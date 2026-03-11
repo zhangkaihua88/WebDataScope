@@ -6,7 +6,7 @@
 
     const SEARCH = '},...e===i.kC.SUBMITTED?[l]:[c],{';
     const VERSION_REGEX = /version:\s*"1\.0\.6"/;
-    const VERSION_REPLACE = 'version:"1.0.6-wqp4"';
+    const VERSION_REPLACE = 'version:"1.0.6-wqp5"';
 
     const EXTRA_COLUMNS = [
         {
