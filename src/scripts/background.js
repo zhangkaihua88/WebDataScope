@@ -113,6 +113,7 @@ function injectFetchInterceptor(tabId) {
 
                     "LOW_ROBUST_UNIVERSE_RETURNS", 
                     "CONCENTRATED_WEIGHT",  
+                    
                 ]));
                 const PPA_CHECK_NAMES = Array.from(new Set([
                     'LOW_TURNOVER',
@@ -120,6 +121,7 @@ function injectFetchInterceptor(tabId) {
                     'LOW_SUB_UNIVERSE_SHARPE', 
                     'LOW_ROBUST_UNIVERSE_SHARPE', 
                     'LOW_ROBUST_UNIVERSE_SHARPE.WITH_RATIO',
+                    "LOW_ROBUST_UNIVERSE_RETURNS",
                     'LOW_INVESTABILITY_CONSTRAINED_SHARPE'
                 ]));
 
