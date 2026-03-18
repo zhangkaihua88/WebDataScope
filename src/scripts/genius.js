@@ -8,9 +8,9 @@ console.log('genius.js loaded');
 const OptUrl = 'https://api.worldquantbrain.com/operators';
 // genius level criteria
 const levelCriteria = {
-    "expert": { "alphaCount": 20, "pyramidCount": 10, "combinedAlphaPerformance": 0.5, "combinedSelectedAlphaPerformance": 0.5, "combinedPowerPoolAlphaPerformance": 0.5 },
-    "master": { "alphaCount": 120, "pyramidCount": 30, "combinedAlphaPerformance": 1, "combinedSelectedAlphaPerformance": 1, "combinedPowerPoolAlphaPerformance": 1 },
-    "grandmaster": { "alphaCount": 220, "pyramidCount": 60, "combinedAlphaPerformance": 2, "combinedSelectedAlphaPerformance": 2, "combinedPowerPoolAlphaPerformance": 2 }
+    "expert": { "alphaCount": 20, "pyramidCount": 10, "combinedAlphaPerformance": 0.5, "combinedSelectedAlphaPerformance": 0.5, "combinedPowerPoolAlphaPerformance": 0.5, "combinedOsmosisPerformance": 0.5},
+    "master": { "alphaCount": 120, "pyramidCount": 30, "combinedAlphaPerformance": 1, "combinedSelectedAlphaPerformance": 1, "combinedPowerPoolAlphaPerformance": 1, "combinedOsmosisPerformance": 1},
+    "grandmaster": { "alphaCount": 220, "pyramidCount": 60, "combinedAlphaPerformance": 2, "combinedSelectedAlphaPerformance": 2, "combinedPowerPoolAlphaPerformance": 2, "combinedOsmosisPerformance": 2}
 }
 
 
@@ -381,7 +381,8 @@ function determineUserLevel(userData, geniusCombineTag) {
             isPerformanceConditionMet = (
                 userData.combinedAlphaPerformance >= criteria.combinedAlphaPerformance ||
                 userData.combinedSelectedAlphaPerformance >= criteria.combinedSelectedAlphaPerformance ||
-                userData.combinedPowerPoolAlphaPerformance >= criteria.combinedPowerPoolAlphaPerformance
+                userData.combinedPowerPoolAlphaPerformance >= criteria.combinedPowerPoolAlphaPerformance ||
+                userData.combinedOsmosisPerformance >= criteria.combinedOsmosisPerformance
             );
         }
 
@@ -417,7 +418,7 @@ async function getAllRank() {
                 } else {
                     itemData = data.map((item, index) => ({ ...item, originalIndex: index })).filter(item => item.alphaCount >= levelCriteria[model].alphaCount && item.pyramidCount >= levelCriteria[model].pyramidCount);
                     if (WQPSettings.geniusCombineTag) {
-                        itemData = itemData.filter(item => item.combinedAlphaPerformance >= levelCriteria[model].combinedAlphaPerformance || item.combinedSelectedAlphaPerformance >= levelCriteria[model].combinedSelectedAlphaPerformance || item.combinedPowerPoolAlphaPerformance >= levelCriteria[model].combinedPowerPoolAlphaPerformance);
+                        itemData = itemData.filter(item => item.combinedAlphaPerformance >= levelCriteria[model].combinedAlphaPerformance || item.combinedSelectedAlphaPerformance >= levelCriteria[model].combinedSelectedAlphaPerformance || item.combinedPowerPoolAlphaPerformance >= levelCriteria[model].combinedPowerPoolAlphaPerformance || item.combinedOsmosisPerformance >= levelCriteria[model].combinedOsmosisPerformance);
                     }
                 }
                 itemData.forEach(item => item['TotalRank'] = 0);
@@ -580,6 +581,12 @@ async function insertRankListInfo() {
 
         data.forEach((item, idx) => {
             item.index = idx + 1;
+			item.maxCombinedAlphaPerformance = Math.max(
+                    item.combinedAlphaPerformance,
+					item.combinedSelectedAlphaPerformance,
+					item.combinedPowerPoolAlphaPerformance,
+					item.combinedOsmosisPerformance,
+			)
         });
         grandmasterCount = data.filter(item => item.finalLevel === 'grandmaster').length;
 
@@ -597,6 +604,8 @@ async function insertRankListInfo() {
             { title: 'Combined Alpha Performance', data: 'combinedAlphaPerformance', visible: false }, // 综合Alpha表现
             { title: 'Combined Selected Alpha Performance', data: 'combinedSelectedAlphaPerformance', visible: false }, // 综合选择的Alpha表现
             { title: 'Combined Power Pool Alpha Performance', data: 'combinedPowerPoolAlphaPerformance', visible: false }, // 综合Power Pool的Alpha表现
+            { title: 'Combined Osmosis Performance', data: 'combinedOsmosisPerformance', visible: false }, // 综合Power Pool的Alpha表现
+            { title: 'Max Combined Performance', data: 'maxCombinedAlphaPerformance', visible: false }, // 最大的Alpha表现
 
             // consultant 信息
             { title: 'RA Count', data: 'submissionsCount', visible: false },
@@ -749,7 +758,7 @@ async function insertRankListInfo() {
             }
 
             var baseFields = [
-                'Signals', 'Pyramids', 'Combined Alpha Performance', 'Combined Selected Alpha Performance', 'Combined Power Pool Alpha Performance'
+                'Signals', 'Pyramids', 'Combined Alpha Performance', 'Combined Selected Alpha Performance', 'Combined Power Pool Alpha Performance', 'Combined Osmosis Performance'
             ];
             var sixFields = [
                 'Operators used', 'Operator Avg', 'Fields used', 'Field Avg', 'Community Activity', 'Max Simulation Streak'
@@ -892,7 +901,7 @@ async function calculateRanks(data, userId, WQPSettings) {
     for (const model of ["expert", "master", "grandmaster"]) {
         let itemData = data.filter(item => item.alphaCount >= levelCriteria[model].alphaCount && item.pyramidCount >= levelCriteria[model].pyramidCount);
         if (WQPSettings.geniusCombineTag) {
-            itemData = itemData.filter(item => item.combinedAlphaPerformance >= levelCriteria[model].combinedAlphaPerformance || item.combinedSelectedAlphaPerformance >= levelCriteria[model].combinedSelectedAlphaPerformance || item.combinedPowerPoolAlphaPerformance >= levelCriteria[model].combinedPowerPoolAlphaPerformance);
+            itemData = itemData.filter(item => item.combinedAlphaPerformance >= levelCriteria[model].combinedAlphaPerformance || item.combinedSelectedAlphaPerformance >= levelCriteria[model].combinedSelectedAlphaPerformance || item.combinedPowerPoolAlphaPerformance >= levelCriteria[model].combinedPowerPoolAlphaPerformance || item.combinedOsmosisPerformance >= levelCriteria[model].combinedOsmosisPerformance);
         }
         result['gold'][model + 'Rank'] = itemData.filter(item => item.totalRank < userData.totalRank).length + 1;
 
@@ -1677,344 +1686,6 @@ function createPowerPoolProgressBar(containerId, value) {
     console.log('[WQP] Progress bar created successfully with', segments.length, 'segments, value:', value, 'at position:', markerPosition.toFixed(1) + '%');
 }
 
-// ############################## 季度分析 ##############################
-
-async function displayQuarterlyAnalysis() {
-    try {
-        setButtonState('WQPQuarterlyAnalysisButton', '分析中...', 'load');
-        const { WQPSettings } = await new Promise(resolve => chrome.storage.local.get('WQPSettings', resolve));
-        const stats = await calculateExclusiveLevelStats(WQPSettings);
-        const html = generateQuarterlyAnalysisHTML(stats);
-
-        const mainContent = document.querySelector(targetSelectorButton)?.parentElement;
-        if (mainContent) {
-            let analysisContainer = document.querySelector("#quarterlyAnalysisCard");
-            if (analysisContainer) {
-                analysisContainer.remove();
-            }
-            // Insert after the button container
-            const buttonContainer = document.getElementById('WQButtonContainer');
-            if(buttonContainer){
-                buttonContainer.insertAdjacentHTML('afterend', html);
-            } else {
-                 mainContent.insertAdjacentHTML('afterend', html);
-            }
-        }
-        setButtonState('WQPQuarterlyAnalysisButton', '季度分析', 'enable');
-    } catch (error) {
-        console.error("季度分析失败:", error);
-        setButtonState('WQPQuarterlyAnalysisButton', '分析失败', 'error');
-    }
-}
-
-async function calculateExclusiveLevelStats(WQPSettings) {
-    // We get all data, with finalLevel pre-assigned by getAllRank
-    const { data } = await getAllRank(false); 
-    const stats = {};
-
-    const limits = {
-        grandmaster: 75,
-        master: 250,
-        expert: 675
-    };
-
-    // The `finalLevel` is already exclusive because a user can only have one final level.
-    // We just need to filter by it and respect the cap.
-    const grandmasters = data.filter(u => u.finalLevel === 'grandmaster').slice(0, limits.grandmaster);
-    const masters = data.filter(u => u.finalLevel === 'master').slice(0, limits.master);
-    const experts = data.filter(u => u.finalLevel === 'expert').slice(0, limits.expert);
-
-    const userSets = {
-        grandmaster: grandmasters,
-        master: masters,
-        expert: experts
-    };
-
-    const dataDimensions = [
-        "alphaCount", "pyramidCount", "combinedAlphaPerformance",
-        "combinedSelectedAlphaPerformance", "combinedPowerPoolAlphaPerformance",
-        "operatorCount", "fieldCount", "communityActivity",
-        "completedReferrals", "maxSimulationStreak",
-        "operatorAvg", "fieldAvg"
-    ];
-
-    const rankDimensionPrefixes = [
-        "operatorCount", "fieldCount", "communityActivity",
-        "completedReferrals", "maxSimulationStreak",
-        "operatorAvg", "fieldAvg", "Total"
-    ];
-
-    for (const level of ["grandmaster", "master", "expert"]) {
-        const levelUsers = userSets[level] || [];
-        stats[level] = {
-            count: levelUsers.length,
-            rawData: {},
-            ranks: {}
-        };
-
-        // Raw Data Stats
-        dataDimensions.forEach(dim => {
-            const values = levelUsers.map(user => user[dim]).filter(v => typeof v === 'number' && !isNaN(v));
-            stats[level].rawData[dim] = calculateAverageAndMedian(values);
-        });
-
-        // Rank Data Stats
-        rankDimensionPrefixes.forEach(dimPrefix => {
-            const rankDim = `${level}${dimPrefix}Rank`;
-            const values = levelUsers.map(user => user[rankDim]).filter(v => typeof v === 'number' && !isNaN(v));
-            // Use original dimPrefix for key
-            const key = dimPrefix === 'Total' ? 'total' : dimPrefix;
-            stats[level].ranks[key] = calculateAverageAndMedian(values);
-        });
-    }
-
-    console.log("Calculated Stats:", stats);
-    return stats;
-}
-
-
-function generateQuarterlyAnalysisHTML(stats) {
-    let html = '<div id="quarterlyAnalysisCard" style="margin-top: 20px;">';
-
-    for (const level of ["grandmaster", "master", "expert"]) {
-        const levelStats = stats[level];
-        if (!levelStats || levelStats.count === 0) continue;
-
-        const rawDataHtml = Object.entries(levelStats.rawData).map(([key, value]) => `<li><strong>${key}:</strong> 平均值 = ${value.average.toFixed(2)}, 中位数 = ${value.median.toFixed(2)}</li>`).join('');
-        const rankDataHtml = Object.entries(levelStats.ranks).map(([key, value]) => `<li><strong>${key}:</strong> 平均值 = ${value.average.toFixed(2)}, 中位数 = ${value.median.toFixed(2)}</li>`).join('');
-
-        html += `
-        <article class="card" style="margin-top: 15px;">
-            <div class="card_wrapper">
-                <div class="card__content" style="padding-bottom: 26px; max-width: 100%">
-                    <h3 style="font-size: 1.5rem; font-weight: bold; margin-bottom: 10px;">${level.charAt(0).toUpperCase() + level.slice(1)} (${levelStats.count}人)</h3>
-                    
-                    <h4 style="margin-top: 15px; font-size: 1.1rem;">原始数据:</h4>
-                    <ul style="list-style-type: disc; padding-left: 20px;">
-                        ${rawDataHtml}
-                    </ul>
-
-                    <h4 style="margin-top: 15px; font-size: 1.1rem;">排名数据:</h4>
-                     <ul style="list-style-type: disc; padding-left: 20px;">
-                        ${rankDataHtml}
-                    </ul>
-                </div>
-            </div>
-        </article>
-        `;
-    }
-
-    html += '</div>';
-    return html;
-}
-// ############################## 数据总览 ##############################
-
-async function openDataOverview() {
-    try {
-        setButtonState('WQPDataOverviewButton', '登录中...', 'load');
-
-        const selfSummary = await getDataFromUrl('https://api.worldquantbrain.com/users/self/consultant/summary');
-
-        if (!selfSummary || !selfSummary.leaderboard || !selfSummary.leaderboard.user) {
-            alert('无法获取用户ID，请检查网络连接');
-            setButtonState('WQPDataOverviewButton', 'WQ Manager', 'enable');
-            return;
-        }
-
-        const wqId = selfSummary.leaderboard.user;
-
-        chrome.runtime.sendMessage(
-            { type: 'WQ_MANAGER_LOGIN_AND_OPEN', wq_id: wqId },
-            (response) => {
-                if (response && response.ok) {
-                    setButtonState('WQPDataOverviewButton', 'WQ Manager', 'enable');
-                } else {
-                    alert('登录失败: ' + (response?.error || '未知错误'));
-                    setButtonState('WQPDataOverviewButton', 'WQ Manager', 'enable');
-                }
-            }
-        );
-    } catch (error) {
-        alert('登录失败: ' + error.message);
-        setButtonState('WQPDataOverviewButton', 'WQ Manager', 'enable');
-    }
-}
-
-// ############################## 运算符Alpha卡片显示 ##############################
-
-let operatorAlphaCard = null;
-
-function dismissOperatorAlphaCard() {
-    if (operatorAlphaCard && operatorAlphaCard.parentNode) {
-        operatorAlphaCard.parentNode.removeChild(operatorAlphaCard);
-    }
-    operatorAlphaCard = null;
-    document.removeEventListener('click', dismissOperatorAlphaCardOutside);
-    document.removeEventListener('keydown', dismissOperatorAlphaCardOnEscape);
-}
-
-function dismissOperatorAlphaCardOutside(event) {
-    if (operatorAlphaCard && !operatorAlphaCard.contains(event.target)) {
-        dismissOperatorAlphaCard();
-    }
-}
-
-function dismissOperatorAlphaCardOnEscape(event) {
-    if (event.key === 'Escape') {
-        dismissOperatorAlphaCard();
-    }
-}
-
-async function showOperatorAlphasCard(event) {
-    card.disable();
-    event.stopPropagation();
-    
-    // 关闭任何现有的卡片
-    dismissOperatorAlphaCard();
-
-    const selection = window.getSelection();
-    const operatorText = selection.toString().trim();
-
-    if (!operatorText) {
-        return;
-    }
-    // 从完整的操作符文本中提取核心操作符名称
-    const coreOperatorName = operatorText.split('(')[0].trim();
-    if (!coreOperatorName) { // 如果提取后为空，则不进行搜索
-        console.warn("WQP DEBUG: 无法提取核心操作符名称，跳过搜索。", operatorText);
-        return;
-    }
-
-    // 创建卡片元素
-    operatorAlphaCard = document.createElement('div');
-    operatorAlphaCard.id = 'operatorAlphaDetailsCard';
-    operatorAlphaCard.style.cssText = `
-        position: fixed;
-        background-color: #f8f8f8;
-        border: 1px solid #ddd;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-        padding: 20px;
-        z-index: 10000;
-        max-width: 600px;
-        max-height: 500px;
-        overflow-y: auto;
-        border-radius: 10px;
-        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        color: #333;
-        line-height: 1.6;
-        cursor: auto;
-    `;
-
-    // 定位卡片
-    operatorAlphaCard.style.left = `${event.clientX + 15}px`;
-    operatorAlphaCard.style.top = `${event.clientY + 15}px`;
-
-    document.body.appendChild(operatorAlphaCard);
-
-    // 初始加载状态
-    operatorAlphaCard.innerHTML = `
-        <div style="font-size: 1.1em; font-weight: bold; margin-bottom: 15px;">
-            <span style="color: #007bff;">${operatorText}</span> 使用情况查询
-        </div>
-        <div style="text-align: center; padding: 20px;">查询中... <div class="loading-spinner" style="display: inline-block; width: 20px; height: 20px; border: 3px solid #f3f3f3; border-top: 3px solid #3498db; border-radius: 50%; animation: spin 1s linear infinite;"></div></div>
-        <button id="closeOperatorAlphaCard" style="position: absolute; top: 10px; right: 10px; background: none; border: none; font-size: 24px; cursor: pointer; color: #666;">&times;</button>
-        <style>
-            @keyframes spin {
-                0% { transform: rotate(0deg); }
-                100% { transform: rotate(360deg); }
-            }
-        </style>
-    `;
-
-    // 关闭按钮功能
-    document.getElementById('closeOperatorAlphaCard').addEventListener('click', dismissOperatorAlphaCard);
-
-    // 添加点击外部和ESC键关闭
-    document.addEventListener('click', dismissOperatorAlphaCardOutside);
-    document.addEventListener('keydown', dismissOperatorAlphaCardOnEscape);
-
-    try {
-        // 获取所有已提交的Alpha
-        const alphas = await fetchAllAlphas(false, true);
-
-        console.log("运算符:", operatorText);
-        // 过滤包含该核心运算符名称的alpha
-        const matchedAlphas = alphas.filter(alpha =>
-            alpha.regular && alpha.regular.code && alpha.regular.code.includes(coreOperatorName)
-        );
-        console.log("匹配的Alphas:", matchedAlphas);
-
-        let cardContentHtml = '';
-        let mainTitleText = `<span style="color: #007bff;">${operatorText}</span> 在本赛季使用情况 (共 ${matchedAlphas.length} 个):`;
-
-        if (matchedAlphas.length > 0) {
-            cardContentHtml += `<ul style="list-style-type: none; padding: 0;">`;
-            matchedAlphas.forEach(alpha => {
-                if (alpha && alpha.id) {
-                    const settings = `${alpha.settings.instrumentType || 'N/A'} / ${alpha.settings.region || 'N/A'} / ${alpha.settings.universe || 'N/A'} / D${alpha.settings.delay || 'N/A'}`;
-                    const alphaCode = alpha.regular && alpha.regular.code ? alpha.regular.code : 'N/A';
-
-                    cardContentHtml += `
-                        <li style="margin-bottom: 20px; padding: 10px; border: 1px solid #eee; border-radius: 5px; background-color: #fff;">
-                            <div style="font-weight: bold; margin-bottom: 5px;">Alpha ID: <a href="https://platform.worldquantbrain.com/alpha/${alpha.id}" target="_blank" style="color: #007bff; text-decoration: none;">${alpha.id}</a></div>
-                            <div style="margin-bottom: 5px;">设置: ${settings}</div>
-                            <div>代码:<pre style="background-color: #f0f0f0; padding: 10px; border-radius: 5px; overflow-x: auto; white-space: pre-wrap; word-break: break-all; font-family: 'Courier New', Courier, monospace; font-size: 0.9em;"><code>${alphaCode}</code></pre></div>
-                        </li>
-                    `;
-                }
-            });
-            cardContentHtml += `</ul>`;
-        } else {
-            cardContentHtml = `<div style="text-align: center; padding: 20px;">本赛季未使用此运算符。</div>`;
-        }
-
-        operatorAlphaCard.innerHTML = `
-            <div style="font-size: 1.1em; font-weight: bold; margin-bottom: 15px;">
-                ${mainTitleText}
-            </div>
-            ${cardContentHtml}
-            <button id="closeOperatorAlphaCard" style="position: absolute; top: 10px; right: 10px; background: none; border: none; font-size: 24px; cursor: pointer; color: #666;">&times;</button>
-        `;
-        // 重新绑定关闭按钮
-        document.getElementById('closeOperatorAlphaCard').addEventListener('click', dismissOperatorAlphaCard);
-
-    } catch (error) {
-        console.error('查询运算符使用情况失败:', error);
-        operatorAlphaCard.innerHTML = `
-            <div style="font-size: 1.1em; font-weight: bold; margin-bottom: 15px;">
-                <span style="color: #007bff;">${operatorText}</span> 使用情况查询失败
-            </div>
-            <div style="text-align: center; padding: 20px; color: red;">查询失败: ${error.message}</div>
-            <button id="closeOperatorAlphaCard" style="position: absolute; top: 10px; right: 10px; background: none; border: none; font-size: 24px; cursor: pointer; color: #666;">&times;</button>
-        `;
-        document.getElementById('closeOperatorAlphaCard').addEventListener('click', dismissOperatorAlphaCard);
-    }
-}
-
-
 watchForElementAndInsertButton();
 document.addEventListener("mouseover", showGeniusCard);
 document.addEventListener("mousemove", (ev) => card.updateCursor(ev.pageX, ev.pageY));
-
-// 添加 Combined Power Pool 进度条 - 多次尝试以确保页面加载完成
-console.log('[WQP] Scheduling progress bar injection...');
-
-// 第一次尝试: 1秒后
-setTimeout(() => {
-    console.log('[WQP] First attempt (1s)');
-    addPowerPoolProgressBar();
-}, 1000);
-
-// 第二次尝试: 3秒后
-setTimeout(() => {
-    console.log('[WQP] Second attempt (3s)');
-    addPowerPoolProgressBar();
-}, 3000);
-
-// 第三次尝试: 5秒后
-setTimeout(() => {
-    console.log('[WQP] Third attempt (5s)');
-    addPowerPoolProgressBar();
-}, 5000);
-
-
