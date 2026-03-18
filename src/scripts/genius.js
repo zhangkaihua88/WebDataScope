@@ -20,10 +20,32 @@ const targetSelectorButton = '#root > div > div.genius__container > div > div > 
 
 // ############################## 运算符分析 ##############################
 
-async function fetchAllAlphas() {
+async function fetchAllAlphas(forceRefresh = false, isSelf = false) { // Added isSelf parameter
     // 抓取本季度所有的alpha
+    // Removed setButtonState('WQPOPSFetchButton', `开始抓取...`,'load'); as this function should not manage the button state directly.
 
-    setButtonState('WQPOPSFetchButton', `开始抓取...`,'load');
+    let cacheKey = 'WQPAllAlphasCache'; // Changed to 'let'
+    if (isSelf) {
+        cacheKey += '_SELF'; // Differentiate cache for self-user's specific date range
+    }
+    const CACHE_DURATION = 5 * 60 * 1000; // Cache for 5 minutes
+
+    if (!forceRefresh) {
+        const storedCache = await new Promise(resolve => {
+            chrome.storage.local.get(cacheKey, (result) => {
+                resolve(result[cacheKey]);
+            });
+        });
+
+        if (storedCache && (Date.now() - storedCache.lastUpdated < CACHE_DURATION)) {
+            console.log('从缓存加载所有Alpha列表:', storedCache.data.length);
+            return storedCache.data;
+        }
+    } else {
+        console.log('Force refreshing: Clearing ' + cacheKey + ' from storage.'); // Added cacheKey to log
+        await chrome.storage.local.remove(cacheKey);
+    }
+
 
     const currentDate = new Date();
     const year = currentDate.getUTCFullYear();
@@ -34,75 +56,160 @@ async function fetchAllAlphas() {
         { start: `${year}-07-01T04:00:00.000Z`, end: `${year}-10-01T04:00:00.000Z` },  // 第三季度
         { start: `${year}-10-01T04:00:00.000Z`, end: `${year+1}-01-01T05:00:00.000Z` }   // 第四季度
     ];
-    const { start, end } = quarters[quarter - 1];
+    let { start, end } = quarters[quarter - 1]; // Changed to 'let' to allow modification
+    console.log(`[fetchAllAlphas] isSelf: ${isSelf}`);
+    console.log(`[fetchAllAlphas] Initial quarter start date: ${start}`);
+
+    // New logic for self-user's start date
+    if (isSelf) {
+        console.log(`[fetchAllAlphas] Checking for geniusStartDateOverride.`);
+        const WQPSettings = await new Promise(resolve => {
+            chrome.storage.local.get('WQPSettings', (result) => {
+                resolve(result.WQPSettings || {});
+            });
+        });
+        const overrideDateString = WQPSettings.geniusStartDateOverride;
+        console.log(`[fetchAllAlphas] Loaded geniusStartDateOverride: ${overrideDateString}`);
+
+        let effectiveStartDate = new Date(start); // Convert calculated start string to Date object
+
+        if (overrideDateString) {
+            const parsedOverrideDate = new Date(overrideDateString + 'T00:00:00.000Z'); // Assume UTC for consistency
+            if (!isNaN(parsedOverrideDate.getTime())) { // Check if date is valid
+                console.log(`[fetchAllAlphas] Using override date: ${parsedOverrideDate.toISOString()}`);
+                effectiveStartDate = parsedOverrideDate;
+            } else {
+                console.warn(`[fetchAllAlphas] Invalid geniusStartDateOverride: ${overrideDateString}. Falling back to default logic.`);
+            }
+        } else {
+            console.log(`[fetchAllAlphas] No geniusStartDateOverride found. Using default logic.`);
+        }
+
+        // Ensure the effective start date is not before the quarter start if no override or invalid override
+        const quarterStartDate = new Date(quarters[quarter - 1].start);
+        if (effectiveStartDate < quarterStartDate) {
+            effectiveStartDate = quarterStartDate;
+        }
+        
+        start = effectiveStartDate.toISOString(); // Convert back to ISO string for the URL
+        console.log(`[fetchAllAlphas] Final effective start date after override/default logic: ${start}`);
+    }
+    console.log(`[fetchAllAlphas] Final start date for dateRange: ${start}`);
     const dateRange = `dateSubmitted%3E${start}&dateSubmitted%3C${end}`;
 
     const limit = 30; // Data limit per page
     const formatUrl = `https://api.worldquantbrain.com/users/self/alphas?limit={limit}&offset={offset}&status!=UNSUBMITTED%1FIS-FAIL&${dateRange}&order=-dateCreated&hidden=false`
     let data = await getDataFromUrlWithOffsetParallel(formatUrl, limit, 'WQPOPSFetchButton')
+
+    // Save to cache
+    await chrome.storage.local.set({ [cacheKey]: { data: data, lastUpdated: Date.now() } });
+
     return data;
 }
 
-async function opsAna() {
+async function opsAna(forceRefresh = false) {
     // 分析所有的alpha中的运算符, button 分析运算符的调用函数
+    try {
+        if (forceRefresh) {
+            console.log('Force refreshing: Clearing WQPOPSAna from storage.');
+            await chrome.storage.local.remove('WQPOPSAna');
+        }
 
-    const data = await fetchAllAlphas();
-    let operators = await getDataFromUrl(OptUrl);
-    operators = operators.filter(item => item.scope.includes('REGULAR'));
+        let data = await fetchAllAlphas(forceRefresh, true); // Changed to true for isSelf
 
-    regulars = data.map(item => item.type === 'REGULAR' ? item.regular.code : '');
-    // regulars = data.map(item => item.type === 'REGULAR' ? item.regular.code : item.combo.code);
-    console.log(regulars);
-    let use_ops = regulars.map(item => findOps(item, operators)).flat();
+        // 过滤出REGULAR类型的alpha
+        let regularAlphas = data.filter(item => item.type === 'REGULAR');
+        console.log('总REGULAR alpha数量:', regularAlphas.length);
 
-    const operatorMapping = {
-        '+': 'add',
-        '-': 'subtract',
-        '*': 'multiply',
-        '/': 'divide',
-        '^': 'power',
-        '<=': 'less_equal',
-        '>=': 'greater_equal',
-        '<': 'less',
-        '>': 'greater',
-        '==': 'equal',
-        '!=': 'not_equal',
-        '?': 'if_else',
-        '&&': 'and',
-        '||': 'or',
-        '!': 'not'
-    };
+        // 按日期分组，每天只取前4个
+        const alphasByDate = {};
+        regularAlphas.forEach(alpha => {
+            if (!alpha.dateSubmitted) return;
 
-    use_ops = use_ops.map(op => operatorMapping[op] || op);
+            // 获取日期部分（YYYY-MM-DD）
+            const dateStr = alpha.dateSubmitted.split('T')[0];
 
-    let counts = {};
-    // Count the occurrences of each item
-    use_ops.forEach(op => {
-        counts[op] = (counts[op] || 0) + 1;
-    });
+            if (!alphasByDate[dateStr]) {
+                alphasByDate[dateStr] = [];
+            }
+            alphasByDate[dateStr].push(alpha);
+        });
 
-    // Assign the count to each element in the array
-    operators = operators.map(op => {
-        return {
-            name: op.name,
-            category: op.category,
-            definition: op.definition,
-            count: counts[op.name] || 0,
-            scope: op.scope,
-            level: op.level === 'ALL' ? 'base' : 'genius',
+        // 每天按提交时间排序，只保留前4个
+        const filteredAlphas = [];
+        Object.keys(alphasByDate).forEach(dateStr => {
+            const dayAlphas = alphasByDate[dateStr];
+            // 按dateSubmitted升序排序（早的在前）
+            dayAlphas.sort((a, b) => new Date(a.dateSubmitted) - new Date(b.dateSubmitted));
+            // 只取前4个
+            filteredAlphas.push(...dayAlphas.slice(0, 4));
+        });
+
+        console.log('过滤后统计的REGULAR alpha数量（每天前4个）:', filteredAlphas.length);
+
+        let operators = await getDataFromUrl(OptUrl);
+        operators = operators.filter(item => item.scope.includes('REGULAR'));
+
+        let regulars = filteredAlphas.map(item => item.regular.code);
+        // regulars = data.map(item => item.type === 'REGULAR' ? item.regular.code : item.combo.code);
+        console.log(regulars);
+        let use_ops = regulars.map(item => findOps(item, operators)).flat();
+
+        const operatorMapping = {
+            '+': 'add',
+            '-': 'subtract',
+            '*': 'multiply',
+            '/': 'divide',
+            '^': 'power',
+            '<=': 'less_equal',
+            '>=': 'greater_equal',
+            '<': 'less',
+            '>': 'greater',
+            '==': 'equal',
+            '!=': 'not_equal',
+            '?': 'if_else',
+            '&&': 'and',
+            '||': 'or',
+            '!': 'not'
         };
-    });
-    let currentTime = new Date().toISOString();
-    let dataToSave = {
-        array: operators,
-        timestamp: currentTime
-    };
-    chrome.storage.local.set({ WQPOPSAna: dataToSave }, function () {
-        console.log('数据已保存');
-        console.log(dataToSave);
-    });
-    insertOpsTable();
-    setButtonState('WQPOPSFetchButton', `运算符分析完成${data.length}`, 'enable');
+
+        use_ops = use_ops.map(op => operatorMapping[op] || op);
+
+        let counts = {};
+        // Count the occurrences of each item
+        use_ops.forEach(op => {
+            counts[op] = (counts[op] || 0) + 1;
+        });
+
+        // Assign the count to each element in the array
+        operators = operators.map(op => {
+            return {
+                name: op.name,
+                category: op.category,
+                definition: op.definition,
+                count: counts[op.name] || 0,
+                scope: op.scope,
+                level: op.level === 'ALL' ? 'base' : 'genius',
+            };
+        });
+        let currentTime = new Date().toISOString();
+        let dataToSave = {
+            array: operators,
+            timestamp: currentTime,
+            version: '1.0', // 添加版本号，用于识别新的过滤逻辑
+            alphaCount: filteredAlphas.length // 保存过滤后的alpha数量
+        };
+        chrome.storage.local.set({ WQPOPSAna: dataToSave }, function () {
+            console.log('数据已保存');
+            console.log(dataToSave);
+        });
+        setButtonState('WQPOPSFetchButton', `运算符分析完成(${filteredAlphas.length}个Alpha)`, 'enable');
+        // Automatically display "我的排名" after Operator Analysis is complete
+        // await insertMyRankInfo(null, null, true); // Temporarily commented out to prevent 'No rank data found' error
+    } catch (error) {
+        console.error("运算符分析失败:", error);
+        setButtonState('WQPOPSFetchButton', `分析失败,请查看控制台`, 'error');
+    }
 }
 
 
@@ -111,17 +218,28 @@ function insertOpsTable() {
 
     chrome.storage.local.get('WQPOPSAna', function (result) {
         if (result.WQPOPSAna) {
+            // 检查缓存版本，如果是旧版本（没有version字段），清除缓存并提示重新分析
+            if (!result.WQPOPSAna.version || result.WQPOPSAna.version !== '1.0') {
+                console.log('检测到旧版本缓存，正在清除...');
+                chrome.storage.local.remove('WQPOPSAna', () => {
+                    alert('检测到旧的分析数据，请重新点击"运算符分析"按钮进行分析。');
+                });
+                return;
+            }
+
             console.log('读取的数据:', result.WQPOPSAna);
             let savedArray = result.WQPOPSAna.array;
             let savedTimestamp = result.WQPOPSAna.timestamp;
+            let alphaCount = result.WQPOPSAna.alphaCount || 0; // 获取统计的alpha数量
             const zeroCount = savedArray.filter(item => item.count === 0).length;
             const nonZeroCount = savedArray.filter(item => item.count !== 0).length;
 
             console.log(savedArray);
             console.log(savedTimestamp);
+            console.log('统计的Alpha数量:', alphaCount);
 
             // 创建表格结构
-            let tableHTML = generateOperatorTable(savedTimestamp, nonZeroCount, zeroCount, savedArray);
+            let tableHTML = generateOperatorTable(savedTimestamp, nonZeroCount, zeroCount, savedArray, alphaCount);
 
             // 查找目标插入位置
             const mainContent = document.querySelector('.genius__main-content');
@@ -138,6 +256,18 @@ function insertOpsTable() {
                 } else {
                     console.error('未找到 mainContent 元素');
                 }
+
+            // 给第二列（运算符定义）添加双击事件的函数
+            function attachOperatorDoubleClickEvents() {
+                const definitionCells = table.querySelectorAll("tbody tr td:nth-child(2)");
+                definitionCells.forEach(cell => {
+                    cell.style.cursor = 'pointer';
+                    cell.style.userSelect = 'text';
+                    // 移除旧的监听器（如果存在）
+                    cell.removeEventListener('dblclick', showOperatorAlphasCard);
+                    cell.addEventListener('dblclick', showOperatorAlphasCard);
+                });
+            }
 
             // 排序功能
             const table = document.getElementById("operatorTable");
@@ -163,8 +293,14 @@ function insertOpsTable() {
                     const tbody = table.querySelector("tbody");
                     tbody.innerHTML = '';
                     sortedRows.forEach(row => tbody.appendChild(row));
+
+                    // 重新绑定双击事件
+                    attachOperatorDoubleClickEvents();
                 });
             });
+
+            // 初始绑定双击事件
+            attachOperatorDoubleClickEvents();
 
         } else {
             console.log('没有找到保存的数据');
@@ -172,7 +308,7 @@ function insertOpsTable() {
     });
 }
 // 工具函數,提供inertOpsTable使用
-function generateOperatorTable(savedTimestamp, nonZeroCount, zeroCount, savedArray) {
+function generateOperatorTable(savedTimestamp, nonZeroCount, zeroCount, savedArray, alphaCount) {
     const [usTime, cnTime] = formatSavedTimestamp(savedTimestamp);
 
     const rowsHTML = savedArray.map((item, index) => `
@@ -193,11 +329,11 @@ function generateOperatorTable(savedTimestamp, nonZeroCount, zeroCount, savedArr
                             <span>北京时间: ${cnTime}</span>
                         </small>
                     </div>
-                    
+
                     <article class="card">
                         <div class="card_wrapper">
                             <div class="card__content" style="padding-bottom: 26px;">
-                                <h3>在你可用的运算符中，共有${nonZeroCount}种运算符被使用，${zeroCount}种运算符未被使用。</h3>
+                                <h3>统计了${alphaCount}个REGULAR Alpha（每天前4个），在你可用的运算符中，共有${nonZeroCount}种运算符被使用，${zeroCount}种运算符未被使用。</h3>
                                 <p>'-'有两种含义分别是substract和revers, 此处统一为substrac
                                 <div class="operator-table">
                                     <table id="operatorTable" class="sortable WQScope_table">
@@ -1262,6 +1398,292 @@ function watchForElementAndInsertButton() {
 
     // Configure the MutationObserver
     observer.observe(document.body, { childList: true, subtree: true });
+}
+
+
+// ############################## Combined Power Pool 进度条 ##############################
+
+function addPowerPoolProgressBar() {
+    // 为 Combined Power Pool Alpha Performance 添加进度条
+    console.log('[WQP] Checking for Combined Power Pool Alpha Performance progress bar...');
+    
+    // 等待页面加载完成
+    const checkAndAddProgressBar = () => {
+        console.log('[WQP] Starting checkAndAddProgressBar...');
+        
+        // 先检查页面上是否有任何包含 "Combined" 的文本
+        const bodyText = document.body.innerText;
+        console.log('[WQP] Searching for "Combined Power Pool" in page text...');
+        
+        // 尝试多种可能的文本格式
+        const searchTerms = [
+            'Combined Power Pool Alpha Performance',
+            'Combined Power Pool',
+            'Power Pool Alpha Performance',
+            'Power Pool'
+        ];
+        
+        let foundTerm = null;
+        for (const term of searchTerms) {
+            if (bodyText.includes(term)) {
+                foundTerm = term;
+                console.log(`[WQP] Found term: "${term}"`);
+                break;
+            }
+        }
+        
+        if (!foundTerm) {
+            console.log('[WQP] No matching text found on page. Available text sample:', bodyText.substring(0, 500));
+            return false;
+        }
+        
+        // 查找包含 "Combined Power Pool Alpha Performance" 的具体元素
+        // 优先查找 H3, 然后是 DIV
+        const selectors = [
+            'h3', 'h2', 'h4',
+            '.research-paradigm__card-header',
+            '.genius__subtitle',
+            'div.research-paradigm__section'
+        ];
+        
+        let powerPoolSection = null;
+        
+        for (const selector of selectors) {
+            const elements = Array.from(document.querySelectorAll(selector));
+            powerPoolSection = elements.find(el => 
+                searchTerms.some(term => el.textContent.includes(term))
+            );
+            if (powerPoolSection) {
+                console.log(`[WQP] Found using selector "${selector}":`, powerPoolSection);
+                break;
+            }
+        }
+        
+        if (!powerPoolSection) {
+            console.log('[WQP] Could not find specific element for Combined Power Pool');
+            return false;
+        }
+        
+        // 查找父容器 - Combined Power Pool 应该在 .research-paradigm__section 中
+        let container = powerPoolSection.closest('.research-paradigm__section');
+        if (!container) {
+            container = powerPoolSection.closest('article');
+        }
+        if (!container) {
+            container = powerPoolSection.closest('.card');
+        }
+        if (!container) {
+            container = powerPoolSection.closest('div');
+        }
+        
+        if (!container) {
+            console.log('[WQP] ERROR: Could not find container');
+            return false;
+        }
+        
+        console.log('[WQP] Found container:', container);
+        
+        // 查找数值 - 从容器文本中提取
+        let performanceValue = 0;
+        let valueElement = null;
+        
+        // 首先尝试查找显示数值的元素
+        const possibleValueElements = container.querySelectorAll('.genius__value, .research-paradigm__card-value, strong, b, h1, h2, h3, h4, span');
+        
+        for (const el of possibleValueElements) {
+            const text = el.textContent.trim();
+            // 匹配纯数字或小数
+            if (/^\d+(\.\d+)?$/.test(text)) {
+                performanceValue = parseFloat(text);
+                valueElement = el;
+                console.log(`[WQP] Found value ${performanceValue} in element:`, el.tagName, el.className);
+                break;
+            }
+        }
+        
+        if (!valueElement) {
+            // 从容器文本中提取数字
+            const containerText = container.textContent;
+            // 查找 "Combined Power Pool Alpha Performance" 后的数字
+            const match = containerText.match(/Combined Power Pool Alpha Performance[^\d]*(\d+\.?\d*)/i);
+            if (match) {
+                performanceValue = parseFloat(match[1]);
+                console.log(`[WQP] Extracted value from text: ${performanceValue}`);
+            } else {
+                console.log('[WQP] Could not find performance value, using default 0');
+            }
+        }
+        
+        console.log(`[WQP] Final performance value: ${performanceValue}`);
+        
+        // 检查是否已经有进度条 (通过 ID 检查)
+        const existingProgressBar = container.querySelector('[id^="wqp-power-pool-progress-chart-"]');
+        if (existingProgressBar) {
+            console.log('[WQP] Progress bar already exists, skipping');
+            return true;
+        }
+        
+        // 创建或查找进度条容器
+        let progressBarContainer = container.querySelector('.genius__progress-bar-container');
+        if (!progressBarContainer) {
+            progressBarContainer = document.createElement('div');
+            progressBarContainer.className = 'genius__progress-bar-container';
+            progressBarContainer.style.marginTop = '16px';
+            progressBarContainer.style.marginBottom = '16px';
+            
+            console.log('[WQP] Creating new progress bar container');
+            
+            // 直接添加到容器末尾
+            container.appendChild(progressBarContainer);
+            console.log('[WQP] Appended progress bar to container');
+        }
+        
+        // 创建进度条图表容器
+        const chartContainer = document.createElement('div');
+        chartContainer.id = 'wqp-power-pool-progress-chart-' + Date.now();
+        chartContainer.style.width = '100%';
+        chartContainer.style.height = '50px';
+        progressBarContainer.appendChild(chartContainer);
+        
+        console.log('[WQP] Chart container created:', chartContainer.id);
+        
+        // 使用 Highcharts 创建进度条
+        createPowerPoolProgressBar(chartContainer.id, performanceValue);
+        
+        console.log('[WQP] ✅ Progress bar successfully added!');
+        return true;
+    };
+    
+    // 使用 MutationObserver 监听页面变化
+    let attempts = 0;
+    const maxAttempts = 100; // 增加尝试次数
+    
+    const observer = new MutationObserver(() => {
+        attempts++;
+        console.log(`[WQP] Attempt ${attempts}/${maxAttempts}`);
+        
+        if (checkAndAddProgressBar() || attempts >= maxAttempts) {
+            observer.disconnect();
+            if (attempts >= maxAttempts) {
+                console.log('[WQP] Max attempts reached, stopping observation');
+            } else {
+                console.log(`[WQP] Progress bar added successfully after ${attempts} attempts`);
+            }
+        }
+    });
+    
+    // 立即尝试一次
+    console.log('[WQP] Attempting immediate check...');
+    if (!checkAndAddProgressBar()) {
+        // 如果失败,开始观察
+        console.log('[WQP] Initial check failed, starting observer...');
+        observer.observe(document.body, { 
+            childList: true, 
+            subtree: true,
+            characterData: true 
+        });
+        
+        // 10秒后停止观察 (延长时间)
+        setTimeout(() => {
+            observer.disconnect();
+            console.log('[WQP] Observer timeout - disconnected after 10 seconds');
+        }, 10000);
+    } else {
+        console.log('[WQP] Initial check succeeded!');
+    }
+}
+
+function createPowerPoolProgressBar(containerId, value) {
+    console.log('[WQP] Creating progress bar for:', containerId, 'with value:', value);
+    
+    const container = document.getElementById(containerId);
+    if (!container) {
+        console.error('[WQP] Container not found:', containerId);
+        return;
+    }
+    
+    const maxValue = 3;
+    
+    // 计算每个颜色段的宽度和颜色
+    // 关键:当前值落在某个区间时,该区间要分成两部分(深色+浅色)
+    const segments = [];
+    
+    // 区间 0-0.5 (深黄/浅黄)
+    if (value >= 0.5) {
+        segments.push({ width: 0.5, color: '#c59b00' }); // 完全达到,全深黄
+    } else if (value > 0) {
+        segments.push({ width: value, color: '#c59b00' }); // 部分达到,深黄
+        segments.push({ width: 0.5 - value, color: '#ffe9b3' }); // 未达到,浅黄
+    } else {
+        segments.push({ width: 0.5, color: '#ffe9b3' }); // 完全未达到,全浅黄
+    }
+    
+    // 区间 0.5-1.0 (深绿/浅绿)
+    if (value >= 1.0) {
+        segments.push({ width: 0.5, color: '#00ae00' }); // 完全达到,全深绿
+    } else if (value > 0.5) {
+        segments.push({ width: value - 0.5, color: '#00ae00' }); // 部分达到,深绿
+        segments.push({ width: 1.0 - value, color: '#d4f4d4' }); // 未达到,浅绿
+    } else {
+        segments.push({ width: 0.5, color: '#d4f4d4' }); // 完全未达到,全浅绿
+    }
+    
+    // 区间 1.0-2.0 (深蓝/浅蓝)
+    if (value >= 2.0) {
+        segments.push({ width: 1.0, color: '#0074c4' }); // 完全达到,全深蓝
+    } else if (value > 1.0) {
+        segments.push({ width: value - 1.0, color: '#0074c4' }); // 部分达到,深蓝
+        segments.push({ width: 2.0 - value, color: '#cce5f6' }); // 未达到,浅蓝
+    } else {
+        segments.push({ width: 1.0, color: '#cce5f6' }); // 完全未达到,全浅蓝
+    }
+    
+    // 区间 2.0-3.0 (深橙/浅橙)
+    if (value >= 3.0) {
+        segments.push({ width: 1.0, color: '#c34800' }); // 完全达到,全深橙
+    } else if (value > 2.0) {
+        segments.push({ width: value - 2.0, color: '#c34800' }); // 部分达到,深橙
+        segments.push({ width: 3.0 - value, color: '#ffd7a7' }); // 未达到,浅橙
+    } else {
+        segments.push({ width: 1.0, color: '#ffd7a7' }); // 完全未达到,全浅橙
+    }
+    
+    // 确定标记点的边框颜色 (根据当前所在区间)
+    let markerColor = '#c59b00'; // 默认黄色 (0-0.5)
+    if (value >= 2.0) {
+        markerColor = '#c34800'; // 深橙 (2.0-3.0)
+    } else if (value >= 1.0) {
+        markerColor = '#0074c4'; // 蓝色 (1.0-2.0)
+    } else if (value >= 0.5) {
+        markerColor = '#00ae00'; // 绿色 (0.5-1.0)
+    }
+    
+    const markerPosition = Math.min((value / maxValue) * 100, 100); // 百分比位置
+    
+    // 生成所有颜色段的 HTML
+    const segmentsHtml = segments.map(seg => 
+        `<div style="width: ${(seg.width / maxValue) * 100}%; background-color: ${seg.color}; height: 100%;"></div>`
+    ).join('');
+    
+    // 创建进度条 HTML
+    container.innerHTML = `
+        <div style="position: relative; width: 100%; height: 40px; padding-bottom: 10px; display: flex;">
+            <!-- 彩色条 -->
+            <div style="position: absolute; top: 0; left: 0; right: 0; height: 20px; display: flex; overflow: hidden;">
+                ${segmentsHtml}
+            </div>
+            
+            <!-- 标记点 -->
+            <div style="position: absolute; top: 10px; left: ${markerPosition}%; transform: translate(-50%, -50%); width: 18px; height: 18px; background: white; border: 3px solid ${markerColor}; border-radius: 50%; z-index: 10;"></div>
+            
+            <!-- 刻度标签 -->
+            <div style="position: absolute; bottom: 0; left: ${(0.5 / maxValue) * 100}%; transform: translateX(-50%); font-size: 0.75rem; color: #7b8292;">0.5</div>
+            <div style="position: absolute; bottom: 0; left: ${(1.0 / maxValue) * 100}%; transform: translateX(-50%); font-size: 0.75rem; color: #7b8292;">1</div>
+            <div style="position: absolute; bottom: 0; left: ${(2.0 / maxValue) * 100}%; transform: translateX(-50%); font-size: 0.75rem; color: #7b8292;">2</div>
+        </div>
+    `;
+    
+    console.log('[WQP] Progress bar created successfully with', segments.length, 'segments, value:', value, 'at position:', markerPosition.toFixed(1) + '%');
 }
 
 watchForElementAndInsertButton();
