@@ -445,6 +445,11 @@ async function insertRankListInfo() {
 
         data.forEach((item, idx) => {
             item.index = idx + 1;
+			item.maxCombinedAlphaPerformance = Math.max(item.combinedAlphaPerformance,
+					item.combinedSelectedAlphaPerformance,
+					item.combinedPowerPoolAlphaPerformance,
+					item.combinedOsmosisPerformance,
+			)
         });
         grandmasterCount = data.filter(item => item.finalLevel === 'grandmaster').length;
 
@@ -463,6 +468,7 @@ async function insertRankListInfo() {
             { title: 'Combined Selected Alpha Performance', data: 'combinedSelectedAlphaPerformance', visible: false }, // 综合选择的Alpha表现
             { title: 'Combined Power Pool Alpha Performance', data: 'combinedPowerPoolAlphaPerformance', visible: false }, // 综合Power Pool的Alpha表现
             { title: 'Combined Osmosis Performance', data: 'combinedOsmosisPerformance', visible: false }, // 综合Power Pool的Alpha表现
+            { title: 'Max Combined Performance', data: 'maxCombinedAlphaPerformance', visible: false }, // 最大的Alpha表现
 
             // consultant 信息
             { title: 'RA Count', data: 'submissionsCount', visible: false },
