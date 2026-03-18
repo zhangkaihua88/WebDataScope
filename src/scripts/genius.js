@@ -8,9 +8,9 @@ console.log('genius.js loaded');
 const OptUrl = 'https://api.worldquantbrain.com/operators';
 // genius level criteria
 const levelCriteria = {
-    "expert": { "alphaCount": 20, "pyramidCount": 10, "combinedAlphaPerformance": 0.5, "combinedSelectedAlphaPerformance": 0.5, "combinedPowerPoolAlphaPerformance": 0.5 },
-    "master": { "alphaCount": 120, "pyramidCount": 30, "combinedAlphaPerformance": 1, "combinedSelectedAlphaPerformance": 1, "combinedPowerPoolAlphaPerformance": 1 },
-    "grandmaster": { "alphaCount": 220, "pyramidCount": 60, "combinedAlphaPerformance": 2, "combinedSelectedAlphaPerformance": 2, "combinedPowerPoolAlphaPerformance": 2 }
+    "expert": { "alphaCount": 20, "pyramidCount": 10, "combinedAlphaPerformance": 0.5, "combinedSelectedAlphaPerformance": 0.5, "combinedPowerPoolAlphaPerformance": 0.5, combinedOsmosisPerformance: 0.5},
+    "master": { "alphaCount": 120, "pyramidCount": 30, "combinedAlphaPerformance": 1, "combinedSelectedAlphaPerformance": 1, "combinedPowerPoolAlphaPerformance": 1, combinedOsmosisPerformance: 1},
+    "grandmaster": { "alphaCount": 220, "pyramidCount": 60, "combinedAlphaPerformance": 2, "combinedSelectedAlphaPerformance": 2, "combinedPowerPoolAlphaPerformance": 2, combinedOsmosisPerformance: 2}
 }
 
 
@@ -245,7 +245,8 @@ function determineUserLevel(userData, geniusCombineTag) {
             isPerformanceConditionMet = (
                 userData.combinedAlphaPerformance >= criteria.combinedAlphaPerformance ||
                 userData.combinedSelectedAlphaPerformance >= criteria.combinedSelectedAlphaPerformance ||
-                userData.combinedPowerPoolAlphaPerformance >= criteria.combinedPowerPoolAlphaPerformance
+                userData.combinedPowerPoolAlphaPerformance >= criteria.combinedPowerPoolAlphaPerformance ||
+                userData.combinedOsmosisPerformance >= criteria.combinedOsmosisPerformance
             );
         }
 
@@ -281,7 +282,7 @@ async function getAllRank() {
                 } else {
                     itemData = data.map((item, index) => ({ ...item, originalIndex: index })).filter(item => item.alphaCount >= levelCriteria[model].alphaCount && item.pyramidCount >= levelCriteria[model].pyramidCount);
                     if (WQPSettings.geniusCombineTag) {
-                        itemData = itemData.filter(item => item.combinedAlphaPerformance >= levelCriteria[model].combinedAlphaPerformance || item.combinedSelectedAlphaPerformance >= levelCriteria[model].combinedSelectedAlphaPerformance || item.combinedPowerPoolAlphaPerformance >= levelCriteria[model].combinedPowerPoolAlphaPerformance);
+                        itemData = itemData.filter(item => item.combinedAlphaPerformance >= levelCriteria[model].combinedAlphaPerformance || item.combinedSelectedAlphaPerformance >= levelCriteria[model].combinedSelectedAlphaPerformance || item.combinedPowerPoolAlphaPerformance >= levelCriteria[model].combinedPowerPoolAlphaPerformance || item.combinedOsmosisPerformance >= levelCriteria[model].combinedOsmosisPerformance);
                     }
                 }
                 itemData.forEach(item => item['TotalRank'] = 0);
@@ -461,6 +462,7 @@ async function insertRankListInfo() {
             { title: 'Combined Alpha Performance', data: 'combinedAlphaPerformance', visible: false }, // 综合Alpha表现
             { title: 'Combined Selected Alpha Performance', data: 'combinedSelectedAlphaPerformance', visible: false }, // 综合选择的Alpha表现
             { title: 'Combined Power Pool Alpha Performance', data: 'combinedPowerPoolAlphaPerformance', visible: false }, // 综合Power Pool的Alpha表现
+            { title: 'Combined Osmosis Performance', data: 'combinedOsmosisPerformance', visible: false }, // 综合Power Pool的Alpha表现
 
             // consultant 信息
             { title: 'RA Count', data: 'submissionsCount', visible: false },
@@ -613,7 +615,7 @@ async function insertRankListInfo() {
             }
 
             var baseFields = [
-                'Signals', 'Pyramids', 'Combined Alpha Performance', 'Combined Selected Alpha Performance', 'Combined Power Pool Alpha Performance'
+                'Signals', 'Pyramids', 'Combined Alpha Performance', 'Combined Selected Alpha Performance', 'Combined Power Pool Alpha Performance', 'Combined Osmosis Performance'
             ];
             var sixFields = [
                 'Operators used', 'Operator Avg', 'Fields used', 'Field Avg', 'Community Activity', 'Max Simulation Streak'
@@ -756,7 +758,7 @@ async function calculateRanks(data, userId, WQPSettings) {
     for (const model of ["expert", "master", "grandmaster"]) {
         let itemData = data.filter(item => item.alphaCount >= levelCriteria[model].alphaCount && item.pyramidCount >= levelCriteria[model].pyramidCount);
         if (WQPSettings.geniusCombineTag) {
-            itemData = itemData.filter(item => item.combinedAlphaPerformance >= levelCriteria[model].combinedAlphaPerformance || item.combinedSelectedAlphaPerformance >= levelCriteria[model].combinedSelectedAlphaPerformance || item.combinedPowerPoolAlphaPerformance >= levelCriteria[model].combinedPowerPoolAlphaPerformance);
+            itemData = itemData.filter(item => item.combinedAlphaPerformance >= levelCriteria[model].combinedAlphaPerformance || item.combinedSelectedAlphaPerformance >= levelCriteria[model].combinedSelectedAlphaPerformance || item.combinedPowerPoolAlphaPerformance >= levelCriteria[model].combinedPowerPoolAlphaPerformance || item.combinedOsmosisPerformance >= levelCriteria[model].combinedOsmosisPerformance);
         }
         result['gold'][model + 'Rank'] = itemData.filter(item => item.totalRank < userData.totalRank).length + 1;
 
