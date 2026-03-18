@@ -8,6 +8,7 @@
     <link rel="stylesheet" href="popup.css">
     <script src="../../scripts/lib/pako.min.js"></script>
     <script src="../../scripts/lib/msgpack.min.js"></script>
+    <script src="../../scripts/lib/jszip.min.js"></script>
 </head>
 
 <body>
@@ -49,6 +50,14 @@
             </div>
             <button id="importCommunityBtn" type="button" style="background-color:#6c757d;">导入</button>
             <input id="importCommunityFile" type="file" accept="application/json,.json,.wqcs" style="display:none;" />
+        </div>
+
+        <h2 style="margin-top:16px;text-align:left;">数据文件加载</h2>
+        <div class="input-group" style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button id="loadDataFileBtn" type="button" style="background-color:#0d6efd;">加载数据文件(ZIP)</button>
+            <input id="loadDataFile" type="file" accept=".zip" style="display:none;" />
+            <button id="testDataBtn" type="button" style="background-color:#6c757d;">测试数据库</button>
+            <span id="dataFileStatus" style="font-size:12px;align-self:center;"></span>
         </div>
         <p id="status" aria-live="polite"></p>
     </div>
