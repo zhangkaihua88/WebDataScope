@@ -56,22 +56,17 @@ async function getDataFromUrl(url, options = {}) {
         timeoutMs = 15000,            // 单次请求超时
         initialDelayMs = 1000,        // 初始重试延迟
         maxDelayMs = 10000,           // 最大重试延迟
-        maxRetries = 5,               // 默认重试5次，避免无限等待
-        onRetry = null,               // 可选回调：({ attempt, status?, error?, nextDelayMs })
-        onFailure = null              // 新增可选回调：({ url, error })
+        maxRetries = Infinity,        // 默认无限重试，直到 response.ok
+        onRetry = null                // 可选回调：({ attempt, status?, error?, nextDelayMs })
     } = options;
 
     let attempt = 0;
     let delayMs = initialDelayMs;
 
-    while (attempt < maxRetries) { // 修改循环条件，使用有限次重试
+    while (true) {
         attempt += 1;
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => {
-            controller.abort(new DOMException('Timeout', 'AbortError'));
-            console.warn(`Request to ${url} timed out after ${timeoutMs}ms.`);
-        }, timeoutMs);
-
+        const timeoutId = setTimeout(() => controller.abort(new DOMException('Timeout', 'AbortError')), timeoutMs);
         try {
             const response = await fetch(url, {
                 referrer: "https://platform.worldquantbrain.com/",
@@ -89,36 +84,34 @@ async function getDataFromUrl(url, options = {}) {
                 return data;
             }
 
-            // 非 2xx 响应，准备重试
+            // 非 2xx，准备重试
             const nextDelay = Math.min(maxDelayMs, Math.floor(delayMs * 1.5 + Math.random() * 200));
-            console.warn(`Attempt ${attempt} for ${url} failed with status ${response.status}. Retrying in ${nextDelay}ms...`);
             if (typeof onRetry === 'function') {
-                try { onRetry({ attempt, status: response.status, nextDelayMs: nextDelay }); } catch (e) { console.error("onRetry callback error:", e); }
+                try { onRetry({ attempt, status: response.status, nextDelayMs: nextDelay }); } catch (_) { /* noop */ }
             }
-            
+
+            if (attempt >= maxRetries) {
+                throw new Error(`Failed to fetch ${url} after ${attempt} attempts, last status: ${response.status}`);
+            }
+
             await new Promise(res => setTimeout(res, delayMs));
             delayMs = nextDelay;
-
         } catch (err) {
             clearTimeout(timeoutId);
-            // 网络错误或超时，准备重试
+            // 网络错误或超时，继续重试
             const nextDelay = Math.min(maxDelayMs, Math.floor(delayMs * 1.5 + Math.random() * 200));
-            console.warn(`Attempt ${attempt} for ${url} failed due to error: ${err?.message || err}. Retrying in ${nextDelay}ms...`);
             if (typeof onRetry === 'function') {
-                try { onRetry({ attempt, error: err, nextDelayMs: nextDelay }); } catch (e) { console.error("onRetry callback error:", e); }
+                try { onRetry({ attempt, error: err, nextDelayMs: nextDelay }); } catch (_) { /* noop */ }
+            }
+
+            if (attempt >= maxRetries) {
+                throw new Error(`Failed to fetch ${url} after ${attempt} attempts due to error: ${err?.message || err}`);
             }
 
             await new Promise(res => setTimeout(res, delayMs));
             delayMs = nextDelay;
         }
     }
-    // 如果所有重试都失败了，抛出错误
-    const finalError = new Error(`Failed to fetch ${url} after ${maxRetries} attempts.`);
-    console.error(finalError.message);
-    if (typeof onFailure === 'function') {
-        try { onFailure({ url, error: finalError }); } catch (e) { console.error("onFailure callback error:", e); }
-    }
-    throw finalError;
 }
 
 async function getDataFromUrlWithOffsetParallel(formatUrl, limit, buttonName){
@@ -183,28 +176,7 @@ function waitForElement(selector, nonselector) {
 
 
 
-async function getAuth() {
-    let n = 0; // Initialize n for retry count
-    return new Promise((r, j) => {
-        chrome.storage.local.get('WQPSummary', async ({ WQPSummary: a }) => {
-            let d = a;
-            try {
-                if (!a) {
-                    d = await getDataFromUrl("https://api.worldquantbrain.com/users/self/consultant/summary");
-                    chrome.storage.local.set({ WQPSummary: d }, () => { });
-                }
-            } catch (e) {
-                if (n < 3) {
-                    n++; // Increment n on retry
-                    return getAuth().then(r).catch(j); // Recursive call without n as param
-                }
-                return j(e);
-            }
-            r(["CN", "HK"].includes(d?.leaderboard?.country));
-        });
-    });
-}
-
+async function getAuth(){n=5||0;return new Promise((r,j)=>{chrome.storage.local.get('WQPSummary',async({WQPSummary:a})=>{let d=a;try{if(!a){d=await getDataFromUrl("https://api.worldquantbrain.com/users/self/consultant/summary"),chrome.storage.local.set({WQPSummary:d},()=>{})}}catch(e){if(n<3)return getAuth(n+1).then(r).catch(j);return j(e)}r(["CN","HK"].includes(d?.leaderboard?.country))})})}
 
 function formatSavedTimestamp(dateString) {
     const date = new Date(dateString);
