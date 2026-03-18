@@ -445,7 +445,8 @@ async function insertRankListInfo() {
 
         data.forEach((item, idx) => {
             item.index = idx + 1;
-			item.maxCombinedAlphaPerformance = Math.max(item.combinedAlphaPerformance,
+			item.maxCombinedAlphaPerformance = Math.max(
+                    item.combinedAlphaPerformance,
 					item.combinedSelectedAlphaPerformance,
 					item.combinedPowerPoolAlphaPerformance,
 					item.combinedOsmosisPerformance,
