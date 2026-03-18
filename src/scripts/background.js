@@ -4,9 +4,6 @@ console.log('Background script is running.');
 import './lib/pako.min.js';
 import './lib/msgpack.min.js';
 
-const dataSetListUrl = chrome.runtime.getURL(`data/dataSetList.json`);
-const dataInfoUrl = chrome.runtime.getURL(`data/oth/info_data.bin`);
-let dataSetList = null; // 定义全局变量
 const REPO_OWNER = "zhangkaihua88";
 const REPO_NAME = "WebDataScope";
 const CHECK_INTERVAL = 24 * 60 * 60 * 1000; // 24小时检查一次
@@ -873,16 +870,6 @@ function showNotification(version, url) {
 
 
 
-// 获取数据集列表
-async function getDataSetList() {
-    const response = await fetch(dataSetListUrl);
-    if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status} for ${dataSetListUrl}`);
-    }
-    const data = await response.json(); // Parse JSON data
-    return data
-}
-
 // 注入分布图脚本
 function injectionDistributionScript(tabId) {
     try {
@@ -900,10 +887,6 @@ function injectionDistributionScript(tabId) {
 }
 // 注入数据标记脚本
 async function injectionDataFlagScript(tabId, tab) {
-    if (dataSetList === null) {
-        dataSetList = await getDataSetList();
-    }
-
     try {
         // 必须注入 pako 和 msgpack 供 content script 使用
         chrome.scripting.executeScript({
