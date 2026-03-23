@@ -596,6 +596,20 @@ async function insertRankListInfo() {
             { title: '当前等级', data: 'geniusLevel' },
             { title: '达成等级', data: 'achievedLevel' },
             { title: '最终等级', data: 'finalLevel' },
+            { 
+                title: '标签', 
+                data: 'extras',
+                render: function (data, type) {
+                    if (type === 'display') {
+                        if (Array.isArray(data) && data.length > 0) {
+                            return data.map(tag => `<span class="badge" style="background-color: #e0e0e0; color: #333; padding: 2px 6px; border-radius: 4px; margin-right: 4px; font-size: 0.85em;">${tag}</span>`).join('');
+                        }
+                        return '';
+                    }
+                    // 对于排序和过滤，将其转换为逗号分隔的字符串
+                    return Array.isArray(data) ? data.join(', ') : (data || '');
+                }
+            },
             { title: '国家/地区', data: 'country', render: function (data, type) { return `<i title="${data}" class="${data.toLowerCase()} flag"></i>` + data; } },
 
             // 基础信息
@@ -693,7 +707,7 @@ async function insertRankListInfo() {
                 { targets: 0, type: 'num' },
                 { targets: 3, orderDataType: 'level-order' },
                 { targets: 2, orderDataType: 'level-order' },
-                { targets: [2, 3, 4], columnControl: ['order', ['searchList']] }
+                { targets: [2, 3, 4, 5], columnControl: ['order', ['searchList']] }
             ],
             scrollX: true,
             responsive: false,
