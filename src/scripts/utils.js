@@ -196,6 +196,25 @@ function formatSavedTimestamp(dateString) {
     return [easternTime, beijingTime];
 }
 
+// Get current time as a Date object in Eastern timezone
+// This is used for date arithmetic and comparisons in Eastern time
+function getEasternTimeDate() {
+    const now = new Date();
+    const easternStr = now.toLocaleString("en-US", {
+        timeZone: "America/New_York"
+    });
+    return new Date(easternStr);
+}
+
+// Convert any date to Eastern timezone for comparison
+function toEasternTime(date) {
+    const d = new Date(date);
+    const easternStr = d.toLocaleString("en-US", {
+        timeZone: "America/New_York"
+    });
+    return new Date(easternStr);
+}
+
 // 定义一个变量来存储已提交的 Alpha 列表和上次更新时间
 let submittedAlphasCache = {
     data: [],
