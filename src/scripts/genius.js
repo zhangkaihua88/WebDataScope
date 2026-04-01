@@ -47,8 +47,9 @@ async function fetchAllAlphas(forceRefresh = false, isSelf = false) { // Added i
     }
 
 
-    const currentDate = new Date();
-    const year = currentDate.getUTCFullYear();
+    // Use Eastern Time to determine current quarter (not browser local time)
+    const currentDate = getEasternTimeDate();
+    const year = currentDate.getFullYear();
     const quarter = Math.floor((currentDate.getMonth() + 3) / 3);
     const quarters = [
         { start: `${year}-01-01T05:00:00.000Z`, end: `${year}-04-01T04:00:00.000Z` },  // 第一季度
