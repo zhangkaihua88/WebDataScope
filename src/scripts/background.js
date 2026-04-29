@@ -1,11 +1,8 @@
 // background.js: 后台脚本，用于监听浏览器事件，如标签页更新、插件安装等，以及与content scripts和popup交互
 console.log('Background script is running.');
-// 以副作用方式加载 pako（UMD 构建会挂到 globalThis.pako），适配 MV3 Service Worker
-import './lib/pako.min.js';
-import './lib/msgpack.min.js';
+import './dataStore.js';
 
-const dataSetListUrl = chrome.runtime.getURL(`data/dataSetList.json`);
-const dataInfoUrl = chrome.runtime.getURL(`data/oth/info_data.bin`);
+const DATA_SET_LIST_PATH = 'dataSetList.json';
 let dataSetList = null; // 定义全局变量
 const REPO_OWNER = "zhangkaihua88";
 const REPO_NAME = "WebDataScope";
@@ -20,6 +17,60 @@ const EXCLUDED_PREFIXES = [
     'https://api.worldquantbrain.com/errors/api/2/envelope/'
 
 ];
+
+function getExtensionDataStore() {
+    if (!globalThis.WQPDataStore) {
+        throw new Error('WQPDataStore is not available');
+    }
+    return globalThis.WQPDataStore;
+}
+
+async function getJsonDataFile(path) {
+    const data = await getExtensionDataStore().getJson(path);
+    if (data === null) {
+        throw new Error(`Data file not found in IndexedDB: ${path}`);
+    }
+    return data;
+}
+
+function arrayBufferToBase64(arrayBuffer) {
+    const bytes = new Uint8Array(arrayBuffer);
+    const chunkSize = 0x8000;
+    let binary = '';
+
+    for (let i = 0; i < bytes.length; i += chunkSize) {
+        const chunk = bytes.subarray(i, i + chunkSize);
+        binary += String.fromCharCode(...chunk);
+    }
+
+    return btoa(binary);
+}
+
+async function getCompressedBase64DataFile(path) {
+    const normalizedPath = getExtensionDataStore().normalizeDataPath(path);
+    const arrayBuffer = await getExtensionDataStore().getFileArrayBuffer(normalizedPath);
+    if (!arrayBuffer) {
+        throw new Error(`Data file not found in IndexedDB: ${normalizedPath}`);
+    }
+    return arrayBufferToBase64(arrayBuffer);
+}
+
+async function handleIndexedDbDataRequest(msg) {
+    if (msg.responseType === 'json') {
+        return getJsonDataFile(msg.path);
+    }
+    if (msg.responseType === 'compressed-base64') {
+        return getCompressedBase64DataFile(msg.path);
+    }
+    if (msg.responseType === 'meta') {
+        return getExtensionDataStore().getMeta();
+    }
+    throw new Error(`Unsupported data response type: ${msg.responseType}`);
+}
+
+function resetIndexedDbDataCache() {
+    dataSetList = null;
+}
 
 
 // 初始化设置
@@ -45,7 +96,12 @@ chrome.runtime.onInstalled.addListener(async () => {
         }
     });
     // 获取数据集列表
-    dataSetList = await getDataSetList();
+    try {
+        dataSetList = await getDataSetList();
+    } catch (error) {
+        console.warn('Data zip has not been imported into IndexedDB yet.', error);
+        dataSetList = null;
+    }
     checkUpdate();
 });
 
@@ -252,6 +308,20 @@ try {
 
 // 内容脚本可主动请求最近 N 条记录
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+    if (msg && msg.type === 'WQP_INDEXED_DATA_GET') {
+        handleIndexedDbDataRequest(msg).then((data) => {
+            sendResponse({ ok: true, data });
+        }).catch((error) => {
+            console.error('IndexedDB data request failed:', error);
+            sendResponse({ ok: false, error: error.message });
+        });
+        return true;
+    } else if (msg && msg.type === 'WQP_INDEXED_DATA_UPDATED') {
+        resetIndexedDbDataCache();
+        sendResponse({ ok: true });
+        return true;
+    }
+
     if (msg && msg.type === 'REQ_MONITOR_GET_RECENT') {
         // 仅返回最近 100 条，且过滤 tabId 匹配或为 -1 的(无法关联标签的)记录
         const tabId = sender?.tab?.id;
@@ -418,12 +488,11 @@ function showNotification(version, url) {
 
 // 获取数据集列表
 async function getDataSetList() {
-    const response = await fetch(dataSetListUrl);
-    if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status} for ${dataSetListUrl}`);
+    const data = await getJsonDataFile(DATA_SET_LIST_PATH);
+    if (!Array.isArray(data)) {
+        throw new Error(`${DATA_SET_LIST_PATH} is not a valid data set list`);
     }
-    const data = await response.json(); // Parse JSON data
-    return data
+    return data;
 }
 
 // 注入分布图脚本
@@ -444,13 +513,15 @@ function injectionDistributionScript(tabId) {
 // 注入数据标记脚本
 async function injectionDataFlagScript(tabId, tab) {
     if (dataSetList === null) {
-        dataSetList = await getDataSetList();
+        try {
+            dataSetList = await getDataSetList();
+        } catch (error) {
+            console.warn('Unable to load dataSetList from IndexedDB.', error);
+            dataSetList = [];
+        }
     }
-    // 获取当前扩展版本号，用于缓存版本控制
-    const version = chrome.runtime.getManifest().version;
-
     try {
-        // 必须注入 pako 和 msgpack 供 content script 使用
+        // 注入数据标记脚本
         chrome.scripting.executeScript({
             target: { tabId: tabId },
             files: [
@@ -463,7 +534,7 @@ async function injectionDataFlagScript(tabId, tab) {
             chrome.scripting.executeScript({
                 target: { tabId },
                 // 仅传递必要的元数据，不传递巨大的 dataInfo 对象
-                args: [dataSetList, dataInfoUrl, version, tab.url],
+                args: [dataSetList, tab.url],
                 func: (...args) => dataFlagFunc(...args),
             });
         });

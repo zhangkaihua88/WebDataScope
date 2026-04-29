@@ -3,97 +3,65 @@ console.log('dataFlag.js loaded');
 
 const flagMapOtherUniverse = {};
 
-// IndexedDB 配置
-const DB_NAME = 'WQP_Data_Cache';
-const STORE_NAME = 'dataInfo';
-const DB_VERSION = 1;
+// IndexedDB data request
+const DATA_INFO_PATH = 'oth/info_data.bin';
 
-// ---------------------- IndexedDB Helper ----------------------
-function openDB(version) {
+function requestIndexedDbData(path, responseType) {
     return new Promise((resolve, reject) => {
-        const request = indexedDB.open(DB_NAME, version || 1);
-        
-        request.onupgradeneeded = (event) => {
-            const db = event.target.result;
-            if (!db.objectStoreNames.contains(STORE_NAME)) {
-                db.createObjectStore(STORE_NAME);
+        chrome.runtime.sendMessage({
+            type: 'WQP_INDEXED_DATA_GET',
+            path,
+            responseType,
+        }, (response) => {
+            if (chrome.runtime.lastError) {
+                reject(chrome.runtime.lastError);
+                return;
             }
-        };
-
-        request.onsuccess = (event) => {
-            resolve(event.target.result);
-        };
-
-        request.onerror = (event) => {
-            reject(event.target.error);
-        };
+            if (!response?.ok) {
+                reject(new Error(response?.error || `Failed to load ${path}`));
+                return;
+            }
+            resolve(response.data);
+        });
     });
 }
-// ---------------------- Data Loader ----------------------
 
-async function getDataInfo(dataInfoUrl, currentVersion) {
-    let db;
+function decodeCompressedBase64Data(base64Data) {
+    const pakoLib = window.pako || globalThis.pako;
+    const msgpackLib = window.msgpack || globalThis.msgpack;
+    if (!pakoLib || !msgpackLib) {
+        throw new Error('pako or msgpack is not available');
+    }
+
+    const binary = atob(base64Data);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) {
+        bytes[i] = binary.charCodeAt(i);
+    }
+
+    const inflatedData = pakoLib.inflate(bytes);
+    return msgpackLib.decode(new Uint8Array(inflatedData));
+}
+
+async function requestDecodedBinData(path) {
+    const base64Data = await requestIndexedDbData(path, 'compressed-base64');
+    return decodeCompressedBase64Data(base64Data);
+}
+
+async function getDataInfo() {
     try {
-        db = await openDB();
-        
-        // 使用事务一次性读取
-        const tx = db.transaction([STORE_NAME], 'readonly');
-        const store = tx.objectStore(STORE_NAME);
-        
-        const versionReq = store.get('version');
-        const dataReq = store.get('data');
-        
-        // 将 IDBRequest 转换为 Promise
-        const getResult = (req) => new Promise((resolve, reject) => {
-            req.onsuccess = () => resolve(req.result);
-            req.onerror = () => reject(req.error);
-        });
-
-        console.log('Checking IndexedDB cache...');
-        const [cachedVersion, cachedData] = await Promise.all([
-            getResult(versionReq),
-            getResult(dataReq)
-        ]);
-
-        if (cachedVersion === currentVersion && cachedData) {
-            console.log('Version matched. Using cached data.');
-            return cachedData;
-        }
-        
-        console.log('Cache miss or version mismatch. Fetching new data from', dataInfoUrl);
-        const response = await fetch(dataInfoUrl);
-        const arrayBuffer = await response.arrayBuffer();
-        
-        const pakoLib = window.pako || globalThis.pako;
-        const msgpackLib = window.msgpack || globalThis.msgpack;
-
-        if (!pakoLib || !msgpackLib) {
-             throw new Error('Pako or Msgpack library not found in content script scope.');
-        }
-
-        console.log('Decompressing and decoding data...');
-        const inflatedData = pakoLib.inflate(new Uint8Array(arrayBuffer));
-        const dataInfo = msgpackLib.decode(new Uint8Array(inflatedData));
-        
-        // 存入 IndexedDB
-        console.log('Saving data to IndexedDB...');
-        const writeTx = db.transaction([STORE_NAME], 'readwrite');
-        const writeStore = writeTx.objectStore(STORE_NAME);
-        writeStore.put(currentVersion, 'version');
-        writeStore.put(dataInfo, 'data');
-        
-        return dataInfo;
+        return await requestDecodedBinData(DATA_INFO_PATH);
     } catch (e) {
-        console.error('Error loading data info:', e);
-        return null; 
+        console.error('Error loading data info from IndexedDB:', e);
+        return null;
     }
 }
 
 
-function dataFlagFunc(dataSetList, dataInfoUrl, currentVersion, url) {
+function dataFlagFunc(dataSetList, url) {
     if(!url.includes("data/data-sets")) return; // 只在数据集列表页面执行
 
-    getDataInfo(dataInfoUrl, currentVersion).then(dataInfo => {
+    getDataInfo().then(dataInfo => {
         if (!dataInfo) {
             console.error('Data info load failed, skipping flagging.');
             return;

@@ -6,6 +6,48 @@ let cacheDataOtherUniverse = {}; // 缓存数据(其他Universe)
 
 let sum = function (x, y) { return x + y; };
 
+function requestIndexedDbData(path, responseType) {
+    return new Promise((resolve, reject) => {
+        chrome.runtime.sendMessage({
+            type: 'WQP_INDEXED_DATA_GET',
+            path,
+            responseType,
+        }, (response) => {
+            if (chrome.runtime.lastError) {
+                reject(chrome.runtime.lastError);
+                return;
+            }
+            if (!response?.ok) {
+                reject(new Error(response?.error || `Failed to load ${path}`));
+                return;
+            }
+            resolve(response.data);
+        });
+    });
+}
+
+function decodeCompressedBase64Data(base64Data) {
+    const pakoLib = window.pako || globalThis.pako;
+    const msgpackLib = window.msgpack || globalThis.msgpack;
+    if (!pakoLib || !msgpackLib) {
+        throw new Error('pako or msgpack is not available');
+    }
+
+    const binary = atob(base64Data);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) {
+        bytes[i] = binary.charCodeAt(i);
+    }
+
+    const inflatedData = pakoLib.inflate(bytes);
+    return msgpackLib.decode(new Uint8Array(inflatedData));
+}
+
+async function requestDecodedBinData(path) {
+    const base64Data = await requestIndexedDbData(path, 'compressed-base64');
+    return decodeCompressedBase64Data(base64Data);
+}
+
 function getDataFieldId(node) {
     // 从当前节点开始向上查找，直到找到包含指定类名的节点
     // console.log('raw', node)
@@ -74,8 +116,12 @@ async function fetchDataDetails(fileName, dataFieldData) {
 
     // 获取数据集列表
     if (!cacheData['dataSetList']) {
-        const response = await fetch(chrome.runtime.getURL(`data/dataSetList.json`));
-        cacheData['dataSetList'] = await response.json();
+        try {
+            cacheData['dataSetList'] = await requestIndexedDbData('dataSetList.json', 'json');
+        } catch (error) {
+            console.error('Data set list load failed from IndexedDB:', error);
+            return;
+        }
     }
     const dataSetList = cacheData['dataSetList'];
 
@@ -102,14 +148,10 @@ async function fetchDataDetails(fileName, dataFieldData) {
     }
 
     // 从文件中获取数据
-    let url = chrome.runtime.getURL(`data/${fileName}.bin`);
     try {
-        const response = await fetch(url);
-        const arrayBuffer = await response.arrayBuffer();
-        const inflatedData = pako.inflate(arrayBuffer);
-        const decodedData = msgpack.decode(new Uint8Array(inflatedData));
+        const decodedData = await requestDecodedBinData(`${fileName}.bin`);
         cacheData[fileName] = decodedData;
-        return decodedData, perfectMatch, universe;
+        return [decodedData, perfectMatch, universe];
     } catch (error) {
         // console.log("error", error);
         return;
@@ -148,7 +190,12 @@ async function updateCardInfo(dataId, data, updateDataCallback) {
     const fileName = data.dataSet + "_" + data.region + "_" + data.universe + "_Delay" + data.delay;
     const dataField = data.dataField;
 
-    const [matchData, perfectMatch, matchUniverse] = await fetchDataDetails(fileName, data);
+    const detailResult = await fetchDataDetails(fileName, data);
+    if (!detailResult) return;
+
+    const [matchData, perfectMatch, matchUniverse] = detailResult;
+    if (!matchData?.[dataField]) return;
+
     let itemData = matchData[dataField];
     try {
         tmp = itemData['yearly_distribution'];

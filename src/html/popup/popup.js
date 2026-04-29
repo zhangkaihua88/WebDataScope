@@ -15,6 +15,8 @@ const exportCommunityBtn = document.getElementById('exportCommunityBtn');
 const exportCommunityCompressedBtn = document.getElementById('exportCommunityCompressedBtn');
 const importCommunityBtn = document.getElementById('importCommunityBtn');
 const importCommunityFile = document.getElementById('importCommunityFile');
+const importDataZipBtn = document.getElementById('importDataZipBtn');
+const importDataZipFile = document.getElementById('importDataZipFile');
 
 // 加载用户设置
 function loadSettings() {
@@ -68,6 +70,72 @@ function saveSettings(event) {
 function showStatusMessage(message, isSuccess = true) {
     statusText.textContent = message;
     statusText.className = isSuccess ? 'success' : 'error';
+}
+
+function formatBytes(bytes) {
+    if (!Number.isFinite(bytes) || bytes <= 0) return '0 B';
+    const units = ['B', 'KB', 'MB', 'GB'];
+    let value = bytes;
+    let unitIndex = 0;
+    while (value >= 1024 && unitIndex < units.length - 1) {
+        value /= 1024;
+        unitIndex += 1;
+    }
+    return `${value.toFixed(value >= 10 || unitIndex === 0 ? 0 : 1)} ${units[unitIndex]}`;
+}
+
+function notifyIndexedDataUpdated() {
+    chrome.runtime.sendMessage({ type: 'WQP_INDEXED_DATA_UPDATED' }, () => {
+        void chrome.runtime.lastError;
+    });
+}
+
+function handleImportDataZipClick() {
+    if (!importDataZipFile) return;
+    if (importDataZipFile) importDataZipFile.value = '';
+    importDataZipFile.click();
+}
+
+async function handleImportDataZipFileChange(evt) {
+    const file = evt.target.files && evt.target.files[0];
+    if (!file) return;
+
+    if (!/\.zip$/i.test(file.name)) {
+        showStatusMessage('请选择 zip 文件。', false);
+        return;
+    }
+
+    if (!globalThis.WQPDataStore) {
+        showStatusMessage('数据存储模块未加载。', false);
+        return;
+    }
+
+    if (importDataZipBtn) importDataZipBtn.disabled = true;
+    showStatusMessage('正在读取 zip...', true);
+
+    try {
+        const meta = await globalThis.WQPDataStore.importZip(file, {
+            onProgress: ({ current, total, path }) => {
+                statusText.className = 'success';
+                statusText.textContent = `正在导入 ${current}/${total}: ${path}`;
+            },
+        });
+        notifyIndexedDataUpdated();
+
+        const missing = meta.missingRequired?.length
+            ? `，缺少 ${meta.missingRequired.join(', ')}`
+            : '';
+        showStatusMessage(
+            `导入完成：${meta.fileCount} 个文件，${formatBytes(meta.totalBytes)}${missing}`,
+            !missing
+        );
+    } catch (e) {
+        console.error(e);
+        showStatusMessage(`导入失败：${e.message || e}`, false);
+    } finally {
+        if (importDataZipBtn) importDataZipBtn.disabled = false;
+        if (importDataZipFile) importDataZipFile.value = '';
+    }
 }
 
 // 事件监听：表单提交
@@ -206,3 +274,5 @@ exportCommunityBtn?.addEventListener('click', handleExportCommunity);
 exportCommunityCompressedBtn?.addEventListener('click', handleExportCommunityCompressed);
 importCommunityBtn?.addEventListener('click', handleImportClick);
 importCommunityFile?.addEventListener('change', handleImportFileChange);
+importDataZipBtn?.addEventListener('click', handleImportDataZipClick);
+importDataZipFile?.addEventListener('change', handleImportDataZipFileChange);

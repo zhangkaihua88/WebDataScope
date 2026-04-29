@@ -8,6 +8,8 @@
     <link rel="stylesheet" href="popup.css">
     <script src="../../scripts/lib/pako.min.js"></script>
     <script src="../../scripts/lib/msgpack.min.js"></script>
+    <script src="../../scripts/lib/jszip.min.js"></script>
+    <script src="../../scripts/dataStore.js"></script>
 </head>
 
 <body>
@@ -40,6 +42,12 @@
             </div>
             <button type="submit" id="saveBtn" disabled>保存设置</button>
         </form>
+
+        <h2 style="margin-top:16px;text-align:left;">Data 文件</h2>
+        <div class="input-group">
+            <button id="importDataZipBtn" type="button" style="background-color:#0d6efd;">导入 Data Zip</button>
+            <input id="importDataZipFile" type="file" accept=".zip,application/zip,application/x-zip-compressed" style="display:none;" />
+        </div>
 
         <h2 style="margin-top:16px;text-align:left;">社区数据</h2>
         <div class="input-group" style="display:flex;gap:8px;flex-wrap:wrap;">
