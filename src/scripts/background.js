@@ -4,254 +4,12 @@ console.log('Background script is running.');
 import './lib/pako.min.js';
 import './lib/msgpack.min.js';
 
+const dataSetListUrl = chrome.runtime.getURL(`data/dataSetList.json`);
+const dataInfoUrl = chrome.runtime.getURL(`data/oth/info_data.bin`);
+let dataSetList = null; // 定义全局变量
 const REPO_OWNER = "zhangkaihua88";
 const REPO_NAME = "WebDataScope";
 const CHECK_INTERVAL = 24 * 60 * 60 * 1000; // 24小时检查一次
-
-// IndexedDB 配置 - 用于存储用户导入的数据文件
-const DB_NAME = 'WQP_User_Data';
-const STORE_NAME = 'dataFiles';
-const DB_VERSION = 1;
-
-// 热路径缓存：避免同一页重复从 IndexedDB 读取 info_data
-let infoDataCache = null;
-let infoDataInflightPromise = null;
-
-function resetInfoDataCache() {
-    infoDataCache = null;
-    infoDataInflightPromise = null;
-}
-
-async function getInfoDataCached() {
-    if (infoDataCache) {
-        return infoDataCache;
-    }
-
-    if (infoDataInflightPromise) {
-        return infoDataInflightPromise;
-    }
-
-    infoDataInflightPromise = (async () => {
-        const result = await getDataFilesFromDB(['data/oth/info_data']);
-        const dataInfo = result?.data?.['data/oth/info_data'] || null;
-        infoDataCache = dataInfo;
-        return dataInfo;
-    })();
-
-    try {
-        return await infoDataInflightPromise;
-    } finally {
-        infoDataInflightPromise = null;
-    }
-}
-
-// IndexedDB Helper for Service Worker
-function openUserDB() {
-    return new Promise((resolve, reject) => {
-        const request = self.indexedDB.open(DB_NAME, DB_VERSION);
-
-        request.onupgradeneeded = (event) => {
-            const db = event.target.result;
-            if (!db.objectStoreNames.contains(STORE_NAME)) {
-                db.createObjectStore(STORE_NAME);
-            }
-        };
-
-        request.onsuccess = (event) => {
-            resolve(event.target.result);
-        };
-
-        request.onerror = (event) => {
-            reject(event.target.error);
-        };
-    });
-}
-
-// 保存数据文件到IndexedDB（每个文件单独存储为一个key）
-async function saveDataFilesToDB(dataFiles, version) {
-    const db = await openUserDB();
-    const tx = db.transaction([STORE_NAME], 'readwrite');
-    const store = tx.objectStore(STORE_NAME);
-
-    // 清空旧数据
-    store.clear();
-
-    // 存储版本
-    store.put(version, 'version');
-
-    // 存储每个文件为独立的key
-    for (const [key, value] of Object.entries(dataFiles)) {
-        store.put(value, key);
-    }
-
-    console.log(`Saved ${Object.keys(dataFiles).length} files to IndexedDB`);
-
-    // 数据更新后清理缓存，避免读到旧的 info_data
-    resetInfoDataCache();
-
-    return new Promise((resolve, reject) => {
-        tx.oncomplete = () => resolve(true);
-        tx.onerror = () => reject(tx.error);
-    });
-}
-
-// 从IndexedDB获取指定的数据文件（不读取全部，只读取需要的key）
-async function getDataFilesFromDB(keys = null) {
-    const db = await openUserDB();
-    const tx = db.transaction([STORE_NAME], 'readonly');
-    const store = tx.objectStore(STORE_NAME);
-
-    // 获取版本
-    const versionReq = store.get('version');
-
-    return new Promise((resolve, reject) => {
-        versionReq.onsuccess = async () => {
-            // 如果没有指定keys，获取所有数据文件的key
-            if (!keys) {
-                const keysReq = store.getAllKeys();
-                keysReq.onsuccess = async () => {
-                    const allKeys = keysReq.result.filter(k => k !== 'version' && k !== 'data');
-                    const data = {};
-                    for (const key of allKeys) {
-                        const req = store.get(key);
-                        await new Promise((res) => {
-                            req.onsuccess = () => {
-                                data[key] = req.result;
-                                res();
-                            };
-                            req.onerror = () => res();
-                        });
-                    }
-                    resolve({ data, version: versionReq.result });
-                };
-                keysReq.onerror = () => reject(keysReq.error);
-            } else {
-                // 只读取指定的keys
-                const data = {};
-                for (const key of keys) {
-                    const req = store.get(key);
-                    await new Promise((res) => {
-                        req.onsuccess = () => {
-                            data[key] = req.result;
-                            res();
-                        };
-                        req.onerror = () => res();
-                    });
-                }
-                resolve({ data, version: versionReq.result });
-            }
-        };
-        versionReq.onerror = () => reject(versionReq.error);
-    });
-}
-
-// 分块数据接收缓冲区
-const dataChunkBuffer = new Map(); // key: version, value: { chunks: [], total: number, received: Set }
-
-// 处理分块数据
-async function handleDataChunk(msg) {
-    const { chunk, chunkIndex, totalChunks, version, isLast } = msg;
-
-    if (!dataChunkBuffer.has(version)) {
-        dataChunkBuffer.set(version, {
-            chunks: new Array(totalChunks),
-            total: totalChunks,
-            received: new Set()
-        });
-    }
-
-    const buffer = dataChunkBuffer.get(version);
-    buffer.chunks[chunkIndex] = chunk;
-    buffer.received.add(chunkIndex);
-
-    // 检查是否接收完毕
-    if (buffer.received.size === totalChunks) {
-        // 计算总大小并合并所有块
-        const totalLength = buffer.chunks.reduce((sum, c) => sum + c.length, 0);
-        const allBytes = new Uint8Array(totalLength);
-        let offset = 0;
-        for (let i = 0; i < totalChunks; i++) {
-            const chunkBytes = new Uint8Array(buffer.chunks[i]);
-            allBytes.set(chunkBytes, offset);
-            offset += chunkBytes.length;
-        }
-
-        // 解码 JSON
-        const decoder = new TextDecoder();
-        const jsonStr = decoder.decode(allBytes);
-        const dataFiles = JSON.parse(jsonStr);
-
-        // 存储到 IndexedDB
-        await saveDataFilesToDB(dataFiles, version);
-
-        // 清理缓冲区
-        dataChunkBuffer.delete(version);
-
-        console.log('All chunks received and saved to IndexedDB, total bytes:', totalLength);
-        return true;
-    }
-
-    console.log(`Chunk ${chunkIndex + 1}/${totalChunks} received`);
-    return false;
-}
-
-// 获取数据块数量
-async function getDataChunkCount() {
-    const db = await openUserDB();
-    const tx = db.transaction([STORE_NAME], 'readonly');
-    const store = tx.objectStore(STORE_NAME);
-    const versionReq = store.get('version');
-    const dataReq = store.get('data');
-
-    return new Promise((resolve) => {
-        versionReq.onsuccess = () => {
-            const version = versionReq.result;
-            if (!version || !dataChunkBuffer.has(version)) {
-                // 数据已存储到IndexedDB，需要重新构建缓冲区
-                const data = dataReq.result;
-                if (data) {
-                    // 将数据转为JSON字符串再分块
-                    const jsonStr = JSON.stringify(data);
-                    const encoder = new TextEncoder();
-                    const dataBytes = encoder.encode(jsonStr);
-                    const chunkSize = 1024 * 1024; // 1MB
-                    const totalChunks = Math.ceil(dataBytes.length / chunkSize);
-
-                    // 预填充缓冲区
-                    const chunks = [];
-                    for (let i = 0; i < totalChunks; i++) {
-                        const start = i * chunkSize;
-                        const end = Math.min(start + chunkSize, dataBytes.length);
-                        chunks.push(Array.from(dataBytes.slice(start, end)));
-                    }
-                    dataChunkBuffer.set(version, {
-                        chunks: chunks,
-                        total: totalChunks,
-                        received: new Set(Array.from({ length: totalChunks }, (_, i) => i))
-                    });
-                    console.log('Rebuilt buffer from IndexedDB, chunks:', totalChunks);
-                }
-                resolve(version ? 1 : 0);
-            } else {
-                resolve(1);
-            }
-        };
-        versionReq.onerror = () => resolve(0);
-    });
-}
-
-// 分块获取数据
-async function getDataChunk(version, chunkIndex) {
-    const buffer = dataChunkBuffer.get(version);
-    if (buffer && buffer.chunks[chunkIndex]) {
-        return {
-            chunk: buffer.chunks[chunkIndex],
-            totalChunks: buffer.total,
-            chunkIndex: chunkIndex
-        };
-    }
-    return null;
-}
 
 
 // 内存中仅会话级别缓存，不做长期持久化
@@ -514,218 +272,6 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
             sendResponse({ ok: false, error: error.message });
         });
         return true;
-    } else if (msg && msg.type === 'STORE_DATA_FILES') {
-        // 处理从popup发送的数据文件
-        saveDataFilesToDB(msg.data, msg.version).then(() => {
-            sendResponse({ ok: true, message: 'Data saved successfully' });
-        }).catch(error => {
-            sendResponse({ ok: false, error: error.message });
-        });
-        return true;
-    } else if (msg && msg.type === 'STORE_DATA_CHUNK') {
-        // 处理分块数据
-        handleDataChunk(msg).then((completed) => {
-            sendResponse({ ok: true, completed: completed });
-        }).catch(error => {
-            sendResponse({ ok: false, error: error.message });
-        });
-        return true;
-    } else if (msg && msg.type === 'GET_DATA_FILES') {
-        // 获取数据块数量（检查是否有数据）
-        getDataChunkCount().then(count => {
-            sendResponse({ ok: true, hasData: count > 0 });
-        }).catch(error => {
-            sendResponse({ ok: false, error: error.message });
-        });
-        return true;
-    } else if (msg && msg.type === 'GET_DATA_CHUNK') {
-        // 分块获取数据
-        const { version, chunkIndex } = msg;
-        getDataChunk(version, chunkIndex).then(chunkData => {
-            sendResponse({ ok: true, chunkData: chunkData });
-        }).catch(error => {
-            sendResponse({ ok: false, error: error.message });
-        });
-        return true;
-    } else if (msg && msg.type === 'GET_DATA_VERSION') {
-        // 获取当前数据版本
-        getDataFilesFromDB().then(result => {
-            sendResponse({ ok: true, version: result.version });
-        }).catch(error => {
-            sendResponse({ ok: false, error: error.message });
-        });
-        return true;
-    } else if (msg && msg.type === 'DEBUG_GET_DATA') {
-        // 测试用：获取 IndexedDB 中的数据
-        console.log('[DEBUG] Requesting data from IndexedDB...');
-        getDataFilesFromDB().then(result => {
-            console.log('[DEBUG] IndexedDB result:', result);
-            if (result.data) {
-                console.log('[DEBUG] Data keys:', Object.keys(result.data));
-                console.log('[DEBUG] Data version:', result.version);
-            } else {
-                console.log('[DEBUG] No data found in IndexedDB');
-            }
-            sendResponse({ ok: true, result: Object.keys(result.data) });
-        }).catch(error => {
-            console.error('[DEBUG] Error:', error);
-            sendResponse({ ok: false, error: error.message });
-        });
-        return true;
-    } else if (msg && msg.type === 'GET_FLAGS') {
-        // 获取数据集标记信息
-        const { region, delay, universe, datasetNames } = msg;
-        // 使用传入的 dataSetList，如果没传则使用全局的
-        getDataFilesFromDB(['data/dataSetList.json']).then(result => {
-            console.log('[DEBUG] Fetched dataSetList from DB:', datasetNames);
-            const listToUse = new Set(result.data['data/dataSetList.json']);
-            const delaySuffix = `_Delay${delay}`;
-            // 预计算：哪些数据集在相同 region+delay 下存在“其它 universe”记录
-            const hasOtherUniverseByDataset = new Set();
-
-            for (const item of listToUse) {
-                if (typeof item !== 'string' || !item.endsWith(delaySuffix)) {
-                    continue;
-                }
-
-                const firstUnderscore = item.indexOf('_');
-                if (firstUnderscore <= 0) {
-                    continue;
-                }
-
-                const secondUnderscore = item.indexOf('_', firstUnderscore + 1);
-                if (secondUnderscore <= firstUnderscore + 1) {
-                    continue;
-                }
-
-                const itemRegion = item.slice(firstUnderscore + 1, secondUnderscore);
-                if (itemRegion === region) {
-                    continue;
-                }
-
-                const datasetKey = item.slice(0, firstUnderscore);
-                hasOtherUniverseByDataset.add(datasetKey);
-            }
-
-            const flags = {};
-            for (const fileName of datasetNames) {
-                const neededName = `${fileName}_${region}_${universe}_Delay${delay}`;
-                const parts = fileName.split('_');
-                const datasetKey = parts[0];
-                const hasAnalysis = listToUse.has(neededName);
-
-                flags[fileName] = {
-                    hasAnalysis,
-                    hasOtherUniverse: !hasAnalysis && hasOtherUniverseByDataset.has(datasetKey)
-                };
-            }
-
-            sendResponse({ ok: true, flags });
-            console.log('[DEBUG] getDataFilesFromDB result:', result);
-        }).catch(error => {
-            console.error('[DEBUG] Error:', error);
-            sendResponse({ ok: false, error: error.message });
-        });
-        return true;
-    } else if (msg && msg.type === 'GET_OSIS_FLAGS') {
-        // 获取 OS/IS 标记信息
-        const { region, delay, datasetNames, pageType } = msg;
-        getInfoDataCached().then((dataInfo) => {
-            if (!dataInfo) {
-                sendResponse({ ok: true, flags: {}, meanSharpe: NaN, endDate: null, totalCount: 0 });
-                return;
-            }
-
-            const key = `${region}_${delay}`;
-            const flags = {};
-            console.log('[DEBUG] Data keys:', dataInfo);
-            // 获取均值和统计信息
-            let meanSharpe = NaN;
-            try {
-                const meanSharpeRaw = dataInfo[key]?.['isos']?.['mean']?.['sharpe_ratio'];
-                meanSharpe = (meanSharpeRaw !== undefined && meanSharpeRaw !== null) ? parseFloat(meanSharpeRaw) : NaN;
-            } catch (_) {}
-            
-            const endDate = dataInfo[key]?.['sub_end_time'];
-            const totalCount = dataInfo[key]?.['isos']?.['total_count'];
-            
-            for (const lastPart of datasetNames) {
-                let item_data = null;
-                try {
-                    item_data = dataInfo[key]?.['isos']?.[pageType]?.[lastPart];
-                } catch (_) {}
-                
-                if (item_data) {
-                    const srRaw = item_data?.sharpe_ratio;
-                    const sr = (srRaw !== undefined && srRaw !== null) ? parseFloat(srRaw) : NaN;
-                    const count = item_data?.count;
-                    flags[lastPart] = { sr, count, hasData: true };
-                } else {
-                    flags[lastPart] = { sr: NaN, count: null, hasData: false };
-                }
-            }
-            
-            sendResponse({ ok: true, flags, meanSharpe, endDate, totalCount });
-        }).catch(error => {
-            sendResponse({ ok: false, error: error.message });
-        });
-        return true;
-    } else if (msg && msg.type === 'GET_NEUT_FLAGS') {
-        // 获取 Neutralization 标记信息
-        const { region, delay, datasetNames, pageType } = msg;
-        getInfoDataCached().then((dataInfo) => {
-            if (!dataInfo) {
-                sendResponse({ ok: true, flags: {} });
-                return;
-            }
-
-            const key = `${region}_${delay}`;
-            const flags = {};
-            
-            for (const lastPart of datasetNames) {
-                let item_data = null;
-                try {
-                    item_data = dataInfo[key]?.['neutralization']?.[pageType]?.[lastPart];
-                } catch (_) {}
-                
-                if (item_data) {
-                    // 处理 neutralization 数据
-                    const entries = Object.entries(item_data).map(([key, value]) => ({
-                        key,
-                        count: value.count
-                    }));
-                    const totalCount = entries.reduce((sum, item) => sum + item.count, 0);
-                    const maxItem = entries.reduce((max, current) =>
-                        current.count > max.count ? current : max, entries[0]);
-                    const maxPercentage = ((maxItem.count / totalCount) * 100).toFixed(2);
-                    
-                    const entriesDict = {};
-                    entries.forEach(item => {
-                        const percentage = ((item.count / totalCount) * 100).toFixed(2);
-                        entriesDict[item.key] = {
-                            count: item.count,
-                            percentage: percentage
-                        };
-                    });
-                    
-                    flags[lastPart] = {
-                        hasData: true,
-                        data: item_data,
-                        maxItem,
-                        maxPercentage,
-                        entries: entriesDict,
-                        totalCount
-                    };
-                } else {
-                    flags[lastPart] = { hasData: false };
-                }
-            }
-            
-            sendResponse({ ok: true, flags });
-        }).catch(error => {
-            sendResponse({ ok: false, error: error.message });
-        });
-        return true;
     }
 });
 
@@ -870,6 +416,16 @@ function showNotification(version, url) {
 
 
 
+// 获取数据集列表
+async function getDataSetList() {
+    const response = await fetch(dataSetListUrl);
+    if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status} for ${dataSetListUrl}`);
+    }
+    const data = await response.json(); // Parse JSON data
+    return data
+}
+
 // 注入分布图脚本
 function injectionDistributionScript(tabId) {
     try {
@@ -887,6 +443,12 @@ function injectionDistributionScript(tabId) {
 }
 // 注入数据标记脚本
 async function injectionDataFlagScript(tabId, tab) {
+    if (dataSetList === null) {
+        dataSetList = await getDataSetList();
+    }
+    // 获取当前扩展版本号，用于缓存版本控制
+    const version = chrome.runtime.getManifest().version;
+
     try {
         // 必须注入 pako 和 msgpack 供 content script 使用
         chrome.scripting.executeScript({
@@ -901,7 +463,7 @@ async function injectionDataFlagScript(tabId, tab) {
             chrome.scripting.executeScript({
                 target: { tabId },
                 // 仅传递必要的元数据，不传递巨大的 dataInfo 对象
-                args: [dataSetList, tab.url],
+                args: [dataSetList, dataInfoUrl, version, tab.url],
                 func: (...args) => dataFlagFunc(...args),
             });
         });

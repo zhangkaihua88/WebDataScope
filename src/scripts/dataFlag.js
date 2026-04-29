@@ -1,302 +1,313 @@
 // dataFlag.js: 对已经分析过的数据集进行标记
-// 架构：只负责提取页面信息，发送给 background 处理，返回结果后再标记
 console.log('dataFlag.js loaded');
 
 const flagMapOtherUniverse = {};
 
-// ---------------------- 向 Background 发送消息的辅助函数 ----------------------
-function sendMessageToBackground(msg) {
+// IndexedDB 配置
+const DB_NAME = 'WQP_Data_Cache';
+const STORE_NAME = 'dataInfo';
+const DB_VERSION = 1;
+
+// ---------------------- IndexedDB Helper ----------------------
+function openDB(version) {
     return new Promise((resolve, reject) => {
-        chrome.runtime.sendMessage(msg, (resp) => {
-            if (chrome.runtime.lastError) {
-                console.error('Message error:', chrome.runtime.lastError);
-                reject(chrome.runtime.lastError);
-            } else {
-                resolve(resp);
+        const request = indexedDB.open(DB_NAME, version || 1);
+        
+        request.onupgradeneeded = (event) => {
+            const db = event.target.result;
+            if (!db.objectStoreNames.contains(STORE_NAME)) {
+                db.createObjectStore(STORE_NAME);
             }
-        });
+        };
+
+        request.onsuccess = (event) => {
+            resolve(event.target.result);
+        };
+
+        request.onerror = (event) => {
+            reject(event.target.error);
+        };
     });
 }
+// ---------------------- Data Loader ----------------------
 
-// ---------------------- Data Loader - 从 background 获取处理结果 ----------------------
-
-// 从 background 获取标记信息
-async function getFlagsFromBackground(region, delay, universe, datasetNames) {
+async function getDataInfo(dataInfoUrl, currentVersion) {
+    let db;
     try {
-        const resp = await sendMessageToBackground({
-            type: 'GET_FLAGS',
-            region: region,
-            delay: delay,
-            universe: universe,
-            datasetNames: datasetNames
-        });
+        db = await openDB();
         
-        if (resp && resp.ok) {
-            return resp.flags;
-        }
-        return null;
-    } catch (e) {
-        console.log('Error getting flags from background:', e);
-        return null;
-    }
-}
+        // 使用事务一次性读取
+        const tx = db.transaction([STORE_NAME], 'readonly');
+        const store = tx.objectStore(STORE_NAME);
+        
+        const versionReq = store.get('version');
+        const dataReq = store.get('data');
+        
+        // 将 IDBRequest 转换为 Promise
+        const getResult = (req) => new Promise((resolve, reject) => {
+            req.onsuccess = () => resolve(req.result);
+            req.onerror = () => reject(req.error);
+        });
 
-// 从 background 获取 OS/IS 标记
-async function getOSISFlagsFromBackground(region, delay, datasetNames) {
-    try {
-        const resp = await sendMessageToBackground({
-            type: 'GET_OSIS_FLAGS',
-            region: region,
-            delay: delay,
-            datasetNames: datasetNames
-        });
-        
-        if (resp && resp.ok) {
-            return resp.flags;
-        }
-        return null;
-    } catch (e) {
-        console.log('Error getting OSIS flags from background:', e);
-        return null;
-    }
-}
+        console.log('Checking IndexedDB cache...');
+        const [cachedVersion, cachedData] = await Promise.all([
+            getResult(versionReq),
+            getResult(dataReq)
+        ]);
 
-// 从 background 获取 Neutralization 标记
-async function getNeutralizationFlagsFromBackground(region, delay, datasetNames) {
-    try {
-        const resp = await sendMessageToBackground({
-            type: 'GET_NEUT_FLAGS',
-            region: region,
-            delay: delay,
-            datasetNames: datasetNames
-        });
-        
-        if (resp && resp.ok) {
-            return resp.flags;
+        if (cachedVersion === currentVersion && cachedData) {
+            console.log('Version matched. Using cached data.');
+            return cachedData;
         }
-        return null;
+        
+        console.log('Cache miss or version mismatch. Fetching new data from', dataInfoUrl);
+        const response = await fetch(dataInfoUrl);
+        const arrayBuffer = await response.arrayBuffer();
+        
+        const pakoLib = window.pako || globalThis.pako;
+        const msgpackLib = window.msgpack || globalThis.msgpack;
+
+        if (!pakoLib || !msgpackLib) {
+             throw new Error('Pako or Msgpack library not found in content script scope.');
+        }
+
+        console.log('Decompressing and decoding data...');
+        const inflatedData = pakoLib.inflate(new Uint8Array(arrayBuffer));
+        const dataInfo = msgpackLib.decode(new Uint8Array(inflatedData));
+        
+        // 存入 IndexedDB
+        console.log('Saving data to IndexedDB...');
+        const writeTx = db.transaction([STORE_NAME], 'readwrite');
+        const writeStore = writeTx.objectStore(STORE_NAME);
+        writeStore.put(currentVersion, 'version');
+        writeStore.put(dataInfo, 'data');
+        
+        return dataInfo;
     } catch (e) {
-        console.log('Error getting neutralization flags from background:', e);
-        return null;
+        console.error('Error loading data info:', e);
+        return null; 
     }
 }
 
 
-function dataFlagFunc(dataSetList, url) {
+function dataFlagFunc(dataSetList, dataInfoUrl, currentVersion, url) {
     if(!url.includes("data/data-sets")) return; // 只在数据集列表页面执行
 
-    // 从 background 获取所有标记信息
-    async function getAllFlagsFromBackground(region, delay, universe, datasetNames, pageType) {
-        try {
-            let flagsResp = { flags: {} };
-            if (pageType === 'dataset') {
-                // 1. 获取分析报告标记
-                console.time("测试代码速度analysisFlags");
-                flagsResp = await sendMessageToBackground({
-                    type: 'GET_FLAGS',
-                    region: region,
-                    delay: delay,
-                    universe: universe,
-                    datasetNames: datasetNames,
-                    dataSetList: dataSetList,
-                    pageType: pageType
-                });
-                console.timeEnd("测试代码速度analysisFlags");
-            }
-
-            // 2&3. OS/IS 与 Neutralization 并行请求，减少总等待时间
-            console.time("测试代码速度flagsParallel");
-            const [osisResp, neutResp] = await Promise.all([
-                sendMessageToBackground({
-                    type: 'GET_OSIS_FLAGS',
-                    region: region,
-                    delay: delay,
-                    datasetNames: datasetNames,
-                    pageType: pageType
-                }),
-                sendMessageToBackground({
-                    type: 'GET_NEUT_FLAGS',
-                    region: region,
-                    delay: delay,
-                    datasetNames: datasetNames,
-                    pageType: pageType
-                })
-            ]);
-            console.timeEnd("测试代码速度flagsParallel");
-            
-            return {
-                analysisFlags: flagsResp?.flags || {},
-                osisFlags: osisResp?.flags || {},
-                osisMeanSharpe: osisResp?.meanSharpe || NaN,
-                osisEndDate: osisResp?.endDate || null,
-                osisTotalCount: osisResp?.totalCount || 0,
-                neutFlags: neutResp?.flags || {}
-            };
-        } catch (e) {
-            console.error('Error getting flags from background:', e);
-            return null;
+    getDataInfo(dataInfoUrl, currentVersion).then(dataInfo => {
+        if (!dataInfo) {
+            console.error('Data info load failed, skipping flagging.');
+            return;
         }
-    }
-    
-    // 应用分析报告标记
-    function applyAnalysisFlags(elements, region, delay, universe, flags) {
-        elements.forEach(function (element) {
-            try {
-                let a_element = element.querySelector(".link.link--wrap");
-                if (a_element.href.includes("data-fields")) {
-                    return;
-                }
-                let parts = a_element.href.split("/");
-                let lastPart = parts[parts.length - 1];
-                let fileName = `${lastPart}`;
-                
-                // 清除旧标记
-                a_element.innerHTML = a_element.innerHTML.replace(/<span.*?★★★<\/span>/g, '');
-                a_element.innerHTML = a_element.innerHTML.replace(/<span.*?☆☆☆<\/span>/g, '');
-                
-                const flag = flags[fileName] || {};
-                if (flag.hasAnalysis) {
-                    a_element.innerHTML = `<span style="color: red;">★★★</span>${a_element.innerHTML}`;
-                } else if (flag.hasOtherUniverse) {
-                    a_element.innerHTML = `<span style="color: red;">☆☆☆</span>${a_element.innerHTML}`;
-                }
-            } catch (error) {
-                console.error('Error applying analysis flags:', error);
-            }
-        });
-    }
-    
-    // 应用 OS/IS 标记
-    function applyOSISFlags(elements, region, delay, flags, meanSharpe, endDate, totalCount) {
-        elements.forEach(function (element) {
-            try {
-                let a_element = element.querySelector(".link.link--wrap");
-                let parts = a_element.href.split("/");
-                let lastPart = parts[parts.length - 1];
-                
-                const existingBadge = a_element.querySelector('.wq-isos-badge');
-                if (existingBadge) existingBadge.remove();
-                
-                const flag = flags[lastPart];
-                if (!flag || !flag.hasData) return;
-                
-                const sr = flag.sr;
-                const count = flag.count;
-                
-                // 颜色规则
-                let bgColor = '#9e9e9e';
-                if (!Number.isNaN(sr)) {
-                    if (sr < 0) {
-                        bgColor = '#e53935';
-                    } else if (!Number.isNaN(meanSharpe) && sr > meanSharpe) {
-                        bgColor = '#2e7d32';
-                    } else {
-                        bgColor = '#f9a825';
+        
+        waitForElement(".data-table__container", ".data-table__stale-loader-container").then(() => {
+            console.log(`${url}完成加载`)
+            const delay = document.getElementById('data-delay').querySelector('[aria-selected="true"]').firstChild.innerHTML
+            const region = document.getElementById('data-region').querySelector('[aria-selected="true"]').firstChild.innerHTML
+            const universe = document.getElementById('data-universe').querySelector('[aria-selected="true"]').firstChild.innerHTML
+            const elements = document.querySelectorAll(".rt-tr-group");
+
+
+            // 数据分析报告标记
+            elements.forEach(function (element) {
+                try {
+                    let a_element = element.querySelector(".link.link--wrap");
+                    // console.log(a_element)
+                    if (a_element.href.includes("data-fields")) {
+                        return;
                     }
-                }
-                
-                const badge = document.createElement('span');
-                badge.className = 'wq-isos-badge';
-                const countText = (count !== undefined && count !== null && count !== '') ? `(${count})` : '';
-                badge.textContent = (!Number.isNaN(sr)) ? `${sr.toFixed(2)}${countText}` : `--${countText}`;
-                badge.style.cssText = [
-                    'display:inline-block',
-                    'margin-left:6px',
-                    'padding:0 6px',
-                    'border-radius:6px',
-                    `background-color:${bgColor}`,
-                    'color:#fff',
-                    'font-size:12px',
-                    'font-weight:600',
-                    'line-height:1.6',
-                    'vertical-align:middle',
-                    'cursor:help'
-                ].join(';');
-                
-                const srText = (!Number.isNaN(sr)) ? sr.toFixed(4) : '--';
-                const meanText = (!Number.isNaN(meanSharpe)) ? meanSharpe.toFixed(4) : '--';
-                const cntText = (count !== undefined && count !== null && count !== '') ? `${count}` : '--';
-                const tooltip = `OS/IS Sharpe: ${srText}\nCount: ${cntText}\nMean OS/IS Sharpe(${region}_${delay}): ${meanText}\nTotal Count: ${totalCount}\nDataset: ${lastPart}\n统计截至日期: ${endDate}`;
-                badge.title = tooltip;
-                a_element.appendChild(badge);
-            } catch (error) {
-                console.error('Error applying OSIS flags:', error);
-            }
-        });
-    }
-    
-    // 应用 Neutralization 标记
-    function applyNeutFlags(elements, region, delay, meanSharpe, flags) {
-        elements.forEach(function (element) {
-            try {
-                let a_element = element.querySelector(".link.link--wrap");
-                let parts = a_element.href.split("/");
-                let lastPart = parts[parts.length - 1];
-                
-                const existingBadge = a_element.querySelector('.wq-neut-badge');
-                if (existingBadge) existingBadge.remove();
-                
-                const flag = flags[lastPart];
-                if (!flag || !flag.hasData) return;
-                
-                const { maxItem, maxPercentage, entries, data } = flag;
-                
-                const badge = document.createElement('span');
-                badge.className = 'wq-neut-badge';
-                badge.textContent = `${maxItem.key.toLowerCase()}(${maxPercentage}%)`;
-                badge.style.cssText = [
-                    'display:inline-block',
-                    'margin-left:6px',
-                    'padding:0 6px',
-                    'border-radius:6px',
-                    'background-color:#9e9e9e',
-                    'color:#fff',
-                    'font-size:12px',
-                    'font-weight:600',
-                    'line-height:1.6',
-                    'vertical-align:middle',
-                    'cursor:pointer'
-                ].join(';');
-                
-                // 创建表格
-                const maxSharpeRatio = Math.max(
-                    ...Object.entries(data)
-                        .map(([key, value]) => parseFloat(value?.sharpe_ratio))
-                        .filter(val => !isNaN(val) && val !== null)
-                );
+                    let parts = a_element.href.split("/");
 
-                const tableRows = Object.entries(entries)
-                    .sort(([keyA], [keyB]) => keyA.localeCompare(keyB))
-                    .map(([key, value], index) => {
-                        const sharpeRatio = data[key]?.sharpe_ratio !== undefined ? parseFloat(data[key]?.sharpe_ratio).toFixed(2) : '--';
-                        const isosCount = data[key]?.osis_count !== undefined ? data[key]?.osis_count : '--';
+                    let lastPart = parts[parts.length - 1];
+                    let fileName = `${lastPart}_${region}_${universe}_Delay${delay}`;
+                    console.log("dataFlag name", fileName);
+                    a_element.innerHTML = a_element.innerHTML.replace(/<span.*?★★★<\/span>/g, '');
+                    a_element.innerHTML = a_element.innerHTML.replace(/<span.*?☆☆☆<\/span>/g, '');
 
-                        // Determine font color for Sharpe Ratio based on rules
-                        let fontColor = '#9e9e9e'; // Default gray for missing values
-                        if (!Number.isNaN(parseFloat(sharpeRatio))) {
-                            const srValue = parseFloat(sharpeRatio);
-                            if (srValue < 0) {
-                                fontColor = '#e53935'; // Red for sr < 0
-                            } else if (!Number.isNaN(meanSharpe) && srValue > meanSharpe) {
-                                fontColor = '#2e7d32'; // Green for sr > meanSharpe
-                            } else {
-                                fontColor = '#f9a825'; // Yellow for other cases
-                            }
+
+                    if (!dataSetList.includes(fileName)) {
+                        const startPrefix = `${lastPart}_${region}_`;
+                        const endPrefix = `_Delay${delay}`;
+                        const partialMatchRegion = dataSetList.find(item => item.startsWith(startPrefix) && item.endsWith(endPrefix));
+                        if (partialMatchRegion) {
+                            flagMapOtherUniverse[fileName] = true;
+                        } else {
+                            flagMapOtherUniverse[fileName] = false;
                         }
+                    }
+                    console.log("dataFlag name", fileName, flagMapOtherUniverse);
+                    if (dataSetList.includes(fileName)) {
+                        a_element.innerHTML = `<span style="color: red;">★★★</span>${a_element.innerHTML}`
+                    } else if (flagMapOtherUniverse[fileName]) {
+                        a_element.innerHTML = `<span style="color: red;">☆☆☆</span>${a_element.innerHTML}`
+                    }
 
-                        const percentageStyle = parseFloat(value.percentage) === maxPercentage ? 'text-decoration: underline double;' : '';
-                        const sharpeRatioStyle = parseFloat(sharpeRatio).toFixed(2) === parseFloat(maxSharpeRatio).toFixed(2) ? 'text-decoration: underline double;' : '';
-                        const bgColor = index % 2 === 0 ? '#ffffff' : '#f2f2f2'; // Alternate row colors
 
-                        return `<tr style="background: ${bgColor};">
-                            <td>${key}</td>
-                            <td>${value.count}</td>
-                            <td style="${percentageStyle}">${value.percentage}%</td>
-                            <td style="${sharpeRatioStyle}; color: ${fontColor};">${sharpeRatio}(${isosCount})</td>
-                        </tr>`;
-                    }).join('');
-                
-                const tableHTML = `
+
+                } catch (error) {
+                    console.error('捕获到错误:', error);
+                }
+            });
+
+
+            // OS/IS数据标记
+            let meanSharpe = NaN;
+            try {
+                const meanSharpeRaw = dataInfo?.[`${region}_${delay}`]?.['isos']?.['mean']?.['sharpe_ratio'];
+                meanSharpe = (meanSharpeRaw !== undefined && meanSharpeRaw !== null) ? parseFloat(meanSharpeRaw) : NaN;
+            } catch (_) { /* 忽略路径异常 */ }
+            let endDate = dataInfo?.[`${region}_${delay}`]?.['sub_end_time']
+            let osisTotalCount = dataInfo?.[`${region}_${delay}`]?.['isos']?.['total_count']
+
+            elements.forEach(function (element) {
+                try {
+                    let a_element = element.querySelector(".link.link--wrap");
+                    // console.log(a_element)
+                    if (a_element.href.includes("data-fields")) {
+                        return;
+                    }
+                    let parts = a_element.href.split("/");
+                    let lastPart = parts[parts.length - 1];
+                    let item_data = undefined;
+                    try {
+                        item_data = dataInfo?.[`${region}_${delay}`]?.['isos']?.['dataset']?.[lastPart];
+                    } catch (_) { /* 忽略路径异常 */ }
+
+                    const existingBadge = a_element.querySelector('.wq-isos-badge');
+                    if (existingBadge) existingBadge.remove();
+
+                    const srRaw = item_data?.sharpe_ratio;
+                    const sr = (srRaw !== undefined && srRaw !== null) ? parseFloat(srRaw) : NaN;
+                    const count = item_data?.count;
+
+                    // 颜色规则：sr < 0 为红；sr > meanSharpe 为绿；其他（>=0 且 <= 均值或无均值）为黄；缺失为灰
+                    let bgColor = '#9e9e9e';
+                    if (!Number.isNaN(sr)) {
+                        if (sr < 0) {
+                            bgColor = '#e53935';
+                        } else if (!Number.isNaN(meanSharpe) && sr > meanSharpe) {
+                            bgColor = '#2e7d32';
+                        } else {
+                            bgColor = '#f9a825';
+                        }
+                    }
+
+                    // 仅当存在 item_data 时展示徽章（允许 sr 缺失但有 count 的情况）
+                    if (item_data) {
+                        const badge = document.createElement('span');
+                        badge.className = 'wq-isos-badge';
+                        const countText = (count !== undefined && count !== null && count !== '') ? `(${count})` : '';
+                        // 徽章内容：sharpe_ratio(count)
+                        badge.textContent = (!Number.isNaN(sr)) ? `${sr.toFixed(2)}${countText}` : `--${countText}`;
+                        badge.style.cssText = [
+                            'display:inline-block',
+                            'margin-left:6px',
+                            'padding:0 6px',
+                            'border-radius:6px',
+                            `background-color:${bgColor}`,
+                            'color:#fff',
+                            'font-size:12px',
+                            'font-weight:600',
+                            'line-height:1.6',
+                            'vertical-align:middle',
+                            'cursor:help'
+                        ].join(';');
+                        // 悬浮提示：Sharpe、Count、Region_Delay 均值、数据集名称
+                        const srText = (!Number.isNaN(sr)) ? sr.toFixed(4) : '--';
+                        const meanText = (!Number.isNaN(meanSharpe)) ? meanSharpe.toFixed(4) : '--';
+                        const cntText = (count !== undefined && count !== null && count !== '') ? `${count}` : '--';
+                        const tooltip = `OS/IS Sharpe: ${srText}\nCount: ${cntText}\nMean OS/IS Sharpe(${region}_${delay}): ${meanText}\nTotal Count: ${osisTotalCount}\nDataset: ${lastPart}\n统计截至日期: ${endDate}`;
+                        badge.title = tooltip;
+                        badge.setAttribute('aria-label', tooltip);
+                        a_element.appendChild(badge);
+                    }
+                } catch (error) {
+                    console.error('捕获到错误:', error);
+                }
+            });
+
+
+            // neutralization 标记
+            elements.forEach(function (element) {
+                try {
+                    let a_element = element.querySelector(".link.link--wrap");
+                    // console.log(a_element)
+                    if (a_element.href.includes("data-fields")) {
+                        return;
+                    }
+                    let parts = a_element.href.split("/");
+                    let lastPart = parts[parts.length - 1];
+                    let item_data = dataInfo?.[`${region}_${delay}`]?.['neutralization']?.['dataset']?.[lastPart];
+                    let item_res = processNeutralizationData(item_data);
+
+                    console.log("neutralization data", lastPart, item_data);
+
+                    const existingBadge = a_element.querySelector('.wq-neut-badge');
+                    if (existingBadge) existingBadge.remove();
+
+                    const srRaw = item_data?.sharpe_ratio;
+                    const sr = (srRaw !== undefined && srRaw !== null) ? parseFloat(srRaw) : NaN;
+                    const count = item_data?.count;
+
+
+                    // 仅当存在 item_data 时展示徽章（允许 sr 缺失但有 count 的情况）
+                    if (item_data) {
+                        const badge = document.createElement('span');
+                        badge.className = 'wq-neut-badge';
+                        badge.textContent = `${item_res.maxItem.key.toLowerCase()}(${item_res.maxPercentage}%)`;
+                        badge.style.cssText = [
+                            'display:inline-block',
+                            'margin-left:6px',
+                            'padding:0 6px',
+                            'border-radius:6px',
+                            `background-color:#9e9e9e`,
+                            'color:#fff',
+                            'font-size:12px',
+                            'font-weight:600',
+                            'line-height:1.6',
+                            'vertical-align:middle',
+                            'cursor:pointer'
+                        ].join(';');
+
+                        // 创建表格内容
+                        const maxPercentage = Math.max(...Object.values(item_res.entries).map(entry => parseFloat(entry.percentage)));
+                        const maxSharpeRatio = Math.max(
+                            ...Object.entries(item_data)
+                                .map(([key, value]) => parseFloat(value?.sharpe_ratio))
+                                .filter(val => !isNaN(val) && val !== null)
+                        );
+
+
+                        const tableRows = Object.entries(item_res.entries)
+                            .sort(([keyA], [keyB]) => keyA.localeCompare(keyB)) // 按照 Neutralization 列字母排序
+                            .map(([key, value], index) => {
+                                const sharpeRatio = item_data[key]?.sharpe_ratio !== undefined ? parseFloat(item_data[key]?.sharpe_ratio).toFixed(2) : '--';
+                                const isosCount = item_data[key]?.osis_count !== undefined ? item_data[key]?.osis_count : '--';
+
+                                // Determine font color for Sharpe Ratio based on rules
+                                let fontColor = '#9e9e9e'; // Default gray for missing values
+                                if (!Number.isNaN(parseFloat(sharpeRatio))) {
+                                    const srValue = parseFloat(sharpeRatio);
+                                    if (srValue < 0) {
+                                        fontColor = '#e53935'; // Red for sr < 0
+                                    } else if (!Number.isNaN(meanSharpe) && srValue > meanSharpe) {
+                                        fontColor = '#2e7d32'; // Green for sr > meanSharpe
+                                    } else {
+                                        fontColor = '#f9a825'; // Yellow for other cases
+                                    }
+                                }
+
+                                const percentageStyle = parseFloat(value.percentage) === maxPercentage ? 'text-decoration: underline double;' : '';
+                                const sharpeRatioStyle = parseFloat(sharpeRatio).toFixed(2) === parseFloat(maxSharpeRatio).toFixed(2) ? 'text-decoration: underline double;' : '';
+                                const bgColor = index % 2 === 0 ? '#ffffff' : '#f2f2f2'; // Alternate row colors
+
+                                return `<tr style="background: ${bgColor};">
+                                    <td>${key}</td>
+                                    <td>${value.count}</td>
+                                    <td style="${percentageStyle}">${value.percentage}%</td>
+                                    <td style="${sharpeRatioStyle}; color: ${fontColor};">${sharpeRatio}(${isosCount})</td>
+                                </tr>`;
+                            }).join('');
+                        const tableHTML = `
                             <table style="border-collapse: collapse; width: 100%; border: 1px solid #ddd; background: #f9f9f9; font-family: Arial, sans-serif;">
                                 <thead style="background: #f1f1f1;">
                                     <tr>
@@ -314,96 +325,268 @@ function dataFlagFunc(dataSetList, url) {
                                 </tbody>
                             </table>
                         `;
-                
-                const popup = document.createElement('div');
-                popup.className = 'wq-neut-popup';
-                popup.style.cssText = [
-                    'position: absolute',
-                    'z-index: 1000',
-                    'background: #fff',
-                    'border: 1px solid #ddd',
-                    'box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2)',
-                    'padding: 10px',
-                    'border-radius: 8px',
-                    'display: none'
-                ].join(';');
-                popup.innerHTML = tableHTML;
-                document.body.appendChild(popup);
-                
-                badge.addEventListener('mouseenter', (e) => {
-                    popup.style.display = 'block';
-                    popup.style.top = `${e.clientY + 10}px`;
-                    popup.style.left = `${e.clientX + 10}px`;
-                });
-                badge.addEventListener('mouseleave', () => popup.style.display = 'none');
-                
-                a_element.appendChild(badge);
-            } catch (error) {
-                console.error('Error applying neut flags:', error);
-            }
-        });
-    }
-    
-    waitForElement(".data-table__container", ".data-table__stale-loader-container").then(async () => {
-        console.log(`${url}完成加载`);
-        
-        const delay = document.getElementById('data-delay').querySelector('[aria-selected="true"]').firstChild.innerHTML;
-        const region = document.getElementById('data-region').querySelector('[aria-selected="true"]').firstChild.innerHTML;
-        const universe = document.getElementById('data-universe').querySelector('[aria-selected="true"]').firstChild.innerHTML;
-        const elements = document.querySelectorAll(".rt-tr-group");
-        
-        // 提取所有数据集名称
-        const datasetNames = [];
-        let pageType = null;
-        elements.forEach(function (element) {
-            try {
-                let a_element = element.querySelector(".link.link--wrap");
-                pageType = a_element.href.includes("data/data-sets") ? 'dataset' : (a_element.href.includes("data-fields") ? 'datafield' : null);
-                let parts = a_element.href.split("/");
-                let lastPart = parts[parts.length - 1];
-                datasetNames.push(lastPart);
-            } catch (_) {}
-        });
+
+                        // 创建弹出层
+                        const popup = document.createElement('div');
+                        popup.className = 'wq-neut-popup';
+                        popup.style.cssText = [
+                            'position: absolute',
+                            'z-index: 1000',
+                            'background: #fff',
+                            'border: 1px solid #ddd',
+                            'box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2)',
+                            'padding: 10px',
+                            'border-radius: 8px',
+                            'display: none'
+                        ].join(';');
+                        popup.innerHTML = tableHTML;
+                        document.body.appendChild(popup);
+
+                        // 显示和隐藏弹出层
+                        badge.addEventListener('mouseenter', (event) => {
+                            popup.style.display = 'block';
+                            popup.style.top = `${event.clientY + 10}px`;
+                            popup.style.left = `${event.clientX + 10}px`;
+                        });
+                        badge.addEventListener('mouseleave', () => {
+                            popup.style.display = 'none';
+                        });
+
+                        a_element.appendChild(badge);
+                    }
+                } catch (error) {
+                    console.error('捕获到错误:', error);
+                }
+            });
 
 
-    
-        
-        console.log('Getting flags from background for', datasetNames.length, pageType, '...');
-        
-        // 从 background 获取所有标记
-        console.time("测试代码速度getAllFlagsFromBackground");
-        const allFlags = await getAllFlagsFromBackground(region, delay, universe, datasetNames, pageType);
-        console.timeEnd("测试代码速度getAllFlagsFromBackground");
-        
-        if (!allFlags) {
-            console.error('Failed to get flags from background');
-            return;
-        }
-        
-        console.log('Applying flags...', allFlags);
-        
-        // 应用各种标记
-        applyAnalysisFlags(elements, region, delay, universe, allFlags.analysisFlags);
-        applyOSISFlags(elements, region, delay, allFlags.osisFlags, allFlags.osisMeanSharpe, allFlags.osisEndDate, allFlags.osisTotalCount);
-        applyNeutFlags(elements, region, delay, allFlags.osisMeanSharpe, allFlags.neutFlags);
-    });
+
+
+            elements.forEach(function (element) {
+                try {
+                    let a_element = element.querySelector(".link.link--wrap");
+                    // console.log(a_element)
+                    if (a_element.href.includes("data-sets")) {
+                        return;
+                    }
+                    let parts = a_element.href.split("/");
+                    let lastPart = parts[parts.length - 1];
+                    let item_data = undefined;
+                    try {
+                        item_data = dataInfo?.[`${region}_${delay}`]?.['isos']?.['datafield']?.[lastPart];
+                    } catch (_) { /* 忽略路径异常 */ }
+
+                    const existingBadge = a_element.querySelector('.wq-isos-badge');
+                    if (existingBadge) existingBadge.remove();
+
+                    const srRaw = item_data?.sharpe_ratio;
+                    const sr = (srRaw !== undefined && srRaw !== null) ? parseFloat(srRaw) : NaN;
+                    const count = item_data?.count;
+
+                    // 颜色规则：sr < 0 为红；sr > meanSharpe 为绿；其他（>=0 且 <= 均值或无均值）为黄；缺失为灰
+                    let bgColor = '#9e9e9e';
+                    if (!Number.isNaN(sr)) {
+                        if (sr < 0) {
+                            bgColor = '#e53935';
+                        } else if (!Number.isNaN(meanSharpe) && sr > meanSharpe) {
+                            bgColor = '#2e7d32';
+                        } else {
+                            bgColor = '#f9a825';
+                        }
+                    }
+
+                    // 仅当存在 item_data 时展示徽章（允许 sr 缺失但有 count 的情况）
+                    if (item_data) {
+                        const badge = document.createElement('span');
+                        badge.className = 'wq-isos-badge';
+                        const countText = (count !== undefined && count !== null && count !== '') ? `(${count})` : '';
+                        // 徽章内容：sharpe_ratio(count)
+                        badge.textContent = (!Number.isNaN(sr)) ? `${sr.toFixed(2)}${countText}` : `--${countText}`;
+                        badge.style.cssText = [
+                            'display:inline-block',
+                            'margin-left:6px',
+                            'padding:0 6px',
+                            'border-radius:6px',
+                            `background-color:${bgColor}`,
+                            'color:#fff',
+                            'font-size:12px',
+                            'font-weight:600',
+                            'line-height:1.6',
+                            'vertical-align:middle',
+                            'cursor:help'
+                        ].join(';');
+                        // 悬浮提示：Sharpe、Count、Region_Delay 均值、数据集名称
+                        const srText = (!Number.isNaN(sr)) ? sr.toFixed(4) : '--';
+                        const meanText = (!Number.isNaN(meanSharpe)) ? meanSharpe.toFixed(4) : '--';
+                        const cntText = (count !== undefined && count !== null && count !== '') ? `${count}` : '--';
+                        const tooltip = `OS/IS Sharpe: ${srText}\nCount: ${cntText}\nMean OS/IS Sharpe(${region}_${delay}): ${meanText}\nTotal Count: ${osisTotalCount}\nDatafield: ${lastPart}\n统计截至日期: ${endDate}`;
+                        badge.title = tooltip;
+                        badge.setAttribute('aria-label', tooltip);
+                        a_element.appendChild(badge);
+                    }
+                } catch (error) {
+                    console.error('捕获到错误:', error);
+                }
+            });
+
+
+            // neutralization 标记
+            elements.forEach(function (element) {
+                try {
+                    let a_element = element.querySelector(".link.link--wrap");
+                    // console.log(a_element)
+                    if (a_element.href.includes("data-sets")) {
+                        return;
+                    }
+                    let parts = a_element.href.split("/");
+                    let lastPart = parts[parts.length - 1];
+                    let item_data = dataInfo?.[`${region}_${delay}`]?.['neutralization']?.['datafield']?.[lastPart];
+                    let item_res = processNeutralizationData(item_data);
+
+                    console.log("neutralization data", lastPart, item_data);
+
+                    const existingBadge = a_element.querySelector('.wq-neut-badge');
+                    if (existingBadge) existingBadge.remove();
+
+                    const srRaw = item_data?.sharpe_ratio;
+                    const sr = (srRaw !== undefined && srRaw !== null) ? parseFloat(srRaw) : NaN;
+                    const count = item_data?.count;
+
+
+                    // 仅当存在 item_data 时展示徽章（允许 sr 缺失但有 count 的情况）
+                    if (item_data) {
+                        const badge = document.createElement('span');
+                        badge.className = 'wq-neut-badge';
+                        badge.textContent = `${item_res.maxItem.key.toLowerCase()}(${item_res.maxPercentage}%)`;
+                        badge.style.cssText = [
+                            'display:inline-block',
+                            'margin-left:6px',
+                            'padding:0 6px',
+                            'border-radius:6px',
+                            `background-color:#9e9e9e`,
+                            'color:#fff',
+                            'font-size:12px',
+                            'font-weight:600',
+                            'line-height:1.6',
+                            'vertical-align:middle',
+                            'cursor:pointer'
+                        ].join(';');
+
+                        // 创建表格内容
+                        const maxPercentage = Math.max(...Object.values(item_res.entries).map(entry => parseFloat(entry.percentage)));
+                        const maxSharpeRatio = Math.max(
+                            ...Object.entries(item_data)
+                                .map(([key, value]) => parseFloat(value?.sharpe_ratio))
+                                .filter(val => !isNaN(val) && val !== null)
+                        );
+
+
+                        const tableRows = Object.entries(item_res.entries)
+                            .sort(([keyA], [keyB]) => keyA.localeCompare(keyB)) // 按照 Neutralization 列字母排序
+                            .map(([key, value], index) => {
+                                const sharpeRatio = item_data[key]?.sharpe_ratio !== undefined ? parseFloat(item_data[key]?.sharpe_ratio).toFixed(2) : '--';
+                                const isosCount = item_data[key]?.osis_count !== undefined ? item_data[key]?.osis_count : '--';
+
+                                // Determine font color for Sharpe Ratio based on rules
+                                let fontColor = '#9e9e9e'; // Default gray for missing values
+                                if (!Number.isNaN(parseFloat(sharpeRatio))) {
+                                    const srValue = parseFloat(sharpeRatio);
+                                    if (srValue < 0) {
+                                        fontColor = '#e53935'; // Red for sr < 0
+                                    } else if (!Number.isNaN(meanSharpe) && srValue > meanSharpe) {
+                                        fontColor = '#2e7d32'; // Green for sr > meanSharpe
+                                    } else {
+                                        fontColor = '#f9a825'; // Yellow for other cases
+                                    }
+                                }
+
+                                const percentageStyle = parseFloat(value.percentage) === maxPercentage ? 'text-decoration: underline double;' : '';
+                                const sharpeRatioStyle = parseFloat(sharpeRatio).toFixed(2) === parseFloat(maxSharpeRatio).toFixed(2) ? 'text-decoration: underline double;' : '';
+                                const bgColor = index % 2 === 0 ? '#ffffff' : '#f2f2f2'; // Alternate row colors
+
+                                return `<tr style="background: ${bgColor};">
+                                    <td>${key}</td>
+                                    <td>${value.count}</td>
+                                    <td style="${percentageStyle}">${value.percentage}%</td>
+                                    <td style="${sharpeRatioStyle}; color: ${fontColor};">${sharpeRatio}(${isosCount})</td>
+                                </tr>`;
+                            }).join('');
+                        const tableHTML = `
+                            <table style="border-collapse: collapse; width: 100%; border: 1px solid #ddd; background: #f9f9f9; font-family: Arial, sans-serif;">
+                                <thead style="background: #f1f1f1;">
+                                    <tr>
+                                        <th style="border: 1px solid #ddd; padding: 8px; text-align: left; font-weight: bold;">Neutralization</th>
+                                        <th style="border: 1px solid #ddd; padding: 8px; text-align: right; font-weight: bold;">Count</th>
+                                        <th style="border: 1px solid #ddd; padding: 8px; text-align: right; font-weight: bold;">Percentage</th>
+                                        <th style="border: 1px solid #ddd; padding: 8px; text-align: right; font-weight: bold;">Sharpe Ratio</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${tableRows.split('</tr>').map((row, index) => {
+                        const bgColor = index % 2 === 0 ? '#ffffff' : '#f2f2f2'; // Alternate row colors
+                        return row ? `<tr style="background: ${bgColor};">${row}</tr>` : '';
+                    }).join('')}
+                                </tbody>
+                            </table>
+                        `;
+
+                        // 创建弹出层
+                        const popup = document.createElement('div');
+                        popup.className = 'wq-neut-popup';
+                        popup.style.cssText = [
+                            'position: absolute',
+                            'z-index: 1000',
+                            'background: #fff',
+                            'border: 1px solid #ddd',
+                            'box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2)',
+                            'padding: 10px',
+                            'border-radius: 8px',
+                            'display: none'
+                        ].join(';');
+                        popup.innerHTML = tableHTML;
+                        document.body.appendChild(popup);
+
+                        // 显示和隐藏弹出层
+                        badge.addEventListener('mouseenter', (event) => {
+                            popup.style.display = 'block';
+                            popup.style.top = `${event.clientY + 10}px`;
+                            popup.style.left = `${event.clientX + 10}px`;
+                        });
+                        badge.addEventListener('mouseleave', () => {
+                            popup.style.display = 'none';
+                        });
+
+                        a_element.appendChild(badge);
+                    }
+                } catch (error) {
+                    console.error('捕获到错误:', error);
+                }
+            });
+        })
+      });
 }
 
 
-// 处理 Neutralization 数据的辅助函数（备用）
+
+
 function processNeutralizationData(itemData) {
-    if (!itemData) return null;
-    
+    // 提取所有键和对应的count值
     const entries = Object.entries(itemData).map(([key, value]) => ({
         key,
         count: value.count
     }));
 
+    // 计算总数
     const totalCount = entries.reduce((sum, item) => sum + item.count, 0);
+
+    // 找到count最大的项
     const maxItem = entries.reduce((max, current) =>
         current.count > max.count ? current : max, entries[0]);
+
+    // 计算百分比
     const maxPercentage = ((maxItem.count / totalCount) * 100).toFixed(2);
 
+    // 为每个条目计算百分比并转换为以key为键的字典
     const entriesDict = {};
     entries.forEach(item => {
         const percentage = ((item.count / totalCount) * 100).toFixed(2);
@@ -414,7 +597,7 @@ function processNeutralizationData(itemData) {
     });
 
     return {
-        entries: entriesDict,
+        entries: entriesDict,  // 现在是字典形式
         totalCount,
         maxItem,
         maxPercentage
