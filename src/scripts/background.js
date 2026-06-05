@@ -33,6 +33,55 @@ async function getJsonDataFile(path) {
     return data;
 }
 
+async function getRegionInfoData(key) {
+    const data = await getExtensionDataStore().getInfoData(key);
+    if (!data) {
+        throw new Error(`Info data shard not found for ${key}. Please re-import the data zip.`);
+    }
+    return data;
+}
+
+function pickInfoRecords(source, ids) {
+    const result = {};
+    if (!source || !Array.isArray(ids)) return result;
+
+    for (const id of ids) {
+        if (Object.prototype.hasOwnProperty.call(source, id)) {
+            result[id] = source[id];
+        }
+    }
+
+    return result;
+}
+
+async function getInfoDataSubset(msg) {
+    const { region, delay, datasetIds = [], datafieldIds = [] } = msg;
+    if (!region || !delay) {
+        throw new Error('region and delay are required');
+    }
+
+    const key = `${region}_${delay}`;
+    const regionData = await getRegionInfoData(key);
+    const isos = regionData.isos || {};
+    const neutralization = regionData.neutralization || {};
+
+    return {
+        [key]: {
+            sub_end_time: regionData.sub_end_time,
+            isos: {
+                mean: isos.mean,
+                total_count: isos.total_count,
+                dataset: pickInfoRecords(isos.dataset, datasetIds),
+                datafield: pickInfoRecords(isos.datafield, datafieldIds),
+            },
+            neutralization: {
+                dataset: pickInfoRecords(neutralization.dataset, datasetIds),
+                datafield: pickInfoRecords(neutralization.datafield, datafieldIds),
+            },
+        },
+    };
+}
+
 function arrayBufferToBase64(arrayBuffer) {
     const bytes = new Uint8Array(arrayBuffer);
     const chunkSize = 0x8000;
@@ -316,6 +365,14 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
             sendResponse({ ok: false, error: error.message });
         });
         return true;
+    } else if (msg && msg.type === 'WQP_INFO_DATA_SUBSET') {
+        getInfoDataSubset(msg).then((data) => {
+            sendResponse({ ok: true, data });
+        }).catch((error) => {
+            console.error('Info data subset request failed:', error);
+            sendResponse({ ok: false, error: error.message });
+        });
+        return true;
     } else if (msg && msg.type === 'WQP_INDEXED_DATA_UPDATED') {
         resetIndexedDbDataCache();
         sendResponse({ ok: true });
@@ -525,8 +582,6 @@ async function injectionDataFlagScript(tabId, tab) {
         chrome.scripting.executeScript({
             target: { tabId: tabId },
             files: [
-                "src/scripts/lib/pako.min.js",
-                "src/scripts/lib/msgpack.min.js",
                 "src/scripts/utils.js", 
                 "src/scripts/dataFlag.js"
             ],

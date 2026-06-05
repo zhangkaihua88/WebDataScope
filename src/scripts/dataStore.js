@@ -1,7 +1,8 @@
 (() => {
     const DB_NAME = 'WQP_Extension_Data_Files';
-    const DB_VERSION = 1;
+    const DB_VERSION = 2;
     const FILE_STORE = 'files';
+    const INFO_STORE = 'infoData';
     const META_STORE = 'meta';
     const REQUIRED_FILES = ['dataSetList.json', 'oth/info_data.bin'];
 
@@ -28,6 +29,9 @@
                 const db = event.target.result;
                 if (!db.objectStoreNames.contains(FILE_STORE)) {
                     db.createObjectStore(FILE_STORE, { keyPath: 'path' });
+                }
+                if (!db.objectStoreNames.contains(INFO_STORE)) {
+                    db.createObjectStore(INFO_STORE, { keyPath: 'key' });
                 }
                 if (!db.objectStoreNames.contains(META_STORE)) {
                     db.createObjectStore(META_STORE);
@@ -99,6 +103,17 @@
         return text ? JSON.parse(text) : null;
     }
 
+    async function getInfoData(key) {
+        const db = await openDB();
+        try {
+            const tx = db.transaction(INFO_STORE, 'readonly');
+            const record = await requestToPromise(tx.objectStore(INFO_STORE).get(key));
+            return record ? record.data : null;
+        } finally {
+            db.close();
+        }
+    }
+
     async function getMeta() {
         const db = await openDB();
         try {
@@ -109,22 +124,55 @@
         }
     }
 
-    async function replaceFiles(records, sourceName) {
+    function getDataCodecs() {
+        const pakoLib = globalThis.pako;
+        const msgpackLib = globalThis.msgpack;
+        if (!pakoLib || !msgpackLib) {
+            throw new Error('pako or msgpack is not loaded');
+        }
+        return { pakoLib, msgpackLib };
+    }
+
+    function decodeInfoDataRecord(records) {
+        const infoRecord = records.find(record => record.path === 'oth/info_data.bin');
+        if (!infoRecord) {
+            throw new Error('Missing required data file: oth/info_data.bin');
+        }
+
+        const { pakoLib, msgpackLib } = getDataCodecs();
+        const inflatedData = pakoLib.inflate(new Uint8Array(infoRecord.data));
+        return msgpackLib.decode(new Uint8Array(inflatedData));
+    }
+
+    function buildInfoDataRecords(dataInfo) {
+        return Object.entries(dataInfo || {}).map(([key, data]) => ({ key, data }));
+    }
+
+    async function replaceFiles(records, sourceName, infoDataRecords) {
         const db = await openDB();
         try {
-            const tx = db.transaction([FILE_STORE, META_STORE], 'readwrite');
+            const tx = db.transaction([FILE_STORE, INFO_STORE, META_STORE], 'readwrite');
             const fileStore = tx.objectStore(FILE_STORE);
+            const infoStore = tx.objectStore(INFO_STORE);
             const metaStore = tx.objectStore(META_STORE);
             const importedAt = new Date().toISOString();
             let totalBytes = 0;
 
             fileStore.clear();
+            infoStore.clear();
             for (const record of records) {
                 totalBytes += record.size;
                 fileStore.put({
                     path: record.path,
                     data: cloneArrayBuffer(record.data),
                     size: record.size,
+                    updatedAt: importedAt,
+                });
+            }
+            for (const record of infoDataRecords) {
+                infoStore.put({
+                    key: record.key,
+                    data: record.data,
                     updatedAt: importedAt,
                 });
             }
@@ -136,6 +184,7 @@
                 importedAt,
                 fileCount: records.length,
                 totalBytes,
+                infoDataKeyCount: infoDataRecords.length,
                 missingRequired,
             };
             metaStore.put(meta, 'importMeta');
@@ -184,17 +233,27 @@
             throw new Error(`Missing required data files: ${missingRequired.join(', ')}`);
         }
 
-        return replaceFiles(records, file.name);
+        options.onProgress?.({
+            current: entries.length,
+            total: entries.length,
+            path: 'preprocess oth/info_data.bin',
+        });
+        const dataInfo = decodeInfoDataRecord(records);
+        const infoDataRecords = buildInfoDataRecords(dataInfo);
+
+        return replaceFiles(records, file.name, infoDataRecords);
     }
 
     globalThis.WQPDataStore = {
         DB_NAME,
         FILE_STORE,
+        INFO_STORE,
         META_STORE,
         normalizeDataPath,
         getFileArrayBuffer,
         getText,
         getJson,
+        getInfoData,
         getMeta,
         importZip,
     };

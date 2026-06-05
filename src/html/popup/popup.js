@@ -117,7 +117,9 @@ async function handleImportDataZipFileChange(evt) {
         const meta = await globalThis.WQPDataStore.importZip(file, {
             onProgress: ({ current, total, path }) => {
                 statusText.className = 'success';
-                statusText.textContent = `正在导入 ${current}/${total}: ${path}`;
+                statusText.textContent = path.startsWith('preprocess ')
+                    ? '正在预处理 info_data.bin...'
+                    : `正在导入 ${current}/${total}: ${path}`;
             },
         });
         notifyIndexedDataUpdated();
@@ -126,7 +128,7 @@ async function handleImportDataZipFileChange(evt) {
             ? `，缺少 ${meta.missingRequired.join(', ')}`
             : '';
         showStatusMessage(
-            `导入完成：${meta.fileCount} 个文件，${formatBytes(meta.totalBytes)}${missing}`,
+            `导入完成：${meta.fileCount} 个文件，${formatBytes(meta.totalBytes)}，${meta.infoDataKeyCount || 0} 个 info 分片${missing}`,
             !missing
         );
     } catch (e) {

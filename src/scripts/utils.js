@@ -50,6 +50,33 @@ function format(formatString, replacements) {
   return result;
 }
 
+const WQP_SELF_SUMMARY_URL = 'https://api.worldquantbrain.com/users/self/consultant/summary';
+const WQP_SELF_SUMMARY_STORAGE_KEY = 'WQPSummary';
+
+function getChromeLocalValue(key) {
+    return new Promise((resolve, reject) => {
+        chrome.storage.local.get(key, (items) => {
+            if (chrome.runtime.lastError) {
+                reject(chrome.runtime.lastError);
+                return;
+            }
+            resolve(items?.[key]);
+        });
+    });
+}
+
+function setChromeLocalValue(key, value) {
+    return new Promise((resolve, reject) => {
+        chrome.storage.local.set({ [key]: value }, () => {
+            if (chrome.runtime.lastError) {
+                reject(chrome.runtime.lastError);
+                return;
+            }
+            resolve();
+        });
+    });
+}
+
 async function getDataFromUrl(url, options = {}) {
     // Retry until response.ok with timeout and exponential backoff
     const {
@@ -59,6 +86,18 @@ async function getDataFromUrl(url, options = {}) {
         maxRetries = Infinity,        // 默认无限重试，直到 response.ok
         onRetry = null                // 可选回调：({ attempt, status?, error?, nextDelayMs })
     } = options;
+
+    const forceRefresh = options.forceRefresh === true;
+    const maxRetriesLimit = Number.isFinite(options.maxRetries) ? options.maxRetries : Infinity;
+    const storageKey = url === WQP_SELF_SUMMARY_URL ? WQP_SELF_SUMMARY_STORAGE_KEY : null;
+    if (storageKey && !forceRefresh) {
+        try {
+            const cachedData = await getChromeLocalValue(storageKey);
+            if (cachedData) return cachedData;
+        } catch (error) {
+            console.warn(`Failed to read ${storageKey} from chrome.storage.local`, error);
+        }
+    }
 
     let attempt = 0;
     let delayMs = initialDelayMs;
@@ -81,6 +120,13 @@ async function getDataFromUrl(url, options = {}) {
 
             if (response.ok) {
                 const data = await response.json();
+                if (storageKey) {
+                    try {
+                        await setChromeLocalValue(storageKey, data);
+                    } catch (error) {
+                        console.warn(`Failed to save ${storageKey} to chrome.storage.local`, error);
+                    }
+                }
                 return data;
             }
 
@@ -90,7 +136,7 @@ async function getDataFromUrl(url, options = {}) {
                 try { onRetry({ attempt, status: response.status, nextDelayMs: nextDelay }); } catch (_) { /* noop */ }
             }
 
-            if (attempt >= maxRetries) {
+            if (attempt >= maxRetriesLimit) {
                 throw new Error(`Failed to fetch ${url} after ${attempt} attempts, last status: ${response.status}`);
             }
 
@@ -104,7 +150,7 @@ async function getDataFromUrl(url, options = {}) {
                 try { onRetry({ attempt, error: err, nextDelayMs: nextDelay }); } catch (_) { /* noop */ }
             }
 
-            if (attempt >= maxRetries) {
+            if (attempt >= maxRetriesLimit) {
                 throw new Error(`Failed to fetch ${url} after ${attempt} attempts due to error: ${err?.message || err}`);
             }
 

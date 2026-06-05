@@ -191,10 +191,10 @@ async function updateCardInfo(dataId, data, updateDataCallback) {
     const dataField = data.dataField;
 
     const detailResult = await fetchDataDetails(fileName, data);
-    if (!detailResult) return;
+    if (!detailResult) return false;
 
     const [matchData, perfectMatch, matchUniverse] = detailResult;
-    if (!matchData?.[dataField]) return;
+    if (!matchData?.[dataField]) return false;
 
     let itemData = matchData[dataField];
     try {
@@ -235,7 +235,8 @@ async function updateCardInfo(dataId, data, updateDataCallback) {
             `;
         const cardTitle = `${dataField} 分析报告` + (perfectMatch ? '' : `(from ${matchUniverse})`);
         const cardContent = container.outerHTML;
-        updateDataCallback(cardTitle, cardContent);
+        const didUpdate = updateDataCallback(cardTitle, cardContent);
+        if (didUpdate === false) return false;
 
 
 
@@ -335,6 +336,7 @@ async function updateCardInfo(dataId, data, updateDataCallback) {
                 },
             });
         }
+        return true;
     }
 }
 
@@ -352,11 +354,24 @@ async function showDataCard(event) {
                             card.updateDataId(dataId);
                             card.updateCursor(event.clientX, event.clientY);
                             card.updateTargetHtml(dataFieldHtml);
-                            await updateCardInfo(dataId, data, (cardTitle, cardContent) => card.updateData(cardTitle, cardContent));
+                            card.el.innerHTML = getCommonCardHTML();
+                            const updated = await updateCardInfo(dataId, data, (cardTitle, cardContent) => {
+                                if (card.dataId !== dataId) {
+                                    return false;
+                                }
+                                card.updateData(cardTitle, cardContent);
+                                return true;
+                            });
+                            if (!updated && card.dataId === dataId) {
+                                card.el.innerHTML = getCommonCardHTML();
+                                card.disable();
+                            }
                             return;
                         } catch (error) {
-                            card.el.innerHTML = getCommonCardHTML();
-                            card.disable();
+                            if (card.dataId === dataId) {
+                                card.el.innerHTML = getCommonCardHTML();
+                                card.disable();
+                            }
                         }
                     } else {
                         return;
