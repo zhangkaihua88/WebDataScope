@@ -2,18 +2,20 @@
     "manifest_version": 3,
     "name": "WorldQuant Scope",
     "description": "WorldQuant Scope is a browser extension that provides a set of tools to help you navigate the WorldQuant platform.",
-    "version": "0.10.21",
+    "version": "1.0.0",
     "author": "幻华",
     "icons": {
         "128": "img/logo.png"
     },
     "action": {
         "default_title": "WorldQuant Scope - Tools for WorldQuant Platform",
-        "default_popup": "src/html/popup/popup.html",
         "default_icon": "img/logo.png"
     },
+    "side_panel": {
+        "default_path": "src/ui/sidebar/sidebar.html"
+    },
     "background": {
-        "service_worker": "src/scripts/background.js",
+        "service_worker": "src/background/background.js",
         "type": "module"
     },
     "content_scripts": [
@@ -21,7 +23,7 @@
             "matches": ["https://platform.worldquantbrain.com/*"],
             "run_at": "document_start",
             "world": "MAIN",
-            "js": ["src/scripts/patchColumns.js"]
+            "js": ["src/content/platform/common/patchColumns.js"]
         },
         {
             "matches": [
@@ -31,40 +33,48 @@
                 "*://platform.worldquantbrain.com/genius/*"
             ],
             "js": [
-                "src/scripts/lib/msgpack.min.js",
-                "src/scripts/lib/pako.min.js",
-                "src/scripts/lib/chart.js",
-                "src/scripts/utils.js",
-                "src/scripts/uiCard.js",
-                "src/scripts/dataAna.js",
-                "src/scripts/noMoreDifficulties.js",
-                "src/scripts/requestMonitorUI.js"
+                "src/vendor/js/msgpack.min.js",
+                "src/vendor/js/pako.min.js",
+                "src/vendor/js/chart.js",
+                "src/content/shared/utils.js",
+                "src/content/shared/uiCard.js",
+                "src/content/platform/data/dataAna.js",
+                "src/content/platform/common/noMoreDifficulties.js",
+                "src/content/shared/requestMonitorUI.js"
             ],
             "css": [
-                "src/css/idcard.css"
+                "src/content/platform/styles/idcard.css"
             ]
+        },
+        {
+            "matches": [
+                "*://platform.worldquantbrain.com/*"
+            ],
+            "js": [
+                "src/content/platform/session/sessionTokenBridge.js"
+            ],
+            "run_at": "document_start"
+        },
+        {
+            "matches": [
+                "*://platform.worldquantbrain.com/*"
+            ],
+            "js": [
+                "src/content/platform/prodmemo/prodmemo.js"
+            ],
+            "css": [
+                "src/content/platform/prodmemo/prodmemo.css"
+            ],
+            "run_at": "document_start"
         },
         {
             "matches": [
                 "*://platform.worldquantbrain.com/profile/performance"
             ],
             "js": [
-                "src/scripts/performanceStyleFix.js"
+                "src/content/platform/common/performanceStyleFix.js"
             ],
             "run_at": "document_end"
-        },
-        {
-            "matches": [
-                "*://support.worldquantbrain.com/*",
-                "*://support.worldquantbrain.com/*"
-            ],
-            "js": [
-                "src/scripts/utils.js",
-                "src/scripts/voteup.js"
-            ],
-            "css": [
-                "src/css/menu.css"
-            ]
         },
         {
             "matches": [
@@ -73,7 +83,7 @@
                 "*://platform.worldquantbrain.com/learn/operators"
             ],
             "js": [
-                "src/scripts/alphaDetailsPopup.js"
+                "src/content/platform/common/alphaDetailsPopup.js"
             ]
         }
     ],
@@ -82,8 +92,13 @@
             "resources": [
                 "data/*.bin",
                 "data/*.json",
-                "src/css/*.css",
-                "src/scripts/lib/*.js"
+                "src/vendor/js/*.js",
+                "src/vendor/css/*.css",
+                "src/content/platform/styles/*.css",
+                "src/content/platform/prodmemo/*.css",
+                "src/content/platform/distribution/*.css",
+                "src/content/platform/genius/*.css",
+                "src/content/platform/simulate/*.css"
             ],
             "matches": [
                 "*://platform.worldquantbrain.com/*"
@@ -99,6 +114,7 @@
         "cookies",
         "tabs",
         "storage",
+        "sidePanel",
         "activeTab",
         "alarms",
         "notifications",

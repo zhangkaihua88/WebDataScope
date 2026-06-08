@@ -1,4 +1,4 @@
-// dataAna.js: 数据分析脚本
+﻿// dataAna.js: 数据分析脚本
 console.log('dataAna.js loaded');
 
 let cacheData = {}; // 缓存数据
@@ -342,8 +342,8 @@ async function updateCardInfo(dataId, data, updateDataCallback) {
 
 async function showDataCard(event) {
     // 显示数据卡片
-    chrome.storage.local.get('WQPSettings', async ({ WQPSettings }) => {
-        if (WQPSettings.dataAnalysisEnabled) {
+    chrome.storage.local.get('WQP_Settings', async ({ WQP_Settings }) => {
+        if (WQP_Settings.dataAnalysisEnabled) {
             const { dataFieldHtml, dataFieldUrl } = getDataFieldId(event.target);
             if (dataFieldUrl) {
                 const data = getDataFieldData(dataFieldHtml, dataFieldUrl);

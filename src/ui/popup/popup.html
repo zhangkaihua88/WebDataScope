@@ -6,26 +6,18 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>WorldQuant Scope 配置</title>
     <link rel="stylesheet" href="popup.css">
-    <script src="../../scripts/lib/pako.min.js"></script>
-    <script src="../../scripts/lib/msgpack.min.js"></script>
-    <script src="../../scripts/lib/jszip.min.js"></script>
-    <script src="../../scripts/dataStore.js"></script>
+    <script src="../../vendor/js/pako.min.js"></script>
+    <script src="../../vendor/js/msgpack.min.js"></script>
+    <script src="../../vendor/js/jszip.min.js"></script>
+    <script src="../../shared/dataStore.js"></script>
 </head>
 
 <body>
     <div class="container">
         <form id="settingsForm">
-            <div class="input-group">
-                <label for="dbAddress">中文搜索 API 地址</label>
-                <input id="dbAddress" type="text" placeholder="请输入 API 地址" required />
-            </div>
             <div class="checkbox-container">
                 <input type="checkbox" id="dataAnalysis">
                 <label for="dataAnalysis">启用数据分析</label>
-            </div>
-            <div class="checkbox-container">
-                <input type="checkbox" id="hiddenFeature">
-                <label for="hiddenFeature">启用隐藏功能</label>
             </div>
             <div class="checkbox-container">
                 <input type="checkbox" id="apiMonitorEnabled">
@@ -40,7 +32,7 @@
                 <label for="geniusAlphaCount">Genius Alpha 数量</label>
                 <input id="geniusAlphaCount" type="number" placeholder="请输入 Genius Alpha 数量" required />
             </div>
-            <button type="submit" id="saveBtn" disabled>保存设置</button>
+            <button type="submit" id="saveBtn">保存设置</button>
         </form>
 
         <h2 style="margin-top:16px;text-align:left;">Data 文件</h2>

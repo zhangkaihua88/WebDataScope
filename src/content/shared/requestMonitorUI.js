@@ -1,4 +1,4 @@
-// requestMonitorUI.js: 在目标页面右下角展示匹配 api.worldquantbrain.com 的请求列表（会话级，非持久化）
+﻿// requestMonitorUI.js: 在目标页面右下角展示匹配 api.worldquantbrain.com 的请求列表（会话级，非持久化）
 (function () {
   // 仅注入一次
   if (window.__WQS_REQ_UI__) return;
@@ -6,8 +6,8 @@
 
   // 读取设置，控制是否显示面板
   try {
-    chrome.storage?.local?.get('WQPSettings', ({ WQPSettings }) => {
-      if (WQPSettings && WQPSettings.apiMonitorEnabled === true) {
+    chrome.storage?.local?.get('WQP_Settings', ({ WQP_Settings }) => {
+      if (WQP_Settings && WQP_Settings.apiMonitorEnabled === true) {
         start();
       }
     });

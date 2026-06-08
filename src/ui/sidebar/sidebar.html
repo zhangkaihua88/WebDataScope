@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WorldQuant Scope</title>
+    <link rel="stylesheet" href="sidebar.css">
+    <script src="../../vendor/js/pako.min.js"></script>
+    <script src="../../vendor/js/msgpack.min.js"></script>
+    <script src="../../vendor/js/jszip.min.js"></script>
+    <script src="../../shared/dataStore.js"></script>
+</head>
+
+<body>
+    <main class="shell">
+        <header class="topbar">
+            <div>
+                <h1>WorldQuant Scope</h1>
+                <p id="globalStatus" aria-live="polite"></p>
+            </div>
+        </header>
+
+        <nav class="tabs" aria-label="侧边栏功能">
+            <button class="tab is-active" type="button" data-tab="settings">设置</button>
+            <button class="tab" type="button" data-tab="session">Session</button>
+            <button class="tab" type="button" data-tab="prodmemo">ProdMemo</button>
+            <button class="tab" type="button" data-tab="community">Community</button>
+        </nav>
+
+        <section id="settingsPanel" class="panel is-active" data-panel="settings">
+            <form id="settingsForm" class="form-stack">
+                <label class="check-row">
+                    <input id="dataAnalysis" type="checkbox">
+                    <span>启用数据分析</span>
+                </label>
+                <label class="check-row">
+                    <input id="apiMonitorEnabled" type="checkbox">
+                    <span>显示 API 监控面板</span>
+                </label>
+
+                <div class="section-title">Genius 排名分析</div>
+                <label class="check-row">
+                    <input id="geniusCombineTag" type="checkbox">
+                    <span>考虑 Combined Performance</span>
+                </label>
+                <label class="field">
+                    <span>Genius Alpha 数量</span>
+                    <input id="geniusAlphaCount" type="number" min="0" step="1" required>
+                </label>
+
+                <button id="saveSettingsBtn" class="primary" type="submit">保存设置</button>
+            </form>
+            <div class="section-title">Data 文件</div>
+            <div class="action-row">
+                <button id="importDataZipBtn" class="primary" type="button">导入 Data Zip</button>
+                <input id="importDataZipFile" type="file" accept=".zip,application/zip,application/x-zip-compressed" hidden>
+            </div>
+            <div id="dataMeta" class="info-box"></div>
+        </section>
+
+        <section id="sessionPanel" class="panel" data-panel="session">
+            <div class="section-title">会话保活</div>
+            <form id="sessionForm" class="form-stack">
+                <label class="check-row">
+                    <input id="sessionEnabled" type="checkbox">
+                    <span>启用会话保活</span>
+                </label>
+                <label class="field">
+                    <span>心跳间隔（分钟）</span>
+                    <input id="sessionKeepAliveInterval" type="number" min="1" max="60" step="1">
+                </label>
+                <label class="check-row">
+                    <input id="sessionPreemptiveLoginEnabled" type="checkbox">
+                    <span>启用预防性重登</span>
+                </label>
+                <label class="field">
+                    <span>距过期小于（小时）时重登</span>
+                    <input id="sessionPreemptiveBeforeExpiry" type="number" min="0.1" max="12" step="0.1">
+                </label>
+
+                <div class="section-title">自动重登</div>
+                <label class="check-row">
+                    <input id="sessionAutoLoginEnabled" type="checkbox">
+                    <span>启用自动重登</span>
+                </label>
+                <label class="field">
+                    <span>登录邮箱</span>
+                    <input id="sessionEmail" type="text" autocomplete="username">
+                </label>
+                <label class="field">
+                    <span>登录密码</span>
+                    <input id="sessionPassword" type="password" autocomplete="current-password" placeholder="留空则保留已保存密码">
+                </label>
+                <button id="saveSessionBtn" class="primary" type="submit">保存 Session 设置</button>
+            </form>
+
+            <div class="section-title">状态</div>
+            <div id="sessionStatusBox" class="info-box"></div>
+            <div class="grid-actions">
+                <button id="checkSessionBtn" type="button">立即检查</button>
+                <button id="loginSessionBtn" type="button">立即重登</button>
+                <button id="clearSessionLogsBtn" type="button">清空日志</button>
+            </div>
+
+            <div class="section-title">运行日志</div>
+            <ol id="sessionLog" class="log-list" aria-live="polite"></ol>
+        </section>
+
+        <section id="prodMemoPanel" class="panel" data-panel="prodmemo">
+            <div class="section-title">ProdMemo 缓存</div>
+            <div id="prodMemoSummary" class="info-box"></div>
+            <div class="grid-actions">
+                <button id="refreshProdMemoBtn" type="button">刷新</button>
+                <button id="exportProdMemoBtn" type="button">导出 JSON</button>
+                <button id="importProdMemoBtn" type="button">导入 JSON</button>
+                <button id="clearProdMemoBtn" class="danger" type="button">清空缓存</button>
+                <input id="importProdMemoFile" type="file" accept="application/json,.json" hidden>
+            </div>
+
+            <div id="prodMemoStatus" class="info-box" aria-live="polite"></div>
+
+            <div class="section-title">缓存列表</div>
+            <label class="field">
+                <span>Alpha ID 搜索</span>
+                <input id="prodMemoSearch" type="search" placeholder="输入 Alpha ID">
+            </label>
+            <div id="prodMemoList" class="cache-list" aria-live="polite"></div>
+        </section>
+
+        <section id="communityPanel" class="panel" data-panel="community">
+            <div class="section-title">Support 连接</div>
+            <div class="form-stack">
+                <button id="connectSupportBtn" class="primary" type="button">连接 Support</button>
+            </div>
+
+            <div class="section-title">论坛抓取</div>
+            <div class="form-stack">
+                <button id="crawlFullAllBtn" type="button">全量抓取帖子评论和文章</button>
+                <button id="crawlRecentIncrementalBtn" type="button">最近活动增量更新</button>
+            </div>
+
+            <div id="communityProgress" class="progress-stack" hidden></div>
+
+            <div class="section-title">社区数据</div>
+            <div class="grid-actions">
+                <button id="exportCommunityBtn" type="button">导出 JSON</button>
+                <button id="exportCommunityCompressedBtn" type="button">导出压缩</button>
+                <button id="importCommunityBtn" type="button">导入</button>
+                <input id="importCommunityFile" type="file" accept="application/json,.json,.wqcs" hidden>
+            </div>
+
+            <div class="section-title">点赞操作</div>
+            <div class="form-stack">
+                <label class="field">
+                    <span>帖子 URL</span>
+                    <input id="postUrl" type="url" placeholder="留空则使用当前 Support 帖子页面">
+                </label>
+                <button id="upvotePostBtn" type="button">点赞帖子和评论</button>
+
+                <label class="field">
+                    <span>用户 Profile ID / URL / WQ ID</span>
+                    <input id="profileId" type="text" placeholder="留空则使用当前 Profile 页面；也可填 WQ ID/name">
+                </label>
+                <button id="resolveProfileBtn" type="button">解析 Profile 链接</button>
+                <button id="upvoteUserBtn" type="button">点赞用户本季度内容</button>
+
+                <label class="field">
+                    <span>批量用户 JSON 或逗号分隔</span>
+                    <textarea id="multiUserJson" rows="5" spellcheck="false" placeholder='{"wq_id_or_name": "profile_id"} 或 name1, name2, name3'></textarea>
+                </label>
+                <button id="upvoteUsersBtn" type="button">批量点赞用户</button>
+                <button id="clearLikedIdsBtn" class="danger" type="button">清空点赞记录</button>
+            </div>
+
+            <div id="voteLiveStats" class="info-box" hidden>本次已点赞 0 个 (来自缓存 0 个)</div>
+            <div id="batchUserResults" class="batch-results" hidden>
+                <div id="batchRunLabel" class="batch-run-label"></div>
+                <div id="batchUserRows" class="batch-user-rows"></div>
+            </div>
+
+            <div class="section-title">运行日志</div>
+            <div id="communitySummary" class="info-box"></div>
+            <ol id="communityLog" class="log-list" aria-live="polite"></ol>
+        </section>
+    </main>
+
+    <script type="module" src="sidebar.js"></script>
+</body>
+
+</html>

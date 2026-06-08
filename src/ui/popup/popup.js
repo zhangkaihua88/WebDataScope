@@ -1,9 +1,7 @@
-// Description: 弹出窗口的 JS 文件
+﻿// Description: 弹出窗口的 JS 文件
 console.log('popup.js loaded');
 
 // 获取 HTML 元素
-const dbAddressInput = document.getElementById('dbAddress');
-const hiddenFeatureCheckbox = document.getElementById('hiddenFeature');
 const dataAnalysisCheckbox = document.getElementById('dataAnalysis');
 const geniusCombineTagCheckbox = document.getElementById('geniusCombineTag');
 const geniusAlphaCountInput = document.getElementById('geniusAlphaCount');
@@ -21,15 +19,13 @@ const importDataZipFile = document.getElementById('importDataZipFile');
 // 加载用户设置
 function loadSettings() {
     statusText.textContent = '加载中...';
-    chrome.storage.local.get('WQPSettings', ({ WQPSettings }) => {
-        dbAddressInput.value = WQPSettings.apiAddress || '';
-        hiddenFeatureCheckbox.checked = WQPSettings.hiddenFeatureEnabled || false;
-        dataAnalysisCheckbox.checked = WQPSettings.dataAnalysisEnabled || false;
-        geniusCombineTagCheckbox.checked = WQPSettings.geniusCombineTag || false;
-        geniusAlphaCountInput.value = WQPSettings.geniusAlphaCount || 40;
-        apiMonitorEnabledCheckbox.checked = WQPSettings.apiMonitorEnabled || false;
+    chrome.storage.local.get('WQP_Settings', ({ WQP_Settings }) => {
+        const settings = WQP_Settings || {};
+        dataAnalysisCheckbox.checked = settings.dataAnalysisEnabled || false;
+        geniusCombineTagCheckbox.checked = settings.geniusCombineTag || false;
+        geniusAlphaCountInput.value = settings.geniusAlphaCount || 40;
+        apiMonitorEnabledCheckbox.checked = settings.apiMonitorEnabled || false;
 
-        saveBtn.disabled = !dbAddressInput.value.trim();
         statusText.textContent = '';
     });
 }
@@ -38,21 +34,14 @@ function loadSettings() {
 function saveSettings(event) {
     event.preventDefault();
     saveBtn.disabled = true;
-    const WQPSettings = {
-        apiAddress: dbAddressInput.value.trim(),
-        hiddenFeatureEnabled: hiddenFeatureCheckbox.checked,
+    const WQP_Settings = {
         dataAnalysisEnabled: dataAnalysisCheckbox.checked,
         geniusCombineTag: geniusCombineTagCheckbox.checked,
         geniusAlphaCount: parseInt(geniusAlphaCountInput.value) || 40,
         apiMonitorEnabled: apiMonitorEnabledCheckbox.checked
     };
 
-    if (!WQPSettings.apiAddress) {
-        showStatusMessage('请输入有效的地址！', false);
-        saveBtn.disabled = false;
-        return;
-    }
-    chrome.storage.local.set({ WQPSettings }, () => {
+    chrome.storage.local.set({ WQP_Settings }, () => {
         if (chrome.runtime.lastError) {
             showStatusMessage('保存失败，请重试！', false);
             saveBtn.disabled = false;
@@ -143,11 +132,6 @@ async function handleImportDataZipFileChange(evt) {
 // 事件监听：表单提交
 settingsForm.addEventListener('submit', saveSettings);
 
-// 监听输入框内容变化，启用或禁用按钮
-dbAddressInput.addEventListener('input', () => {
-    saveBtn.disabled = !dbAddressInput.value.trim();
-});
-
 // 页面加载时初始化
 document.addEventListener('DOMContentLoaded', loadSettings);
 
@@ -184,14 +168,14 @@ function formatNow() {
 
 function handleExportCommunity() {
     statusText.textContent = '导出中...';
-    chrome.storage.local.get('WQPCommunityState', ({ WQPCommunityState }) => {
+    chrome.storage.local.get('WQP_CommunityState', ({ WQP_CommunityState }) => {
         try {
-            if (!WQPCommunityState) {
+            if (!WQP_CommunityState) {
                 showStatusMessage('没有可导出的社区数据。', false);
                 return;
             }
-            const json = JSON.stringify(WQPCommunityState, null, 2);
-            downloadText(`WQPCommunityState_${formatNow()}.json`, json);
+            const json = JSON.stringify(WQP_CommunityState, null, 2);
+            downloadText(`WQP_CommunityState_${formatNow()}.json`, json);
             showStatusMessage('导出完成。', true);
         } catch (e) {
             console.error(e);
@@ -202,16 +186,16 @@ function handleExportCommunity() {
 
 function handleExportCommunityCompressed() {
     statusText.textContent = '导出(压缩)中...';
-    chrome.storage.local.get('WQPCommunityState', ({ WQPCommunityState }) => {
+    chrome.storage.local.get('WQP_CommunityState', ({ WQP_CommunityState }) => {
         try {
-            if (!WQPCommunityState) {
+            if (!WQP_CommunityState) {
                 showStatusMessage('没有可导出的社区数据。', false);
                 return;
             }
             // 使用 msgpack 编码 + pako 压缩
-            const packed = msgpack.encode(WQPCommunityState);
+            const packed = msgpack.encode(WQP_CommunityState);
             const deflated = pako.deflate(packed);
-            downloadBytes(`WQPCommunityState_${formatNow()}.wqcs`, deflated, 'application/octet-stream');
+            downloadBytes(`WQP_CommunityState_${formatNow()}.wqcs`, deflated, 'application/octet-stream');
             showStatusMessage('压缩导出完成。', true);
         } catch (e) {
             console.error(e);
@@ -237,7 +221,7 @@ function handleImportFileChange(evt) {
                 const arr = new Uint8Array(reader.result);
                 const inflated = pako.inflate(arr);
                 const obj = msgpack.decode(inflated);
-                chrome.storage.local.set({ WQPCommunityState: obj }, () => {
+                chrome.storage.local.set({ WQP_CommunityState: obj }, () => {
                     if (chrome.runtime.lastError) {
                         showStatusMessage('写入存储失败。', false);
                     } else {
@@ -255,7 +239,7 @@ function handleImportFileChange(evt) {
         reader.onload = () => {
             try {
                 const obj = JSON.parse(reader.result);
-                chrome.storage.local.set({ WQPCommunityState: obj }, () => {
+                chrome.storage.local.set({ WQP_CommunityState: obj }, () => {
                     if (chrome.runtime.lastError) {
                         showStatusMessage('写入存储失败。', false);
                     } else {

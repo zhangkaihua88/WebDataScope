@@ -1,4 +1,4 @@
-// 入口概览：
+﻿// 入口概览：
 // - 加载后：插入进度条、恢复显示、监听 DOM
 // - 监听后台：/simulations 完成时根据响应头更新配额（不删除正常模拟）
 // - 刷新按钮：触发一次模拟，仅删除本次刷新产生的模拟，用于刷新配额
@@ -11,8 +11,8 @@ const fallbackContainerSelector = '.editor-bottom-bar-left-monaco';
 const simulateBlockSelector = '.editor-simulate.editor-simulate--isConsultant.editor-simulate--is-code';
 const buttonContainerSelector = '.editor-button-container';
 // 本地存储键：配额显示与刷新次数
-const storageKey = 'WQ_SIM_RATE_LIMIT';
-const refreshQuotaKey = 'WQ_SIM_REFRESH_QUOTA';
+const storageKey = 'WQP_SIM_RATE_LIMIT';
+const refreshQuotaKey = 'WQP_SIM_REFRESH_QUOTA';
 
 // 查找底部工具栏容器：优先完整类名，找不到则降级简化类名
 function findContainer() {

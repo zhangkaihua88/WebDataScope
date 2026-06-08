@@ -1,4 +1,4 @@
-// genius.js: genius相关功能的 JS 文件
+﻿// genius.js: genius相关功能的 JS 文件
 console.log('genius.js loaded');
 
 
@@ -24,7 +24,7 @@ async function fetchAllAlphas(forceRefresh = false, isSelf = false) { // Added i
     // 抓取本季度所有的alpha
     // Removed setButtonState('WQPOPSFetchButton', `开始抓取...`,'load'); as this function should not manage the button state directly.
 
-    let cacheKey = 'WQPAllAlphasCache'; // Changed to 'let'
+    let cacheKey = 'WQP_AllAlphasCache'; // Changed to 'let'
     if (isSelf) {
         cacheKey += '_SELF'; // Differentiate cache for self-user's specific date range
     }
@@ -64,12 +64,12 @@ async function fetchAllAlphas(forceRefresh = false, isSelf = false) { // Added i
     // New logic for self-user's start date
     if (isSelf) {
         console.log(`[fetchAllAlphas] Checking for geniusStartDateOverride.`);
-        const WQPSettings = await new Promise(resolve => {
-            chrome.storage.local.get('WQPSettings', (result) => {
-                resolve(result.WQPSettings || {});
+        const WQP_Settings = await new Promise(resolve => {
+            chrome.storage.local.get('WQP_Settings', (result) => {
+                resolve(result.WQP_Settings || {});
             });
         });
-        const overrideDateString = WQPSettings.geniusStartDateOverride;
+        const overrideDateString = WQP_Settings.geniusStartDateOverride;
         console.log(`[fetchAllAlphas] Loaded geniusStartDateOverride: ${overrideDateString}`);
 
         let effectiveStartDate = new Date(start); // Convert calculated start string to Date object
@@ -112,8 +112,8 @@ async function opsAna(forceRefresh = false) {
     // 分析所有的alpha中的运算符, button 分析运算符的调用函数
     try {
         if (forceRefresh) {
-            console.log('Force refreshing: Clearing WQPOPSAna from storage.');
-            await chrome.storage.local.remove('WQPOPSAna');
+            console.log('Force refreshing: Clearing WQP_OPSAna from storage.');
+            await chrome.storage.local.remove('WQP_OPSAna');
         }
 
         let data = await fetchAllAlphas(forceRefresh, true); // Changed to true for isSelf
@@ -200,7 +200,7 @@ async function opsAna(forceRefresh = false) {
             version: '1.0', // 添加版本号，用于识别新的过滤逻辑
             alphaCount: filteredAlphas.length // 保存过滤后的alpha数量
         };
-        chrome.storage.local.set({ WQPOPSAna: dataToSave }, function () {
+        chrome.storage.local.set({ WQP_OPSAna: dataToSave }, function () {
             console.log('数据已保存');
             console.log(dataToSave);
         });
@@ -217,21 +217,21 @@ async function opsAna(forceRefresh = false) {
 function insertOpsTable() {
     // 插入运算符分析的表格, button 插入表格的调用函数
 
-    chrome.storage.local.get('WQPOPSAna', function (result) {
-        if (result.WQPOPSAna) {
+    chrome.storage.local.get('WQP_OPSAna', function (result) {
+        if (result.WQP_OPSAna) {
             // 检查缓存版本，如果是旧版本（没有version字段），清除缓存并提示重新分析
-            if (!result.WQPOPSAna.version || result.WQPOPSAna.version !== '1.0') {
+            if (!result.WQP_OPSAna.version || result.WQP_OPSAna.version !== '1.0') {
                 console.log('检测到旧版本缓存，正在清除...');
-                chrome.storage.local.remove('WQPOPSAna', () => {
+                chrome.storage.local.remove('WQP_OPSAna', () => {
                     alert('检测到旧的分析数据，请重新点击"运算符分析"按钮进行分析。');
                 });
                 return;
             }
 
-            console.log('读取的数据:', result.WQPOPSAna);
-            let savedArray = result.WQPOPSAna.array;
-            let savedTimestamp = result.WQPOPSAna.timestamp;
-            let alphaCount = result.WQPOPSAna.alphaCount || 0; // 获取统计的alpha数量
+            console.log('读取的数据:', result.WQP_OPSAna);
+            let savedArray = result.WQP_OPSAna.array;
+            let savedTimestamp = result.WQP_OPSAna.timestamp;
+            let alphaCount = result.WQP_OPSAna.alphaCount || 0; // 获取统计的alpha数量
             const zeroCount = savedArray.filter(item => item.count === 0).length;
             const nonZeroCount = savedArray.filter(item => item.count !== 0).length;
 
@@ -399,17 +399,17 @@ async function getAllRank() {
     // 根据用户ID获取单个用户的排名信息
 
     return new Promise((resolve, reject) => {
-        chrome.storage.local.get(['WQPRankData', 'WQPSettings'], function ({ WQPRankData, WQPSettings }) {
+        chrome.storage.local.get(['WQP_RankData', 'WQP_Settings'], function ({ WQP_RankData, WQP_Settings }) {
             if (chrome.runtime.lastError) {
                 reject(chrome.runtime.lastError);
                 return;
             }
 
-            let data = WQPRankData?.array || [];
-            const savedTimestamp = WQPRankData?.timestamp || 'N/A';
+            let data = WQP_RankData?.array || [];
+            const savedTimestamp = WQP_RankData?.timestamp || 'N/A';
             let itemData;
 
-            // data.forEach(item => item['achievedLevel'] = determineUserLevel(item, WQPSettings.geniusCombineTag));
+            // data.forEach(item => item['achievedLevel'] = determineUserLevel(item, WQP_Settings.geniusCombineTag));
             data.forEach(item => item['finalLevel'] = 'gold');
             data = data.filter(item => item.alphaCount > 0);
 
@@ -418,7 +418,7 @@ async function getAllRank() {
                     itemData = data.map((item, index) => ({ ...item, originalIndex: index }));
                 } else {
                     itemData = data.map((item, index) => ({ ...item, originalIndex: index })).filter(item => item.alphaCount >= levelCriteria[model].alphaCount && item.pyramidCount >= levelCriteria[model].pyramidCount);
-                    if (WQPSettings.geniusCombineTag) {
+                    if (WQP_Settings.geniusCombineTag) {
                         itemData = itemData.filter(item => item.combinedAlphaPerformance >= levelCriteria[model].combinedAlphaPerformance || item.combinedSelectedAlphaPerformance >= levelCriteria[model].combinedSelectedAlphaPerformance || item.combinedPowerPoolAlphaPerformance >= levelCriteria[model].combinedPowerPoolAlphaPerformance || item.combinedOsmosisPerformance >= levelCriteria[model].combinedOsmosisPerformance);
                     }
                 }
@@ -444,7 +444,7 @@ async function getAllRank() {
 
 
 
-            baseCount = data.filter(item => item.alphaCount >= WQPSettings.geniusAlphaCount).length;
+            baseCount = data.filter(item => item.alphaCount >= WQP_Settings.geniusAlphaCount).length;
             grandmasterCount = Math.min(75, Math.round(baseCount * 0.02));
             masterCount = Math.min(250, Math.round(baseCount * 0.08));
             expertCount = Math.min(675, Math.round(baseCount * 0.2));
@@ -877,23 +877,23 @@ async function insertRankListInfo() {
 async function getSingleRankByUserId(userId) {
     // 根据用户ID获取单个用户的排名信息
     return new Promise((resolve, reject) => {
-        chrome.storage.local.get(['WQPRankData', 'WQPSettings'], function ({ WQPRankData, WQPSettings }) {
+        chrome.storage.local.get(['WQP_RankData', 'WQP_Settings'], function ({ WQP_RankData, WQP_Settings }) {
             if (chrome.runtime.lastError) {
                 reject(chrome.runtime.lastError);
                 return;
             }
 
-            const data = WQPRankData?.array || [];
-            const savedTimestamp = WQPRankData?.timestamp || 'N/A';
+            const data = WQP_RankData?.array || [];
+            const savedTimestamp = WQP_RankData?.timestamp || 'N/A';
 
-            calculateRanks(data, userId, WQPSettings)
+            calculateRanks(data, userId, WQP_Settings)
                 .then(result => resolve({ result, savedTimestamp }))
                 .catch(reject);
         });
     });
 }
 
-async function calculateRanks(data, userId, WQPSettings) {
+async function calculateRanks(data, userId, WQP_Settings) {
     const userData = data.find(item => item.user === userId);
 
     if (!userData) {
@@ -904,18 +904,18 @@ async function calculateRanks(data, userId, WQPSettings) {
     const result = {};
     result['userData'] = userData;
     result['info'] = {
-        "currentLevel": determineUserLevel(userData, WQPSettings.geniusCombineTag),
-        "baseAlphaCount": WQPSettings.geniusAlphaCount,
+        "currentLevel": determineUserLevel(userData, WQP_Settings.geniusCombineTag),
+        "baseAlphaCount": WQP_Settings.geniusAlphaCount,
     };
     // filter以item.name Rank结尾的
     result['gold'] = Object.fromEntries(Object.entries(userData).filter(([key, value]) => key.endsWith('Rank')));
     result['gold']['rank'] = data.filter(item => item.totalRank < userData.totalRank).length;
     result['gold']['count'] = data.length;
-    result['gold']['baseCount'] = data.filter(item => item.alphaCount >= WQPSettings.geniusAlphaCount).length;
+    result['gold']['baseCount'] = data.filter(item => item.alphaCount >= WQP_Settings.geniusAlphaCount).length;
 
     for (const model of ["expert", "master", "grandmaster"]) {
         let itemData = data.filter(item => item.alphaCount >= levelCriteria[model].alphaCount && item.pyramidCount >= levelCriteria[model].pyramidCount);
-        if (WQPSettings.geniusCombineTag) {
+        if (WQP_Settings.geniusCombineTag) {
             itemData = itemData.filter(item => item.combinedAlphaPerformance >= levelCriteria[model].combinedAlphaPerformance || item.combinedSelectedAlphaPerformance >= levelCriteria[model].combinedSelectedAlphaPerformance || item.combinedPowerPoolAlphaPerformance >= levelCriteria[model].combinedPowerPoolAlphaPerformance || item.combinedOsmosisPerformance >= levelCriteria[model].combinedOsmosisPerformance);
         }
         result['gold'][model + 'Rank'] = itemData.filter(item => item.totalRank < userData.totalRank).length + 1;
@@ -1149,16 +1149,16 @@ function bindRankEditEvents(userId, savedTimestamp) {
 
 async function updateUserRankings(userId, newData) {
     // 获取所有用户数据
-    const { WQPRankData, WQPSettings } = await new Promise(resolve => {
-        chrome.storage.local.get(['WQPRankData', 'WQPSettings'], resolve);
+    const { WQP_RankData, WQP_Settings } = await new Promise(resolve => {
+        chrome.storage.local.get(['WQP_RankData', 'WQP_Settings'], resolve);
     });
 
-    if (!WQPRankData || !WQPRankData.array) {
+    if (!WQP_RankData || !WQP_RankData.array) {
         throw new Error('No rank data available');
     }
 
     // 找到当前用户的数据
-    const userData = WQPRankData.array.find(item => item.user === userId);
+    const userData = WQP_RankData.array.find(item => item.user === userId);
     if (!userData) {
         throw new Error('User data not found');
     }
@@ -1167,7 +1167,7 @@ async function updateUserRankings(userId, newData) {
     Object.assign(userData, newData);
 
     // 使用通用的排名计算函数
-    return await calculateRanks(WQPRankData.array, userId, WQPSettings);
+    return await calculateRanks(WQP_RankData.array, userId, WQP_Settings);
 }
 
 function getSeason() {
@@ -1234,7 +1234,7 @@ async function rankAna() {
         array: data,
         timestamp: currentTime
     };
-    chrome.storage.local.set({ WQPRankData: dataToSave }, function () {
+    chrome.storage.local.set({ WQP_RankData: dataToSave }, function () {
         console.log('数据已保存');
         console.log(dataToSave);
     });

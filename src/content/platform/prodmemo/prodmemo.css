@@ -1,0 +1,113 @@
+#wqp-prod-memo-card {
+    width: min(320px, calc(100vw - 32px));
+    margin: 12px 0;
+    padding: 12px;
+    border: 1px solid #d8e0ec;
+    border-radius: 8px;
+    background: #ffffff;
+    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
+    color: #1f2937;
+    font: 12px/1.4 "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+    z-index: 10020;
+}
+
+#wqp-prod-memo-card.is-floating {
+    position: fixed;
+    right: 18px;
+    bottom: 18px;
+}
+
+.wqp-prod-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+.wqp-prod-title {
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.wqp-prod-alpha {
+    max-width: 170px;
+    overflow: hidden;
+    color: #64748b;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+
+.wqp-prod-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+}
+
+.wqp-prod-stat {
+    min-width: 0;
+    padding: 8px;
+    border: 1px solid #e5eaf2;
+    border-radius: 6px;
+    background: #f8fafc;
+}
+
+.wqp-prod-stat.is-disabled {
+    opacity: 0.55;
+}
+
+.wqp-prod-stat-label {
+    color: #64748b;
+    font-size: 11px;
+    font-weight: 700;
+}
+
+.wqp-prod-stat-value {
+    margin-top: 2px;
+    font-size: 16px;
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+}
+
+.wqp-prod-stat-value.is-good {
+    color: #15803d;
+}
+
+.wqp-prod-stat-value.is-warn {
+    color: #b45309;
+}
+
+.wqp-prod-stat-value.is-bad {
+    color: #b91c1c;
+}
+
+.wqp-prod-stat-value.is-empty,
+.wqp-prod-stat-sub {
+    color: #64748b;
+}
+
+.wqp-prod-stat-sub {
+    margin-top: 1px;
+    font-size: 10px;
+    font-variant-numeric: tabular-nums;
+}
+
+.wqp-prod-stat-time {
+    margin-top: 5px;
+    overflow: hidden;
+    color: #94a3b8;
+    font-size: 10px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+
+.wqp-prod-empty {
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px dashed #d8e0ec;
+    color: #64748b;
+    font-size: 11px;
+    text-align: center;
+}

@@ -1,8 +1,22 @@
-// background.js: 后台脚本，用于监听浏览器事件，如标签页更新、插件安装等，以及与content scripts和popup交互
+﻿// background.js: 后台脚本，用于监听浏览器事件，如标签页更新、插件安装等，以及与content scripts和popup交互
 console.log('Background script is running.');
-import './dataStore.js';
+import '../shared/dataStore.js';
+import { ensureDefaultSettings } from './services/settingsService.js';
+import './services/sidebarMessageRouter.js';
+import { initSessionKeeperService } from './services/sessionKeeperService.js';
 
 const DATA_SET_LIST_PATH = 'dataSetList.json';
+const PATHS = {
+    vendorJs: 'src/vendor/js',
+    vendorCss: 'src/vendor/css',
+    sharedContent: 'src/content/shared',
+    platformCommon: 'src/content/platform/common',
+    platformData: 'src/content/platform/data',
+    platformDistribution: 'src/content/platform/distribution',
+    platformGenius: 'src/content/platform/genius',
+    platformSimulate: 'src/content/platform/simulate',
+    platformStyles: 'src/content/platform/styles',
+};
 let dataSetList = null; // 定义全局变量
 const REPO_OWNER = "zhangkaihua88";
 const REPO_NAME = "WebDataScope";
@@ -17,6 +31,16 @@ const EXCLUDED_PREFIXES = [
     'https://api.worldquantbrain.com/errors/api/2/envelope/'
 
 ];
+
+async function configureSidePanel() {
+    try {
+        if (chrome.sidePanel?.setPanelBehavior) {
+            await chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
+        }
+    } catch (error) {
+        console.warn('Side panel setup failed:', error);
+    }
+}
 
 function getExtensionDataStore() {
     if (!globalThis.WQPDataStore) {
@@ -124,26 +148,9 @@ function resetIndexedDbDataCache() {
 
 // 初始化设置
 chrome.runtime.onInstalled.addListener(async () => {
-    chrome.storage.local.get('WQPSettings', ({ WQPSettings }) => {
-        // 如果没有找到 WQPSettings，则设置默认值
-        if (!WQPSettings) {
-            const defaultSettings = {
-                apiAddress: "https://wq-backend.vercel.app",
-                hiddenFeatureEnabled: false,
-                dataAnalysisEnabled: true,
-                geniusAlphaCount: 40,
-                geniusCombineTag: true,
-                apiMonitorEnabled: true,
-            };
-
-            // 将默认设置保存到 Chrome 存储中
-            chrome.storage.local.set({ WQPSettings: defaultSettings }, () => {
-                console.log('Default settings have been applied.');
-            });
-        } else {
-            console.log('Current settings:', WQPSettings);
-        }
-    });
+    configureSidePanel();
+    const WQP_Settings = await ensureDefaultSettings();
+    console.log('Current settings:', WQP_Settings);
     // 获取数据集列表
     try {
         dataSetList = await getDataSetList();
@@ -156,8 +163,12 @@ chrome.runtime.onInstalled.addListener(async () => {
 
 // 设置定时器，每天检查一次更新
 chrome.runtime.onStartup.addListener(() => {
+    configureSidePanel();
     checkUpdate();
 });
+
+configureSidePanel();
+initSessionKeeperService();
 
 
 
@@ -203,8 +214,87 @@ function injectFetchInterceptor(tabId) {
         world: "MAIN", // 必须指定 MAIN，否则无法覆盖页面本身的 window.fetch
         func: () => {
 
+            function postCapturedSessionToken(value) {
+                const text = String(value || '');
+                const match = text.match(/Bearer\s+([A-Za-z0-9_-]+\.[A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+)?)/i);
+                if (!match?.[1]) return;
+                window.postMessage({
+                    type: 'WQP_SESSION_TOKEN_CAPTURED',
+                    token: match[1],
+                }, '*');
+            }
+
+            function scanHeadersForSessionToken(headers) {
+                if (!headers) return;
+                try {
+                    if (headers instanceof Headers) {
+                        postCapturedSessionToken(headers.get('Authorization') || headers.get('authorization'));
+                        return;
+                    }
+                } catch (_) {
+                    // Fall through to structural checks.
+                }
+
+                if (Array.isArray(headers)) {
+                    headers.forEach(([key, value]) => {
+                        if (String(key || '').toLowerCase() === 'authorization') {
+                            postCapturedSessionToken(value);
+                        }
+                    });
+                    return;
+                }
+
+                if (typeof headers === 'object') {
+                    Object.keys(headers).forEach((key) => {
+                        if (key.toLowerCase() === 'authorization') {
+                            postCapturedSessionToken(headers[key]);
+                        }
+                    });
+                }
+            }
+
+            function captureSessionTokenFromFetchArgs(resource, config) {
+                try {
+                    scanHeadersForSessionToken(config?.headers);
+                    if (resource instanceof Request) {
+                        scanHeadersForSessionToken(resource.headers);
+                    }
+                } catch (_) {
+                    // Token sniffing must never affect page requests.
+                }
+            }
+
             // 将辅助函数定义在注入的内容脚本内
             function getAlphaCheckStates(originalData) {
+                function readProdMemoCache() {
+                    try {
+                        return JSON.parse(localStorage.getItem('WQP_ProdMemoCache') || '{}') || {};
+                    } catch (e) {
+                        console.warn('[WQP] ProdMemo cache parse failed:', e);
+                        return {};
+                    }
+                }
+
+                function formatMemoValue(value) {
+                    const numeric = Number(value);
+                    return Number.isFinite(numeric) ? numeric.toFixed(4) : '';
+                }
+
+                function getMaxProdCorr(cache, alphaId) {
+                    const memo = cache?.[alphaId];
+                    return formatMemoValue(memo?.prod?.max);
+                }
+
+                function getMaxPoolProdCorr(cache, alphaId) {
+                    const memo = cache?.[alphaId];
+                    return formatMemoValue(memo?.pool?.max);
+                }
+
+                function getMaxSelfCorr(cache, alphaId) {
+                    const memo = cache?.[alphaId];
+                    return formatMemoValue(memo?.self?.max);
+                }
+
                 // 1. 定义需要校验的RA检查项名称（自动去重，避免重复统计）
                 const RA_CHECK_NAMES = Array.from(new Set([
                     "HIGH_TURNOVER", "LOW_TURNOVER",
@@ -236,9 +326,15 @@ function injectFetchInterceptor(tabId) {
                 // 能不能加个显示负的alpha的功能，比如当sharp为负的时候，如果测试值的绝对值都能通过平台标准就显示’-0‘
                 // risk neut那个就是用传统neut跑的时候 会有个risk neut的线 大概sharpe 和 fit都更高的话 就需要遍历risk neut
                 // 按照具体的pyramid筛选
+                if (!Array.isArray(originalData?.results)) return originalData;
+                const prodMemoCache = readProdMemoCache();
                 originalData.results.forEach(item => {
+                    item.maxProdCorr = getMaxProdCorr(prodMemoCache, item?.id);
+                    item.maxPoolProdCorr = getMaxPoolProdCorr(prodMemoCache, item?.id);
+                    item.maxSelfCorr = getMaxSelfCorr(prodMemoCache, item?.id);
                     // 容错处理：如果is/checks不存在，直接赋值0
                     if (!item?.is?.checks || !Array.isArray(item.is.checks)) {
+                        item.is = item.is || {};
                         item.is.failedNumRA = 0;
                         item.is.failedNumPPA = 0;
                         return;
@@ -267,9 +363,38 @@ function injectFetchInterceptor(tabId) {
             const originalFetch = window.fetch;
             window.fetch = async function (...args) {
                 const url = typeof args[0] === 'string' ? args[0] : (args[0]?.url || '');
+                captureSessionTokenFromFetchArgs(args[0], args[1]);
 
                 // 执行原始请求
                 const response = await originalFetch.apply(this, args);
+
+                if (url && url.includes('/alphas/') && url.includes('/correlations/')) {
+                    try {
+                        const match = url.match(/\/alphas\/([^/]+)\/correlations\/([^/?#]+)/);
+                        if (match) {
+                            response.clone().json().then(data => {
+                                window.postMessage({
+                                    type: 'WQP_PRODMEMO_CORRELATION_DATA',
+                                    alphaId: match[1],
+                                    subType: match[2],
+                                    data,
+                                }, '*');
+                            }).catch(() => {});
+                        }
+                    } catch (e) {
+                        console.warn('[WQP] ProdMemo correlation capture failed:', e);
+                    }
+                }
+
+                if (url && url.includes('/alphas/') && url.includes('/recordsets')) {
+                    const match = url.match(/\/alphas\/([^/]+)\/recordsets/);
+                    if (match) {
+                        window.postMessage({
+                            type: 'WQP_PRODMEMO_ALPHA_VIEW',
+                            alphaId: match[1],
+                        }, '*');
+                    }
+                }
 
                 // 拦截并修改目标接口的响应
                 if (url && url.includes("https://api.worldquantbrain.com/users/self/alphas?")) {
@@ -292,6 +417,14 @@ function injectFetchInterceptor(tabId) {
                     }
                 }
                 return response;
+            };
+
+            const originalSetRequestHeader = XMLHttpRequest.prototype.setRequestHeader;
+            XMLHttpRequest.prototype.setRequestHeader = function (header, value) {
+                if (String(header || '').toLowerCase() === 'authorization') {
+                    postCapturedSessionToken(value);
+                }
+                return originalSetRequestHeader.apply(this, arguments);
             };
         }
     }).catch(err => console.error("注入 Fetch 拦截器失败：", err));
@@ -496,9 +629,9 @@ async function checkUpdate() {
         const today = new Date().toISOString().split('T')[0]; // 获取当前日期 (YYYY-MM-DD)
 
         // 读取存储的上次提醒日期
-        chrome.storage.local.get('lastNotifyDate', async ({ lastNotifyDate }) => {
-            console.log('上次提醒日期:', lastNotifyDate);
-            if (lastNotifyDate === today) {
+        chrome.storage.local.get('WQP_LastNotifyDate', async ({ WQP_LastNotifyDate }) => {
+            console.log('上次提醒日期:', WQP_LastNotifyDate);
+            if (WQP_LastNotifyDate === today) {
                 console.log('今天已经提醒过，无需重复提醒');
                 return;
             }
@@ -518,7 +651,7 @@ async function checkUpdate() {
                 showNotification(latestVersion, `https://github.com/${REPO_OWNER}/${REPO_NAME}/archive/refs/tags/${latestVersion}.zip`);
 
                 // 记录今天已经提醒过
-                chrome.storage.local.set({ lastNotifyDate: today });
+                chrome.storage.local.set({ WQP_LastNotifyDate: today });
             }
         });
 
@@ -557,11 +690,15 @@ function injectionDistributionScript(tabId) {
     try {
         chrome.scripting.insertCSS({
             target: { tabId: tabId },
-            files: ['src/css/distribution.css'],
+            files: [`${PATHS.platformDistribution}/distribution.css`],
         });
         chrome.scripting.executeScript({
             target: { tabId: tabId },
-            files: ['src/scripts/lib/chart.js', "src/scripts/utils.js", 'src/scripts/distribution.js'],
+            files: [
+                `${PATHS.vendorJs}/chart.js`,
+                `${PATHS.sharedContent}/utils.js`,
+                `${PATHS.platformDistribution}/distribution.js`,
+            ],
         });
     } catch (error) {
         console.error('Script injection failed: ', error);
@@ -582,8 +719,8 @@ async function injectionDataFlagScript(tabId, tab) {
         chrome.scripting.executeScript({
             target: { tabId: tabId },
             files: [
-                "src/scripts/utils.js", 
-                "src/scripts/dataFlag.js"
+                `${PATHS.sharedContent}/utils.js`,
+                `${PATHS.platformData}/dataFlag.js`,
             ],
         }, () => {
             chrome.scripting.executeScript({
@@ -607,12 +744,12 @@ function injectionGeniusScript(tabId) {
         chrome.scripting.insertCSS({
             target: { tabId: tabId },
             files: [
-                "src/css/genius.css",
-                "src/css/idcard.css",
-                "src/css/dataTables.dataTables.css",
-                "src/css/columnControl.dataTables.min.css",
-                "src/css/responsive.dataTables.min.css",
-                "src/css/buttons.dataTables.min.css",
+                `${PATHS.platformGenius}/genius.css`,
+                `${PATHS.platformStyles}/idcard.css`,
+                `${PATHS.vendorCss}/dataTables.dataTables.css`,
+                `${PATHS.vendorCss}/columnControl.dataTables.min.css`,
+                `${PATHS.vendorCss}/responsive.dataTables.min.css`,
+                `${PATHS.vendorCss}/buttons.dataTables.min.css`,
             ],
         }, () => {
             if (chrome.runtime.lastError) {
@@ -634,19 +771,20 @@ function injectionGeniusScript(tabId) {
                 chrome.scripting.executeScript({
                     target: { tabId: tabId },
                     files: [
-                        "src/scripts/requestMonitorUI.js",
-                        "src/scripts/lib/jquery-3.7.0.min.js",
-                        "src/scripts/lib/jquery.dataTables.min.js",
-                        "src/scripts/lib/dataTables.columnControl.min.js",
-                        "src/scripts/lib/columnControl.dataTables.min.js",
-                        "src/scripts/lib/dataTables.responsive.min.js",
-                        "src/scripts/lib/responsive.dataTables.min.js",
-                        "src/scripts/lib/dataTables.buttons.min.js",
-                        "src/scripts/lib/buttons.colVis.min.js",
-                        "src/scripts/lib/buttons.html5.min.js",
-                        "src/scripts/utils.js",
-                        "src/scripts/uiCard.js",
-                        "src/scripts/genius.js"],
+                        `${PATHS.sharedContent}/requestMonitorUI.js`,
+                        `${PATHS.vendorJs}/jquery-3.7.0.min.js`,
+                        `${PATHS.vendorJs}/jquery.dataTables.min.js`,
+                        `${PATHS.vendorJs}/dataTables.columnControl.min.js`,
+                        `${PATHS.vendorJs}/columnControl.dataTables.min.js`,
+                        `${PATHS.vendorJs}/dataTables.responsive.min.js`,
+                        `${PATHS.vendorJs}/responsive.dataTables.min.js`,
+                        `${PATHS.vendorJs}/dataTables.buttons.min.js`,
+                        `${PATHS.vendorJs}/buttons.colVis.min.js`,
+                        `${PATHS.vendorJs}/buttons.html5.min.js`,
+                        `${PATHS.sharedContent}/utils.js`,
+                        `${PATHS.sharedContent}/uiCard.js`,
+                        `${PATHS.platformGenius}/genius.js`,
+                    ],
                 });
             }
             else {
@@ -659,7 +797,7 @@ function injectionGeniusScript(tabId) {
                 // 同时确保请求监视器 UI 注入
                 chrome.scripting.executeScript({
                     target: { tabId: tabId },
-                    files: ["src/scripts/requestMonitorUI.js"],
+                    files: [`${PATHS.sharedContent}/requestMonitorUI.js`],
                 });
             }
         });
@@ -674,13 +812,13 @@ function injectionSimulateScript(tabId) {
         chrome.scripting.insertCSS({
             target: { tabId: tabId },
             files: [
-                "src/css/simulate.css",
+                `${PATHS.platformSimulate}/simulate.css`,
             ],
         });
         chrome.scripting.executeScript({
             target: { tabId: tabId },
             files: [
-                "src/scripts/simulate.js",
+                `${PATHS.platformSimulate}/simulate.js`,
             ],
         });
     } catch (error) {
