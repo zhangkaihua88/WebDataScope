@@ -4,9 +4,9 @@
     // 在 MAIN world 中同步启动，保证在页面任何 <script> 执行之前就已就位。
     // 这与油猴的效果完全等价。
 
-    const SEARCH = '},...e===s.kC.SUBMITTED?[l]:[c],...a?[d]:[],{';
+    const SEARCH = 'kC.SUBMITTED?[l]:[c],...a?[d]:[],{';
     const VERSION_REGEX = /version:\s*"1\.0\.6"/;
-    const VERSION_REPLACE = 'version:"1.0.6-wqp8"';
+    const VERSION_REPLACE = 'version:"1.0.6-wqp9"';
 
     const EXTRA_COLUMNS = [
         {
@@ -97,7 +97,7 @@
     ];
     function buildReplacement() {
         const colsJson = EXTRA_COLUMNS.map(col => JSON.stringify(col)).join(',');
-        return `},...e===s.kC.SUBMITTED?[l]:[c],...a?[d]:[],${colsJson},{`;
+        return `kC.SUBMITTED?[l]:[c],...a?[d]:[],${colsJson},{`;
     }
 
     async function fetchPatchAndRun(src) {
